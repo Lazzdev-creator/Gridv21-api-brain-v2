@@ -1,4 +1,4 @@
-import express from 'express';
+const { supabaseAdmin } = require('./lib/supabaseAdmin')import express from 'express';
 import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
 
