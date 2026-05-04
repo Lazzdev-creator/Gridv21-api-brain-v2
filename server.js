@@ -31,13 +31,58 @@ app.get('/', (req, res) => {
   res.json({ status: 'Gridv21 Brain Online', timestamp: new Date().toISOString() })
 })
 
+// ===== NEW: DASHBOARD STATS ENDPOINT =====
+app.get('/api/stats', async (req, res) => {
+  try {
+    const { data: leads, error: leadsError } = await supabaseAdmin
+     .from('leads')
+     .select('*')
+
+    if (leadsError) throw leadsError
+
+    const { data: posts, error: postsError } = await supabaseAdmin
+     .from('posts')
+     .select('*')
+     .eq('status', 'published')
+
+    if (postsError) throw postsError
+
+    const { data: tools, error: toolsError } = await supabaseAdmin
+     .from('tools')
+     .select('name, clicks, conversions')
+     .order('clicks', { ascending: false })
+     .limit(1)
+
+    if (toolsError) throw toolsError
+
+    const contractorLeads = leads.filter(l => l.type === 'contractor').length
+    const aiLeads = leads.filter(l => l.type === 'ai').length
+    const topTool = tools?.[0]?.name || '-'
+    const topScore = (tools?.[0]?.clicks || 0) + (tools?.[0]?.conversions || 0) * 3
+
+    res.json({
+      total_leads: leads.length,
+      contractor_leads: contractorLeads,
+      ai_leads: aiLeads,
+      est_revenue: contractorLeads * 150 + aiLeads * 5,
+      live_posts: posts.length,
+      top_tool: topTool,
+      score: topScore
+    })
+  } catch (err) {
+    console.error('Stats error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+// ===== END NEW ROUTE =====
+
 // Get all live posts
 app.get('/api/posts', async (req, res) => {
   const { data, error } = await supabaseAdmin
-  .from('posts')
-  .select('*, tools(*)')
-  .eq('status', 'published')
-  .order('published_at', { ascending: false })
+   .from('posts')
+   .select('*, tools(*)')
+   .eq('status', 'published')
+   .order('published_at', { ascending: false })
   if (error) return res.status(500).json({ error: error.message })
   res.json(data || [])
 })
@@ -46,12 +91,18 @@ app.get('/api/posts', async (req, res) => {
 app.get('/go/:slug', async (req, res) => {
   const { slug } = req.params
   const { data: tool } = await supabaseAdmin
-  .from('tools')
-  .select('affiliate_link, id')
-  .eq('slug', slug)
-  .single()
+   .from('tools')
+   .select('affiliate_link, id')
+   .eq('slug', slug)
+   .single()
   if (!tool ||!tool.affiliate_link) return res.status(404).send('Tool not found or no affiliate link')
-  await supabaseAdmin.from('clicks').insert({ tool_id: tool.id, ip: req.ip, user_agent: req.headers['user-agent'] })
+
+  await supabaseAdmin.from('clicks').insert({
+    tool_id: tool.id,
+    ip: req.ip,
+    user_agent: req.headers['user-agent']
+  })
+
   await supabaseAdmin.rpc('increment_clicks', { tool_id: tool.id })
   res.redirect(302, tool.affiliate_link)
 })
@@ -60,16 +111,26 @@ app.get('/go/:slug', async (req, res) => {
 app.post('/api/lead', async (req, res) => {
   const { name, email, phone, tool_slug, type } = req.body
   const { data: tool } = await supabaseAdmin
-  .from('tools')
-  .select('id')
-  .eq('slug', tool_slug)
-  .single()
+   .from('tools')
+   .select('id')
+   .eq('slug', tool_slug)
+   .single()
+
   const { data, error } = await supabaseAdmin
-  .from('leads')
-  .insert({ name, email, phone, tool_id: tool?.id, type: type || 'ai', status: 'new' })
-  .select()
-  .single()
+   .from('leads')
+   .insert({
+      name,
+      email,
+      phone,
+      tool_id: tool?.id,
+      type: type || 'ai',
+      status: 'new'
+    })
+   .select()
+   .single()
+
   if (error) return res.status(500).json({ error: error.message })
+
   if (tool?.id) {
     await supabaseAdmin.rpc('increment_conversions', { tool_id: tool.id })
   }
@@ -79,33 +140,43 @@ app.post('/api/lead', async (req, res) => {
 // Admin dashboard data
 app.get('/admin/dashboard', requireAdminKey, async (req, res) => {
   const { data: posts } = await supabaseAdmin
-  .from('posts')
-  .select('*, tools(*)')
-  .eq('status', 'published')
-  .order('published_at', { ascending: false })
+   .from('posts')
+   .select('*, tools(*)')
+   .eq('status', 'published')
+   .order('published_at', { ascending: false })
+
   const { data: leads } = await supabaseAdmin
-  .from('leads')
-  .select('*')
-  .order('created_at', { ascending: false })
-  .limit(10)
+   .from('leads')
+   .select('*')
+   .order('created_at', { ascending: false })
+   .limit(10)
+
   res.json({ live_posts: posts || [], recent_leads: leads || [] })
 })
 
 // Lead counts for revenue calc
 app.get('/api/leads/count', requireAdminKey, async (req, res) => {
   const { count: total_leads } = await supabaseAdmin
-  .from('leads')
-  .select('*', { count: 'exact', head: true })
+   .from('leads')
+   .select('*', { count: 'exact', head: true })
+
   const { count: contractor_leads } = await supabaseAdmin
-  .from('leads')
-  .select('*', { count: 'exact', head: true })
-  .eq('type', 'contractor')
+   .from('leads')
+   .select('*', { count: 'exact', head: true })
+   .eq('type', 'contractor')
+
   const { count: ai_leads } = await supabaseAdmin
-  .from('leads')
-  .select('*', { count: 'exact', head: true })
-  .eq('type', 'ai')
+   .from('leads')
+   .select('*', { count: 'exact', head: true })
+   .eq('type', 'ai')
+
   const estimated_revenue = (contractor_leads * 150) + (ai_leads * 5)
-  res.json({ total_leads: total_leads || 0, contractor_leads: contractor_leads || 0, ai_leads: ai_leads || 0, estimated_revenue })
+  res.json({
+    total_leads: total_leads || 0,
+    contractor_leads: contractor_leads || 0,
+    ai_leads: ai_leads || 0,
+    estimated_revenue
+  })
 })
 
 // Edit post
@@ -113,9 +184,9 @@ app.post('/admin/edit/:id', requireAdminKey, async (req, res) => {
   const { id } = req.params
   const { title, meta } = req.body
   const { error } = await supabaseAdmin
-  .from('posts')
-  .update({ title, meta_description: meta, updated_at: new Date() })
-  .eq('id', id)
+   .from('posts')
+   .update({ title, meta_description: meta, updated_at: new Date() })
+   .eq('id', id)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
@@ -124,9 +195,9 @@ app.post('/admin/edit/:id', requireAdminKey, async (req, res) => {
 app.post('/admin/unpublish/:id', requireAdminKey, async (req, res) => {
   const { id } = req.params
   const { error } = await supabaseAdmin
-  .from('posts')
-  .update({ status: 'draft' })
-  .eq('id', id)
+   .from('posts')
+   .update({ status: 'draft' })
+   .eq('id', id)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
@@ -135,37 +206,58 @@ app.post('/admin/unpublish/:id', requireAdminKey, async (req, res) => {
 app.get('/internal/run-cycle', requireCronKey, async (req, res) => {
   try {
     const { data: tools, error: toolsError } = await supabaseAdmin
-    .from('tools')
-    .select('*')
-    .eq('status', 'active')
-    .is('last_posted_at', null)
-    .order('clicks', { ascending: false })
-    .limit(1)
+     .from('tools')
+     .select('*')
+     .eq('status', 'active')
+     .is('last_posted_at', null)
+     .order('clicks', { ascending: false })
+     .limit(1)
+
     if (toolsError) {
       console.log('Tools query error:', toolsError)
       return res.status(500).json({ error: toolsError.message })
     }
+
     if (!tools?.length) return res.json({ success: false, message: 'No tools to process' })
+
     const tool = tools[0]
     console.log('Processing tool:', tool.name)
+
     const slug = `best-${tool.slug}-${Date.now()}`
     const title = `Best ${tool.name} for Contractors in 2026 | Gridv21`
     const meta_description = `${tool.name} review: Features, pricing, and why contractors use it. Compare alternatives and get exclusive deals.`
     const body_md = `# ${tool.name} Review\n\n## What is ${tool.name}?\n${tool.description || 'Top-rated tool for contractors.'}\n\n## Key Features\n- Feature 1\n- Feature 2\n- Feature 3\n\n## Pricing\nStarting at $${tool.price || 99}/month\n\n## Verdict\nBest for: ${tool.category}\n\n[Get ${tool.name} Here](/go/${tool.slug})`
+
     const { data: post, error: postError } = await supabaseAdmin
-    .from('posts')
-    .insert({ tool_id: tool.id, slug, title, meta_description, body_md, status: 'published', published_at: new Date() })
-    .select()
-    .single()
+     .from('posts')
+     .insert({
+        tool_id: tool.id,
+        slug,
+        title,
+        meta_description,
+        body_md,
+        status: 'published',
+        published_at: new Date()
+      })
+     .select()
+     .single()
+
     if (postError) {
       console.log('Post insert error:', postError)
       return res.status(500).json({ error: postError.message })
     }
+
     await supabaseAdmin
-    .from('tools')
-    .update({ last_posted_at: new Date() })
-    .eq('id', tool.id)
-    res.json({ success: true, posts_created: 1, tool_used: tool.name, post_slug: post.slug })
+     .from('tools')
+     .update({ last_posted_at: new Date() })
+     .eq('id', tool.id)
+
+    res.json({
+      success: true,
+      posts_created: 1,
+      tool_used: tool.name,
+      post_slug: post.slug
+    })
   } catch (err) {
     console.log('Run cycle error:', err)
     res.status(500).json({ error: err.message })
@@ -180,9 +272,9 @@ app.get('/internal/tune-brain', requireCronKey, async (req, res) => {
       const score = (tool.clicks || 0) + (tool.conversions || 0) * 3
       const status = score > 15? 'boost' : score < 3? 'pause' : 'active'
       await supabaseAdmin
-      .from('tools')
-      .update({ performance_status: status })
-      .eq('id', tool.id)
+       .from('tools')
+       .update({ performance_status: status })
+       .eq('id', tool.id)
     }
     res.json({ success: true, tuned: tools?.length || 0 })
   } catch (err) {
@@ -191,13 +283,11 @@ app.get('/internal/tune-brain', requireCronKey, async (req, res) => {
 })
 
 // ===== AFFILIATE HQ ROUTES - UPDATED TO affiliate_link =====
-
 // GET all tools for the affiliate dashboard
 app.get('/api/tools', async (req, res) => {
   const { data, error } = await supabaseAdmin
-  .from('tools')
-  .select('name, affiliate_link')
-
+   .from('tools')
+   .select('name, affiliate_link')
   if (error) return res.status(500).json({ error: error.message })
   res.json(data || [])
 })
@@ -205,16 +295,13 @@ app.get('/api/tools', async (req, res) => {
 // POST - save affiliate link from dashboard to tools table
 app.post('/api/affiliates/update-link', async (req, res) => {
   const { tool_name, affiliate_link } = req.body
-
   const { error } = await supabaseAdmin
-  .from('tools')
-  .update({ affiliate_link: affiliate_link })
-  .eq('name', tool_name)
-
+   .from('tools')
+   .update({ affiliate_link: affiliate_link })
+   .eq('name', tool_name)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
-
 // ===== END AFFILIATE ROUTES =====
 
 app.listen(PORT, () => {
