@@ -1,3 +1,129 @@
-git add.
-git commit -m "Add Affiliate HQ"
-git push origin main
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Affiliate HQ - Gridv21</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 p-4 md:p-8">
+  <div class="max-w-7xl mx-auto">
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold mb-2">Affiliate HQ</h1>
+      <p class="text-gray-600">High-ticket programs. Apply + save your links. Updates your <code>tools.affiliate_link</code> directly.</p>
+    </div>
+    
+    <div id="status" class="mb-4 text-sm h-5"></div>
+    
+    <div class="bg-white rounded-lg shadow overflow-x-auto">
+      <table class="w-full">
+        <thead class="bg-gray-100">
+          <tr>
+            <th class="p-4 text-left">Tool</th>
+            <th class="p-4 text-left">Commission</th>
+            <th class="p-4 text-left">Payout Min</th>
+            <th class="p-4 text-left">Cookie</th>
+            <th class="p-4 text-left">Apply</th>
+            <th class="p-4 text-left">Your Affiliate Link</th>
+          </tr>
+        </thead>
+        <tbody id="table-body">
+          <tr><td colspan="6" class="p-8 text-center text-gray-500">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 p-4 bg-blue-50 rounded border border-blue-200">
+      <h3 class="font-bold mb-2">Quick Payout Tier List:</h3>
+      <p class="text-sm"><strong>Fastest:</strong> Surfer SEO - $50 min, lifetime recurring, 60d cookie</p>
+      <p class="text-sm"><strong>High Volume:</strong> Jasper, ClickUp, Hostinger - $100 min, 30% recurring</p>
+      <p class="text-sm"><strong>Big Tickets:</strong> Semrush $200/sale, HubSpot 30% on $3k+ deals</p>
+    </div>
+  </div>
+
+  <script>
+    const PROGRAMS = [
+      { name: 'Jasper', signup_url: 'https://jasper.ai/partners', commission: '30% recurring', payout_min: '$100', cookie_days: 30 },
+      { name: 'Surfer SEO', signup_url: 'https://surferseo.com/affiliates/', commission: '25% lifetime', payout_min: '$50', cookie_days: 60 },
+      { name: 'Canva Pro', signup_url: 'https://www.canva.com/affiliates/', commission: '$36/signup', payout_min: '$50', cookie_days: 30 },
+      { name: 'ClickUp', signup_url: 'https://clickup.com/affiliates', commission: '30% recurring', payout_min: '$100', cookie_days: 90 },
+      { name: 'Hostinger', signup_url: 'https://www.hostinger.com/affiliates', commission: '60% per sale', payout_min: '$50', cookie_days: 30 },
+      { name: 'Semrush', signup_url: 'https://www.semrush.com/affiliates/', commission: '$200/sale', payout_min: '$1000', cookie_days: 120 },
+      { name: 'HubSpot', signup_url: 'https://www.hubspot.com/partners/affiliates', commission: '30% recurring', payout_min: '$250', cookie_days: 90 },
+      { name: 'Webflow', signup_url: 'https://webflow.com/affiliates', commission: '50% recurring', payout_min: '$50', cookie_days: 30 }
+    ]
+
+    async function loadPage() {
+      try {
+        const res = await fetch('/api/tools')
+        const tools = await res.json()
+        
+        const tbody = document.getElementById('table-body')
+        tbody.innerHTML = PROGRAMS.map(p => {
+          const tool = tools.find(t => t.name === p.name)
+          const currentLink = tool?.affiliate_link || ''
+          const hasLink = currentLink && currentLink.length > 10
+          
+          return `
+            <tr class="border-t hover:bg-gray-50">
+              <td class="p-4 font-medium">${p.name}</td>
+              <td class="p-4 text-sm">${p.commission}</td>
+              <td class="p-4 text-sm">${p.payout_min}</td>
+              <td class="p-4 text-sm">${p.cookie_days}d</td>
+              <td class="p-4">
+                <a href="${p.signup_url}" target="_blank" 
+                   class="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 inline-block">
+                  Apply
+                </a>
+              </td>
+              <td class="p-4">
+                <div class="flex gap-2 items-center">
+                  <input 
+                    type="text" 
+                    value="${currentLink}"
+                    id="link-${p.name}"
+                    class="border px-2 py-1 text-sm w-64 rounded"
+                    placeholder="Paste affiliate link"
+                  />
+                  <button 
+                    onclick="saveLink('${p.name}')"
+                    class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 whitespace-nowrap"
+                  >
+                    Save
+                  </button>
+                  ${hasLink ? '<span class="text-xs text-green-600">✓</span>' : ''}
+                </div>
+              </td>
+            </tr>`
+        }).join('')
+      } catch (err) {
+        document.getElementById('status').innerHTML = `<span class="text-red-600">Error: ${err.message}</span>`
+      }
+    }
+
+    async function saveLink(name) {
+      const input = document.getElementById(`link-${name}`)
+      const link = input.value.trim()
+      if (!link) return alert('Paste your affiliate link first')
+      
+      const status = document.getElementById('status')
+      status.innerHTML = '<span class="text-blue-600">Saving...</span>'
+      
+      const res = await fetch('/api/affiliates/update-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tool_name: name, affiliate_link: link })
+      })
+      
+      if (res.ok) {
+        status.innerHTML = `<span class="text-green-600">✓ Saved ${name} - /go/${name.toLowerCase().replace(' ', '-')} is now live</span>`
+        setTimeout(loadPage, 800)
+      } else {
+        status.innerHTML = '<span class="text-red-600">Error saving</span>'
+      }
+    }
+    
+    loadPage()
+  </script>
+</body>
+  </html>
