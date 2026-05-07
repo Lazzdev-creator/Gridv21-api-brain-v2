@@ -31,20 +31,18 @@ app.get('/', (req, res) => {
   res.json({ status: 'Gridv21 Brain Online', timestamp: new Date().toISOString() })
 })
 
-// ===== NEW: DASHBOARD STATS ENDPOINT =====
+// ===== DASHBOARD STATS ENDPOINT =====
 app.get('/api/stats', async (req, res) => {
   try {
     const { data: leads, error: leadsError } = await supabaseAdmin
      .from('leads')
      .select('*')
-
     if (leadsError) throw leadsError
 
     const { data: posts, error: postsError } = await supabaseAdmin
      .from('posts')
      .select('*')
      .eq('status', 'published')
-
     if (postsError) throw postsError
 
     const { data: tools, error: toolsError } = await supabaseAdmin
@@ -52,7 +50,6 @@ app.get('/api/stats', async (req, res) => {
      .select('name, clicks, conversions')
      .order('clicks', { ascending: false })
      .limit(1)
-
     if (toolsError) throw toolsError
 
     const contractorLeads = leads.filter(l => l.type === 'contractor').length
@@ -74,7 +71,6 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 })
-// ===== END NEW ROUTE =====
 
 // Get all live posts
 app.get('/api/posts', async (req, res) => {
@@ -87,34 +83,52 @@ app.get('/api/posts', async (req, res) => {
   res.json(data || [])
 })
 
-// Redirect tracker for affiliates - UPDATED TO affiliate_link
+// ===== FIXED: Redirect tracker now uses redirects table =====
 app.get('/go/:slug', async (req, res) => {
   const { slug } = req.params
-  const { data: tool } = await supabaseAdmin
-   .from('tools')
-   .select('affiliate_link, id')
-   .eq('slug', slug)
-   .single()
-  if (!tool ||!tool.affiliate_link) return res.status(404).send('Tool not found or no affiliate link')
 
-  await supabaseAdmin.from('clicks').insert({
-    tool_id: tool.id,
-    ip: req.ip,
-    user_agent: req.headers['user-agent']
-  })
+  try {
+    const { data: redirect, error } = await supabaseAdmin
+     .from('redirects')
+     .select('target_url, id, description')
+     .eq('slug', slug)
+     .eq('active', true)
+     .maybeSingle()
 
-  await supabaseAdmin.rpc('increment_clicks', { tool_id: tool.id })
-  res.redirect(302, tool.affiliate_link)
+    if (error) {
+      console.error('Redirect DB error:', error)
+      return res.status(500).send('Database error')
+    }
+
+    if (!redirect ||!redirect.target_url) {
+      return res.status(404).send('Tool not found or no affiliate link')
+    }
+
+    // Optional: Log click - comment out if you don't have clicks table
+    // await supabaseAdmin.from('clicks').insert({
+    // redirect_id: redirect.id,
+    // slug: slug,
+    // ip: req.ip,
+    // user_agent: req.headers['user-agent'],
+    // created_at: new Date()
+    // }).then().catch(e => console.log('Click log failed:', e.message))
+
+    res.redirect(301, redirect.target_url)
+  } catch (err) {
+    console.error('Redirect error:', err)
+    res.status(500).send('Server error')
+  }
 })
 
 // Lead capture
 app.post('/api/lead', async (req, res) => {
   const { name, email, phone, tool_slug, type } = req.body
+
   const { data: tool } = await supabaseAdmin
    .from('tools')
    .select('id')
    .eq('slug', tool_slug)
-   .single()
+   .maybeSingle()
 
   const { data, error } = await supabaseAdmin
    .from('leads')
@@ -132,8 +146,9 @@ app.post('/api/lead', async (req, res) => {
   if (error) return res.status(500).json({ error: error.message })
 
   if (tool?.id) {
-    await supabaseAdmin.rpc('increment_conversions', { tool_id: tool.id })
+    await supabaseAdmin.rpc('increment_conversions', { tool_id: tool.id }).then().catch(()=>{})
   }
+
   res.json({ success: true, lead_id: data.id })
 })
 
@@ -171,6 +186,7 @@ app.get('/api/leads/count', requireAdminKey, async (req, res) => {
    .eq('type', 'ai')
 
   const estimated_revenue = (contractor_leads * 150) + (ai_leads * 5)
+
   res.json({
     total_leads: total_leads || 0,
     contractor_leads: contractor_leads || 0,
@@ -183,10 +199,12 @@ app.get('/api/leads/count', requireAdminKey, async (req, res) => {
 app.post('/admin/edit/:id', requireAdminKey, async (req, res) => {
   const { id } = req.params
   const { title, meta } = req.body
+
   const { error } = await supabaseAdmin
    .from('posts')
    .update({ title, meta_description: meta, updated_at: new Date() })
    .eq('id', id)
+
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
@@ -194,15 +212,17 @@ app.post('/admin/edit/:id', requireAdminKey, async (req, res) => {
 // Unpublish post
 app.post('/admin/unpublish/:id', requireAdminKey, async (req, res) => {
   const { id } = req.params
+
   const { error } = await supabaseAdmin
    .from('posts')
    .update({ status: 'draft' })
    .eq('id', id)
+
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
 
-// BRAIN: Hourly auto-publish cycle - FIXED
+// BRAIN: Hourly auto-publish cycle
 app.get('/internal/run-cycle', requireCronKey, async (req, res) => {
   try {
     const { data: tools, error: toolsError } = await supabaseAdmin
@@ -268,22 +288,24 @@ app.get('/internal/run-cycle', requireCronKey, async (req, res) => {
 app.get('/internal/tune-brain', requireCronKey, async (req, res) => {
   try {
     const { data: tools } = await supabaseAdmin.from('tools').select('*')
+
     for (const tool of tools || []) {
       const score = (tool.clicks || 0) + (tool.conversions || 0) * 3
       const status = score > 15? 'boost' : score < 3? 'pause' : 'active'
+
       await supabaseAdmin
        .from('tools')
        .update({ performance_status: status })
        .eq('id', tool.id)
     }
+
     res.json({ success: true, tuned: tools?.length || 0 })
   } catch (err) {
     res.status(500).json({ error: err.message })
   }
 })
 
-// ===== AFFILIATE HQ ROUTES - UPDATED TO affiliate_link =====
-// GET all tools for the affiliate dashboard
+// ===== AFFILIATE HQ ROUTES =====
 app.get('/api/tools', async (req, res) => {
   const { data, error } = await supabaseAdmin
    .from('tools')
@@ -292,17 +314,17 @@ app.get('/api/tools', async (req, res) => {
   res.json(data || [])
 })
 
-// POST - save affiliate link from dashboard to tools table
 app.post('/api/affiliates/update-link', async (req, res) => {
   const { tool_name, affiliate_link } = req.body
+
   const { error } = await supabaseAdmin
    .from('tools')
    .update({ affiliate_link: affiliate_link })
    .eq('name', tool_name)
+
   if (error) return res.status(500).json({ error: error.message })
   res.json({ success: true })
 })
-// ===== END AFFILIATE ROUTES =====
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
