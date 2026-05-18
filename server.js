@@ -263,3 +263,49 @@ app.get('/internal/run-cycle', requireCronKey, async (req, res) => {
      .eq('id', tool.id)
 
     res.json({ success: true, posts_created: 1, tool_used: tool.name, post_slug: post.slug })
+  } catch (err) {
+    console.log('Run cycle error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// BRAIN: Weekly self-optimize
+app.get('/internal/tune-brain', requireCronKey, async (req, res) => {
+  try {
+    const { data: tools } = await supabaseAdmin.from('tools').select('*')
+    for (const tool of tools || []) {
+      const score = (tool.clicks || 0) + (tool.conversions || 0) * 3
+      const status = score > 15? 'boost' : score < 3? 'pause' : 'active'
+      await supabaseAdmin
+       .from('tools')
+       .update({ performance_status: status })
+       .eq('id', tool.id)
+    }
+    res.json({ success: true, tuned: tools?.length || 0 })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ===== AFFILIATE HQ ROUTES =====
+app.get('/api/tools', async (req, res) => {
+  const { data, error } = await supabaseAdmin
+   .from('tools')
+   .select('name, affiliate_link')
+  if (error) return res.status(500).json({ error: error.message })
+  res.json(data || [])
+})
+
+app.post('/api/affiliates/update-link', async (req, res) => {
+  const { tool_name, affiliate_link } = req.body
+  const { error } = await supabaseAdmin
+   .from('tools')
+   .update({ affiliate_link: affiliate_link })
+   .eq('name', tool_name)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ success: true })
+})
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
