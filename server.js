@@ -80,8 +80,7 @@ class Brain {
   }
 }
 
-// Health check v4.3.5
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.5' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.6' }));
 
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
@@ -123,7 +122,7 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// FIXED CRON: 5 fields = every 30 minutes
+// FIXED: 5 field cron = every 30 minutes
 cron.schedule('*/30 *', async () => {
   console.log('Cron tick: scanning permits...');
   const mode = await Brain.autoUpgrade();
@@ -200,24 +199,17 @@ app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
   const mode = await Brain.autoUpgrade();
   res.json({
-    mode,
-    monthly_projection: monthly,
-    daily_revenue: monthly/30,
-    youtube: YOUTUBE_HANDLE,
-    linkedin: LINKEDIN_PROFILE,
-    whatsapp: WHATSAPP_NUMBER,
-    email: OWNER_EMAIL,
-    amazon_id: AMAZON_AFFILIATE_ID
+    mode, monthly_projection: monthly, daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE, linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER, email: OWNER_EMAIL, amazon_id: AMAZON_AFFILIATE_ID
   });
 });
 
-// Auth routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// FIXED: Port listen v4.3.5 - was cut off before
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.5 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.3.6 LIVE on port ${PORT}`));
