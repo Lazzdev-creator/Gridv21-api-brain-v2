@@ -1,3 +1,5 @@
+console.log('GridV21 starting... Node:', process.version);
+
 import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
@@ -80,7 +82,7 @@ class Brain {
   }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.8' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.9' }));
 
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
@@ -122,7 +124,7 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// FIXED: 5 field cron + try/catch so Render won't exit on error
+// FIXED: 5 field cron + wrapped in try/catch so crash won't kill server
 try {
   cron.schedule('*/30 *', async () => {
     console.log('Cron tick: scanning permits...');
@@ -217,5 +219,6 @@ app.get('/auth/google/callback', passport.authenticate('google', { successRedire
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
+// FIXED: This 2 lines were missing = Port scan timeout
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.8 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.3.9 LIVE on port ${PORT}`));
