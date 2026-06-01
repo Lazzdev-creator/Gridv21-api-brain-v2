@@ -23,10 +23,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rate limit DMs to avoid bans
 const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
 
-// YOUR DETAILS
 const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
 const AMAZON_AFFILIATE_ID = 'grid08-20';
 const YOUTUBE_HANDLE = '@lazarustakudzwachenana1936';
@@ -37,7 +35,6 @@ const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
 const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_KEY?.trim());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
-// Google OAuth - only init if keys exist
 if (process.env.GOOGLE_CLIENT_ID) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -83,10 +80,8 @@ class Brain {
   }
 }
 
-// Health check for Render
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.3' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.4' }));
 
-// WhatsApp DM - rate limited
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
   const message = `🔔 New ${leadData.trade_type} permit - ${leadData.region}
@@ -97,47 +92,38 @@ Status: Approved, bidding open
 Get full details for $75:
 https://gridv21.onrender.com/api/lead/checkout
 
-30-sec Stripe checkout.
-
 Lazarus Chenana
 WhatsApp: ${WHATSAPP_NUMBER}
-Email: ${OWNER_EMAIL}
-YouTube: ${YOUTUBE_HANDLE}`;
+Email: ${OWNER_EMAIL}`;
 
   try {
     await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
-      messaging_product: "whatsapp",
-      to: phone,
-      type: "text",
-      text: { body: message }
+      messaging_product: "whatsapp", to: phone, type: "text", text: { body: message }
     }, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } });
     await Brain.logRevenue(0, `whatsapp_dm_${leadData.trade_type}`);
   } catch(e) { console.log('WhatsApp error:', e.message); }
 }
 
-// Get contractors for DM
 async function getContractorPhones(trade, region) {
   const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
   const targetRegion = regions.includes(region)? region : regions[0];
 
   const { data } = await supabase.from('contractors')
-  .select('phone, id, dm_sent_count')
-  .eq('trade_type', trade)
-  .eq('region', targetRegion)
-  .not('phone', 'is', null)
-  .order('dm_sent_count', { ascending: true })
-  .limit(50);
+ .select('phone, id, dm_sent_count')
+ .eq('trade_type', trade)
+ .eq('region', targetRegion)
+ .not('phone', 'is', null)
+ .order('dm_sent_count', { ascending: true })
+ .limit(50);
 
   if (data && data.length > 0) {
     const ids = data.map(c => c.id);
-    await supabase.from('contractors').update({
-      last_dm_at: new Date()
-    }).in('id', ids);
+    await supabase.from('contractors').update({ last_dm_at: new Date() }).in('id', ids);
   }
   return data || [];
 }
 
-// Scraper Cron - every 30 min FIXED
+// FIXED CRON: 5 fields = every 30 minutes
 cron.schedule('*/30 *', async () => {
   console.log('Cron tick: scanning permits...');
   const mode = await Brain.autoUpgrade();
@@ -147,7 +133,6 @@ cron.schedule('*/30 *', async () => {
   for (const trade of trades) {
     for (const region of regions) {
       try {
-        // Demo permit - replace with real API later
         const permit = { value: 67000, address: '123 Main St', type: trade };
         if (permit.value > 5000) {
           const { data: lead } = await supabase.from('leads').insert({
@@ -156,10 +141,10 @@ cron.schedule('*/30 *', async () => {
 
           if (mode === 'growth_mode' && lead) {
             const contractors = await getContractorPhones(trade, region);
-            contractors.slice(0, 20).forEach(async c => {
+            for (const c of contractors.slice(0, 20)) {
               await sendWhatsAppDM(c.phone, lead);
               await new Promise(r => setTimeout(r, 20000));
-            });
+            }
           }
         }
       } catch(e) { console.log('Scrape error:', e.message); }
@@ -167,7 +152,6 @@ cron.schedule('*/30 *', async () => {
   }
 });
 
-// Stripe Checkout with your email
 app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   const { lead_id, trade, region, value } = req.body;
   const price = Math.max(75, value * 0.01);
@@ -201,36 +185,27 @@ app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   }
 });
 
-// Amazon Affiliate
 app.get('/affiliate/amazon/:id', async (req, res) => {
   await Brain.logRevenue(0, `aff_${req.params.id}`);
   res.redirect(`https://amazon.com/dp/${req.params.id}/?tag=${AMAZON_AFFILIATE_ID}`);
 });
 
-// Test revenue endpoint
 app.post('/api/revenue', async (req, res) => {
   const { amount, source } = req.body;
   await Brain.logRevenue(amount, source);
   res.json({ ok: true });
 });
 
-// Forecast API
 app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
   const mode = await Brain.autoUpgrade();
   res.json({
-    mode,
-    monthly_projection: monthly,
-    daily_revenue: monthly/30,
-    youtube: YOUTUBE_HANDLE,
-    linkedin: LINKEDIN_PROFILE,
-    whatsapp: WHATSAPP_NUMBER,
-    email: OWNER_EMAIL,
-    amazon_id: AMAZON_AFFILIATE_ID
+    mode, monthly_projection: monthly, daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE, linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER, email: OWNER_EMAIL, amazon_id: AMAZON_AFFILIATE_ID
   });
 });
 
-// Auth routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
 
@@ -238,4 +213,4 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.3 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.3.4 LIVE on port ${PORT}`));
