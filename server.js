@@ -80,8 +80,8 @@ class Brain {
   }
 }
 
-// Health check v4.3.4 - matches your diff
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.4' }));
+// Health check v4.3.5
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.5' }));
 
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
@@ -109,12 +109,12 @@ async function getContractorPhones(trade, region) {
   const targetRegion = regions.includes(region)? region : regions[0];
 
   const { data } = await supabase.from('contractors')
- .select('phone, id, dm_sent_count')
- .eq('trade_type', trade)
- .eq('region', targetRegion)
- .not('phone', 'is', null)
- .order('dm_sent_count', { ascending: true })
- .limit(50);
+.select('phone, id, dm_sent_count')
+.eq('trade_type', trade)
+.eq('region', targetRegion)
+.not('phone', 'is', null)
+.order('dm_sent_count', { ascending: true })
+.limit(50);
 
   if (data && data.length > 0) {
     const ids = data.map(c => c.id);
@@ -123,7 +123,7 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// FIXED CRON: 5 fields = every 30 minutes - matches your screenshot
+// FIXED CRON: 5 fields = every 30 minutes
 cron.schedule('*/30 *', async () => {
   console.log('Cron tick: scanning permits...');
   const mode = await Brain.autoUpgrade();
@@ -141,7 +141,6 @@ cron.schedule('*/30 *', async () => {
 
           if (mode === 'growth_mode' && lead) {
             const contractors = await getContractorPhones(trade, region);
-            // FIXED: forEach async → for...of loop. forEach doesn't await properly
             for (const c of contractors.slice(0, 20)) {
               await sendWhatsAppDM(c.phone, lead);
               await new Promise(r => setTimeout(r, 20000));
@@ -197,7 +196,6 @@ app.post('/api/revenue', async (req, res) => {
   res.json({ ok: true });
 });
 
-// Forecast API with mode + monthly_projection - matches your diff
 app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
   const mode = await Brain.autoUpgrade();
@@ -220,5 +218,6 @@ app.get('/auth/google/callback', passport.authenticate('google', { successRedire
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// Port listen v4.3.4 - matches your last screenshot
-const PORT = process.env.PORT ||
+// FIXED: Port listen v4.3.5 - was cut off before
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`GridV21 v4.3.5 LIVE on port ${PORT}`));
