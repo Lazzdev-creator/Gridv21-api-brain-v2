@@ -1,64 +1,11 @@
 <!DOCTYPE html>
-<html><head><title>GridV21 Brain</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{background:#0a0a0a;color:#fff;font-family:system-ui;padding:20px;max-width:900px;margin:auto}
-.card{background:#1a1a1a;padding:20px;margin:15px 0;border-radius:12px;border-left:4px solid #22c55e}
-.stat{font-size:36px;font-weight:bold;margin:5px 0}
-.label{color:#888;font-size:14px}
-button{background:#3b82f6;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;margin:5px}
-a{color:#3b82f6}
-footer{margin-top:40px;padding:20px;border-top:1px solid #333;text-align:center;color:#888;font-size:13px}
-.live{color:#22c55e;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
-</style></head><body>
-<h1>🧠 GridV21 Brain <span class="live">● LIVE v4.3.1</span></h1>
-
-<div class="card">
-  <div class="label">Current Mode</div>
-  <div id="mode" class="stat">Loading...</div>
-  <div class="label">30-Day Projection</div>
-  <div id="monthly" class="stat">$0.00</div>
-</div>
-
-<div class="card">
-  <div class="label">Daily Revenue</div>
-  <div id="daily" class="stat">$0.00</div>
-  <button onclick="testSale()">+ Log $25 Test Sale</button>
-  <button onclick="load()">Refresh</button>
-</div>
-
-<div class="card">
-  <h3>High Ticket Affiliates</h3>
-  <a href="/affiliate/amazon/B0CWF9PMGZ">MacBook Pro $2499 → You earn $99/sale</a><br>
-  <a href="/affiliate/amazon/B09PV1HSDT">Sony A7IV $2498 → You earn $99/sale</a>
-</div>
-
-<div class="card">
-  <h3>Contact & Trust</h3>
-  WhatsApp: +672049913<br>
-  Email: ltchenana.thirteen@gmail.com<br>
-  <a href="https://youtube.com/@lazarustakudzwachenana1936">YouTube Channel</a> |
-  <a href="https://za.linkedin.com/in/lazarus-chenana-5b511215b">LinkedIn</a>
-</div>
-
-<footer>
-  Amazon Affiliate ID: grid08-20 | Built by Lazarus Chenana<br>
-  Add bank details at dashboard.stripe.com → Settings → Payouts after first sale
-</footer>
-
-<script>
-async function load(){
-  const r = await fetch('/api/forecast');
-  const d = await r.json();
-  document.getElementById('mode').textContent = d.mode.toUpperCase();
-  document.getElementById('monthly').textContent = '$' + d.monthly_projection.toFixed(2);
-  document.getElementById('daily').textContent = '$' + d.daily_revenue.toFixed(2);
-}
-async function testSale(){
-  await fetch('/api/revenue', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:25,source:'test'})});
-  load();
-}
-load(); setInterval(load, 5000);
-</script>
-</body></html>
+<html>
+<head><title>GridV21 v4.4.0</title></head>
+<body style="font-family:Arial;text-align:center;padding:50px;background:#0a0a0a;color:#0f0">
+<h1>GridV21 API Brain v4.4.0</h1>
+<p>Status: LIVE ✅</p>
+<p><a href="/api/health" style="color:#0ff">Health Check</a></p>
+<p><a href="/api/forecast" style="color:#0ff">Forecast</a></p>
+<p>Email: ltchenana.thirteen@gmail.com</p>
+</body>
+</html>
