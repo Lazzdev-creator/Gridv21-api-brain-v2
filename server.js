@@ -23,7 +23,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rate limit DMs
+// Rate limit DMs to avoid bans
 const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
 
 // YOUR DETAILS
@@ -34,14 +34,10 @@ const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
 const WHATSAPP_NUMBER = '+672049913';
 const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
 
-// REGIONS
-const REGIONS = ['US-TX-Austin', 'US-TX-Dallas', 'US-TX-Houston', 'US-CA-LA', 'US-CA-SanDiego', 'US-CA-SanFrancisco', 'US-NY-Brooklyn'];
-const TRADES = ['building', 'plumbing', 'electrical', 'roofing'];
-
 const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_KEY?.trim());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
-// Google OAuth
+// Google OAuth - only init if keys exist
 if (process.env.GOOGLE_CLIENT_ID) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -56,6 +52,7 @@ if (process.env.GOOGLE_CLIENT_ID) {
     return done(null, data);
   }));
 }
+
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
   const { data } = await supabase.from('companies').select().eq('id', id).single();
@@ -70,52 +67,32 @@ class Brain {
     const daily = data?.reduce((s, r) => s + parseFloat(r.amount), 0) || 0;
     return daily * 30;
   }
+
   static async autoUpgrade() {
     const monthly = await this.getMonthlyProjection();
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (monthly >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
-      console.log('BRAIN UPGRADE: $300 hit. Paid ads + full DM bot unlocked');
+      console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
     }
     return monthly >= 300? 'growth_mode' : 'zero_capex';
   }
+
   static async logRevenue(amount, source) {
     if (amount >= 0) await supabase.from('revenue_log').insert({ amount, source, created_at: new Date() });
   }
 }
 
-// Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: 'v4.3.2', regions: REGIONS.length }));
+// Health check for Render
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.2' }));
 
-// Get contractors - auto-stop if already bought
-async function getContractorPhones(trade, region) {
-  const { data } = await supabase.from('contractors')
-   .select('phone, id, dm_sent_count, bought_lead')
-   .eq('trade_type', trade)
-   .eq('region', region)
-   .eq('bought_lead', false) // Stop DMing if they bought
-   .not('phone', 'is', null)
-   .order('dm_sent_count', { ascending: true })
-   .limit(50);
-
-  if (data?.length > 0) {
-    const ids = data.map(c => c.id);
-    await supabase.from('contractors').update({
-      dm_sent_count: supabase.raw('dm_sent_count + 1'),
-      last_dm_at: new Date()
-    }).in('id', ids);
-  }
-  return data || [];
-}
-
-// WhatsApp DM
+// WhatsApp DM - rate limited
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
   const message = `🔔 New ${leadData.trade_type} permit - ${leadData.region}
 
 Project: $${leadData.value_estimate.toLocaleString()}
 Status: Approved, bidding open
-Age: 4 hours old
 
 Get full details for $75:
 https://gridv21.onrender.com/api/lead/checkout
@@ -129,31 +106,64 @@ YouTube: ${YOUTUBE_HANDLE}`;
 
   try {
     await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
-      messaging_product: "whatsapp", to: phone, type: "text", text: { body: message }
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "text",
+      text: { body: message }
     }, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } });
     await Brain.logRevenue(0, `whatsapp_dm_${leadData.trade_type}`);
   } catch(e) { console.log('WhatsApp error:', e.message); }
 }
 
-// LinkedIn DM
-async function sendLinkedInDM(profileUrl, leadData) {
-  if (!process.env.LINKEDIN_COOKIE) return;
-  const message = `New ${leadData.trade_type} permit $${leadData.value_estimate} in ${leadData.region}. Full details $75: https://gridv21.onrender.com/api/lead/checkout - Lazarus ${LINKEDIN_PROFILE}`;
+// Get contractors for DM
+async function getContractorPhones(trade, region) {
+  const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
+  const targetRegion = regions.includes(region)? region : regions[0];
 
-  try {
-    await axios.post('https://api.linkedin.com/v2/messages', {
-      recipients: [profileUrl],
-      message: { text: message }
-    }, { headers: { 'Authorization': `Bearer ${process.env.LINKEDIN_COOKIE}` } });
-  } catch(e) { console.log('LinkedIn error'); }
+  const { data } = await supabase.from('contractors')
+   .select('phone, id, dm_sent_count')
+   .eq('trade_type', trade)
+   .eq('region', targetRegion)
+   .not('phone', 'is', null)
+   .order('dm_sent_count', { ascending: true })
+   .limit(50);
+
+  if (data && data.length > 0) {
+    const ids = data.map(c => c.id);
+    await supabase.from('contractors').update({
+      last_dm_at: new Date()
+    }).in('id', ids);
+  }
+  return data || [];
 }
 
-// Scraper Cron - every 30 min across all regions
+// Scraper Cron - every 30 min
 cron.schedule('*/30 *', async () => {
   const mode = await Brain.autoUpgrade();
-  console.log(`Cron running. Mode: ${mode}, Regions: ${REGIONS.length}`);
+  const trades = ['building', 'plumbing', 'electrical', 'roofing'];
+  const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
 
-  for (const trade of TRADES) {
-    for (const region of REGIONS) {
+  for (const trade of trades) {
+    for (const region of regions) {
       try {
         // Demo permit - replace with real API later
+        const permit = { value: 67000, address: '123 Main St', type: trade };
+        if (permit.value > 5000) {
+          const { data: lead } = await supabase.from('leads').insert({
+            trade_type: trade, region, permit_data: permit, value_estimate: permit.value
+          }).select().single();
+
+          if (mode === 'growth_mode' && lead) {
+            const contractors = await getContractorPhones(trade, region);
+            contractors.slice(0, 20).forEach(async c => {
+              await sendWhatsAppDM(c.phone, lead);
+              await new Promise(r => setTimeout(r, 20000));
+            });
+          }
+        }
+      } catch(e) { console.log('Scrape error:', e.message); }
+    }
+  }
+});
+
+// Stripe Checkout with your
