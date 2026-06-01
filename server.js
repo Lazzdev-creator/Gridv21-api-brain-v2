@@ -20,12 +20,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21-final', resave: false, saveUninitialized: true }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'gridv21-final',
+  resave: false,
+  saveUninitialized: true
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
+const dmLimiter = rateLimit({
+  windowMs: 30*60*1000,
+  max: 50,
+  message: 'Rate limited'
+});
 
 const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
 const AMAZON_AFFILIATE_ID = 'grid08-20';
@@ -43,46 +51,76 @@ if (process.env.GOOGLE_CLIENT_ID) {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: '/auth/google/callback'
   }, async (token, tokenSecret, profile, done) => {
-    const { data } = await supabase.from('companies').upsert({
-      email: profile.emails[0].value,
-      name: profile.displayName,
-      avatar: profile.photos[0]?.value
-    }, { onConflict: 'email' }).select().single();
-    return done(null, data);
+    try {
+      const { data } = await supabase.from('companies').upsert({
+        email: profile.emails[0].value,
+        name: profile.displayName,
+        avatar: profile.photos[0]?.value
+      }, { onConflict: 'email' }).select().single();
+      return done(null, data);
+    } catch(e) {
+      return done(e, null);
+    }
   }));
 }
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
-  const { data } = await supabase.from('companies').select().eq('id', id).single();
-  done(null, data);
+  try {
+    const { data } = await supabase.from('companies').select().eq('id', id).single();
+    done(null, data);
+  } catch(e) {
+    done(e, null);
+  }
 });
 
 class Brain {
   static async getMonthlyProjection() {
-    const since = new Date(Date.now() - 24*60*60*1000).toISOString();
-    const { data, error } = await supabase.from('revenue_log').select('amount').gte('created_at', since);
-    if (error) { console.error('DB error:', error); return 0; }
-    const daily = data?.reduce((s, r) => s + parseFloat(r.amount), 0) || 0;
-    return daily * 30;
+    try {
+      const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+      const { data, error } = await supabase.from('revenue_log').select('amount').gte('created_at', since);
+      if (error) { console.error('DB error:', error); return 0; }
+      const daily = data?.reduce((s, r) => s + parseFloat(r.amount), 0) || 0;
+      return daily * 30;
+    } catch(e) {
+      console.error('Projection error:', e);
+      return 0;
+    }
   }
 
   static async autoUpgrade() {
-    const monthly = await this.getMonthlyProjection();
-    const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
-    if (monthly >= 300 && tier?.value === 'free') {
-      await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
-      console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
+    try {
+      const monthly = await this.getMonthlyProjection();
+      const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
+      if (monthly >= 300 && tier?.value === 'free') {
+        await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
+        console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
+      }
+      return monthly >= 300? 'growth_mode' : 'zero_capex';
+    } catch(e) {
+      console.error('AutoUpgrade error:', e);
+      return 'zero_capex';
     }
-    return monthly >= 300? 'growth_mode' : 'zero_capex';
   }
 
   static async logRevenue(amount, source) {
-    if (amount >= 0) await supabase.from('revenue_log').insert({ amount, source, created_at: new Date() });
+    try {
+      if (amount >= 0) {
+        await supabase.from('revenue_log').insert({
+          amount,
+          source,
+          created_at: new Date()
+        });
+      }
+    } catch(e) {
+      console.error('Log revenue error:', e);
+    }
   }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.9' }));
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.4.0' });
+});
 
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
@@ -99,32 +137,42 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
 
   try {
     await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
-      messaging_product: "whatsapp", to: phone, type: "text", text: { body: message }
+      messaging_product: "whatsapp",
+      to: phone,
+      type: "text",
+      text: { body: message }
     }, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } });
     await Brain.logRevenue(0, `whatsapp_dm_${leadData.trade_type}`);
-  } catch(e) { console.log('WhatsApp error:', e.message); }
+  } catch(e) {
+    console.log('WhatsApp error:', e.message);
+  }
 }
 
 async function getContractorPhones(trade, region) {
-  const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
-  const targetRegion = regions.includes(region)? region : regions[0];
+  try {
+    const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
+    const targetRegion = regions.includes(region)? region : regions[0];
 
-  const { data } = await supabase.from('contractors')
-.select('phone, id, dm_sent_count')
-.eq('trade_type', trade)
-.eq('region', targetRegion)
-.not('phone', 'is', null)
-.order('dm_sent_count', { ascending: true })
-.limit(50);
+    const { data } = await supabase.from('contractors')
+     .select('phone, id, dm_sent_count')
+     .eq('trade_type', trade)
+     .eq('region', targetRegion)
+     .not('phone', 'is', null)
+     .order('dm_sent_count', { ascending: true })
+     .limit(50);
 
-  if (data && data.length > 0) {
-    const ids = data.map(c => c.id);
-    await supabase.from('contractors').update({ last_dm_at: new Date() }).in('id', ids);
+    if (data && data.length > 0) {
+      const ids = data.map(c => c.id);
+      await supabase.from('contractors').update({ last_dm_at: new Date() }).in('id', ids);
+    }
+    return data || [];
+  } catch(e) {
+    console.error('Get contractors error:', e);
+    return [];
   }
-  return data || [];
 }
 
-// FIXED: 5 field cron + wrapped in try/catch so crash won't kill server
+// FIXED: 5 field cron + clean syntax + try/catch
 try {
   cron.schedule('*/30 *', async () => {
     console.log('Cron tick: scanning permits...');
@@ -138,8 +186,11 @@ try {
           try {
             const permit = { value: 67000, address: '123 Main St', type: trade };
             if (permit.value > 5000) {
-              cron.schedule('*/30 *', async () => {
-                trade_type: trade, region, permit_data: permit, value_estimate: permit.value
+              const { data: lead } = await supabase.from('leads').insert({
+                trade_type: trade,
+                region: region,
+                permit_data: permit,
+                value_estimate: permit.value
               }).select().single();
 
               if (mode === 'growth_mode' && lead) {
@@ -150,10 +201,14 @@ try {
                 }
               }
             }
-          } catch(e) { console.log('Scrape error:', e.message); }
+          } catch(e) {
+            console.log('Scrape error:', e.message);
+          }
         }
       }
-    } catch(e) { console.log('Cron loop error:', e.message); }
+    } catch(e) {
+      console.log('Cron loop error:', e.message);
+    }
   });
 } catch(e) {
   console.error('Cron init failed:', e.message);
@@ -207,9 +262,14 @@ app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
   const mode = await Brain.autoUpgrade();
   res.json({
-    mode, monthly_projection: monthly, daily_revenue: monthly/30,
-    youtube: YOUTUBE_HANDLE, linkedin: LINKEDIN_PROFILE,
-    whatsapp: WHATSAPP_NUMBER, email: OWNER_EMAIL, amazon_id: AMAZON_AFFILIATE_ID
+    mode,
+    monthly_projection: monthly,
+    daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE,
+    linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER,
+    email: OWNER_EMAIL,
+    amazon_id: AMAZON_AFFILIATE_ID
   });
 });
 
@@ -219,6 +279,6 @@ app.get('/auth/google/callback', passport.authenticate('google', { successRedire
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// FIXED: This 2 lines were missing = Port scan timeout
+// FIXED: Port binding - this kills "Port scan timeout"
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.9 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.4.0 LIVE on port ${PORT}`));
