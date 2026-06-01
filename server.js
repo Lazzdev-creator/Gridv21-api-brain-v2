@@ -80,7 +80,7 @@ class Brain {
   }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.7' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.8' }));
 
 async function sendWhatsAppDM(phone, leadData) {
   if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
@@ -122,34 +122,40 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// FIXED: 5 field cron = every 30 minutes. This was causing "Exited status 1"
-cron.schedule('*/30 *', async () => {
-  console.log('Cron tick: scanning permits...');
-  const mode = await Brain.autoUpgrade();
-  const trades = ['building', 'plumbing', 'electrical', 'roofing'];
-  const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
+// FIXED: 5 field cron + try/catch so Render won't exit on error
+try {
+  cron.schedule('*/30 *', async () => {
+    console.log('Cron tick: scanning permits...');
+    try {
+      const mode = await Brain.autoUpgrade();
+      const trades = ['building', 'plumbing', 'electrical', 'roofing'];
+      const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
 
-  for (const trade of trades) {
-    for (const region of regions) {
-      try {
-        const permit = { value: 67000, address: '123 Main St', type: trade };
-        if (permit.value > 5000) {
-          const { data: lead } = await supabase.from('leads').insert({
-            trade_type: trade, region, permit_data: permit, value_estimate: permit.value
-          }).select().single();
+      for (const trade of trades) {
+        for (const region of regions) {
+          try {
+            const permit = { value: 67000, address: '123 Main St', type: trade };
+            if (permit.value > 5000) {
+              const { data: lead } = await supabase.from('leads').insert({
+                trade_type: trade, region, permit_data: permit, value_estimate: permit.value
+              }).select().single();
 
-          if (mode === 'growth_mode' && lead) {
-            const contractors = await getContractorPhones(trade, region);
-            for (const c of contractors.slice(0, 20)) {
-              await sendWhatsAppDM(c.phone, lead);
-              await new Promise(r => setTimeout(r, 20000));
+              if (mode === 'growth_mode' && lead) {
+                const contractors = await getContractorPhones(trade, region);
+                for (const c of contractors.slice(0, 20)) {
+                  await sendWhatsAppDM(c.phone, lead);
+                  await new Promise(r => setTimeout(r, 20000));
+                }
+              }
             }
-          }
+          } catch(e) { console.log('Scrape error:', e.message); }
         }
-      } catch(e) { console.log('Scrape error:', e.message); }
-    }
-  }
-});
+      }
+    } catch(e) { console.log('Cron loop error:', e.message); }
+  });
+} catch(e) {
+  console.error('Cron init failed:', e.message);
+}
 
 app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   const { lead_id, trade, region, value } = req.body;
@@ -211,6 +217,5 @@ app.get('/auth/google/callback', passport.authenticate('google', { successRedire
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// FIXED: Port line was cut off. This was also causing "Exited status 1"
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.7 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.3.8 LIVE on port ${PORT}`));
