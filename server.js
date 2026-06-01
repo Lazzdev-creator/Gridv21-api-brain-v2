@@ -1,210 +1,202 @@
 import express from 'express';
+import session from 'express-session';
+import passport from 'passport';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+import axios from 'axios';
+import cron from 'node-cron';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21-final', resave: false, saveUninitialized: true }));
+app.use(passport.initialize());
+app.use(passport.session());
+app.use(express.static(path.join(__dirname, 'public')));
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+// Rate limit DMs to avoid bans
+const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
 
-const THRESHOLDS = { render: 300, supabase: 500 };
-const RENDER_API_KEY = process.env.RENDER_API_KEY;
-const RENDER_SERVICE_ID = process.env.RENDER_SERVICE_ID;
+// YOUR DETAILS
+const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
+const AMAZON_AFFILIATE_ID = 'grid08-20';
+const YOUTUBE_HANDLE = '@lazarustakudzwachenana1936';
+const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
+const WHATSAPP_NUMBER = '+672049913';
+const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
 
-const MICRO_CAPEX = {
-  budget: 87,
-  spent: 0,
-  target_days: 14,
-  daily_target_revenue: 300/14
-};
+const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_KEY?.trim());
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+
+// Google OAuth - add keys after deploy
+if (process.env.GOOGLE_CLIENT_ID) {
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: '/auth/google/callback'
+  }, async (token, tokenSecret, profile, done) => {
+    const { data } = await supabase.from('companies').upsert({
+      email: profile.emails[0].value,
+      name: profile.displayName,
+      avatar: profile.photos[0]?.value
+    }, { onConflict: 'email' }).select().single();
+    return done(null, data);
+  }));
+}
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
+  const { data } = await supabase.from('companies').select().eq('id', id).single();
+  done(null, data);
+});
 
 class Brain {
-  static async getLast24hRevenue() {
-    const since = new Date(Date.now() - 24*60*60*1000).toISOString();
-    const { data } = await supabase.from('revenue_log').select('amount').gte('created_at', since);
-    return data?.reduce((sum, r) => sum + parseFloat(r.amount), 0) || 0;
-  }
-
   static async getMonthlyProjection() {
-    const daily = await this.getLast24hRevenue();
+    const since = new Date(Date.now() - 24*60*60*1000).toISOString();
+    const { data, error } = await supabase.from('revenue_log').select('amount').gte('created_at', since);
+    if (error) { console.error('DB error:', error); return 0; }
+    const daily = data?.reduce((s, r) => s + parseFloat(r.amount), 0) || 0;
     return daily * 30;
   }
-
-  static async getRevenueBySource(days = 30) {
-    const since = new Date(Date.now() - days*24*60*60*1000).toISOString();
-    const { data } = await supabase.from('revenue_log').select('amount, source, created_at').gte('created_at', since);
-    const bySource = {};
-    data?.forEach(r => {
-      bySource[r.source] = (bySource[r.source] || 0) + parseFloat(r.amount);
-    });
-    return bySource;
-  }
-
-  static async logRevenue(amount, source = 'manual') {
-    if (amount > 0) {
-      await supabase.from('revenue_log').insert({ amount, source, created_at: new Date() });
-    }
-  }
-
   static async autoUpgrade() {
     const monthly = await this.getMonthlyProjection();
-    const actions = [];
-    let status = 'zero_capex';
-
-    const { data: renderTier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
-    if (monthly >= THRESHOLDS.render && renderTier?.value === 'free' && RENDER_API_KEY && RENDER_SERVICE_ID) {
-      const result = await this.upgradeRender();
-      if (result.success) {
-        await supabase.from('settings').update({ value: 'starter', updated_at: new Date() }).eq('key', 'render_tier');
-        actions.push('render_upgraded_to_starter_$7');
-        status = 'upgraded';
-      }
+    const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
+    if (monthly >= 300 && tier?.value === 'free') {
+      await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
+      console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
     }
-
-    const { data: supaTier } = await supabase.from('settings').select('value').eq('key', 'supabase_tier').single();
-    if (monthly >= THRESHOLDS.supabase && supaTier?.value === 'free') {
-      await supabase.from('settings').update({ value: 'pro', updated_at: new Date() }).eq('key', 'supabase_tier');
-      actions.push('supabase_upgrade_to_pro_$25_needed');
-      status = 'upgraded';
-    }
-
-    return { monthly_projection: monthly, actions, status };
+    return monthly >= 300? 'growth_mode' : 'zero_capex';
   }
-
-  static async upgradeRender() {
-    if (!RENDER_API_KEY ||!RENDER_SERVICE_ID) {
-      return { error: 'Add RENDER_API_KEY + RENDER_SERVICE_ID to enable auto-upgrade' };
-    }
-    try {
-      const res = await fetch(`https://api.render.com/v1/services/${RENDER_SERVICE_ID}`, {
-        method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${RENDER_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serviceDetails: { plan: 'starter' } })
-      });
-      return res.ok ? { success: true } : { error: await res.text() };
-    } catch (err) {
-      return { error: err.message };
-    }
+  static async logRevenue(amount, source) {
+    if (amount >= 0) await supabase.from('revenue_log').insert({ amount, source, created_at: new Date() });
   }
 }
 
-// Zero cost traffic webhooks
-app.post('/webhook/tiktok', async (req, res) => {
-  const { clicks, revenue } = req.body;
-  await Brain.logRevenue(revenue, 'tiktok_organic');
-  res.json({ logged: true, source: 'tiktok_organic', cost: '$0' });
+// Health check for Render
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.1' }));
+
+// WhatsApp DM - rate limited
+async function sendWhatsAppDM(phone, leadData) {
+  if (!process.env.WHATSAPP_TOKEN) return;
+  const message = `🔔 New ${leadData.trade_type} permit - ${leadData.region}
+
+Project: $${leadData.value_estimate.toLocaleString()}
+Status: Approved, bidding open
+Age: 4 hours old
+
+Get full details for $75:
+https://gridv21.onrender.com/api/lead/checkout
+
+30-sec Stripe checkout.
+
+Lazarus Chenana
+WhatsApp: ${WHATSAPP_NUMBER}
+Email: ${OWNER_EMAIL}
+YouTube: ${YOUTUBE_HANDLE}`;
+
+  try {
+    await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
+      messaging_product: "whatsapp", to: phone, type: "text", text: { body: message }
+    }, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } });
+    await Brain.logRevenue(0, `whatsapp_dm_${leadData.trade_type}`);
+  } catch(e) { console.log('WhatsApp error:', e.message); }
+}
+
+// Scraper Cron - every 30 min
+cron.schedule('*/30 *', async () => {
+  const mode = await Brain.autoUpgrade();
+  const trades = ['building', 'plumbing', 'electrical', 'roofing'];
+  const regions = ['US-TX-Austin', 'US-CA-LA'];
+
+  for (const trade of trades) {
+    for (const region of regions) {
+      try {
+        // Demo permit - replace with real API
+        const permit = { value: 67000, address: '123 Lamar Blvd', type: trade };
+        if (permit.value > 5000) {
+          const { data: lead } = await supabase.from('leads').insert({
+            trade_type: trade, region, permit_data: permit, value_estimate: permit.value
+          }).select().single();
+
+          if (mode === 'growth_mode') {
+            const contractors = [{ phone: '+15125551234' }]; // Add real numbers to DB later
+            contractors.slice(0, 20).forEach(async c => {
+              await sendWhatsAppDM(c.phone, lead);
+              await new Promise(r => setTimeout(r, 20000));
+            });
+          }
+        }
+      } catch(e) { console.log('Scrape error'); }
+    }
+  }
 });
 
-app.post('/webhook/pinterest', async (req, res) => {
-  const { clicks, revenue } = req.body;
-  await Brain.logRevenue(revenue, 'pinterest_organic');
-  res.json({ logged: true, source: 'pinterest_organic', cost: '$0' });
+// Stripe Checkout with your email
+app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
+  const { lead_id, trade, region, value } = req.body;
+  const price = Math.max(75, value * 0.01);
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: OWNER_EMAIL,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `${trade.toUpperCase()} Permit ${region}`,
+            description: `$${value.toLocaleString()} project. Contact: ${OWNER_EMAIL}`
+          },
+          unit_amount: price * 100
+        },
+        quantity: 1
+      }],
+      success_url: `https://gridv21.onrender.com/api/lead/download/${lead_id}`,
+      cancel_url: 'https://gridv21.onrender.com/'
+    });
+    await Brain.logRevenue(0, `checkout_${trade}`);
+    res.json({ url: session.url });
+  } catch(e) {
+    res.json({ error: 'Add STRIPE_SECRET_KEY to Render env first' });
+  }
 });
 
-app.post('/webhook/seo', async (req, res) => {
-  const { clicks, revenue } = req.body;
-  await Brain.logRevenue(revenue, 'seo_organic');
-  res.json({ logged: true, source: 'seo_organic', cost: '$0' });
+// Amazon Affiliate
+app.get('/affiliate/amazon/:id', async (req, res) => {
+  await Brain.logRevenue(0, `aff_${req.params.id}`);
+  res.redirect(`https://amazon.com/dp/${req.params.id}/?tag=${AMAZON_AFFILIATE_ID}`);
 });
 
-app.post('/webhook/youtube', async (req, res) => {
-  const { clicks, revenue } = req.body;
-  await Brain.logRevenue(revenue, 'youtube_organic');
-  res.json({ logged: true, source: 'youtube_organic', cost: '$0' });
-});
-
-app.post('/api/revenue', async (req, res) => {
-  const { amount, source } = req.body;
-  await Brain.logRevenue(amount, source);
-  res.json({ success: true });
-});
-
+// Forecast API
 app.get('/api/forecast', async (req, res) => {
-  const daily = await Brain.getLast24hRevenue();
   const monthly = await Brain.getMonthlyProjection();
-  const upgrade = await Brain.autoUpgrade();
-
-  const api_budget = monthly > 300? monthly * 0.05 : 0;
-  const costs = monthly >= 500? 32 : monthly >= 300? 7 : 0;
-
+  const mode = await Brain.autoUpgrade();
   res.json({
-    mode: upgrade.status,
-    daily_revenue: `$${daily.toFixed(2)}`,
-    monthly_projection: `$${monthly.toFixed(2)}`,
-    api_budget_reserve: `$${api_budget.toFixed(2)}`,
-    monthly_costs: `$${costs}`,
-    net_profit: `$${(monthly - costs - api_budget).toFixed(2)}`,
-    days_to_render: daily > 0 && monthly < 300? Math.ceil((300 - monthly) / daily) : monthly >= 300? 'UPGRADED' : '∞',
-    days_to_supabase: daily > 0 && monthly < 500? Math.ceil((500 - monthly) / daily) : monthly >= 500? 'UPGRADED' : '∞',
-    cap_ex_required: monthly < 300? '$0 - Zero CapEx Mode' : monthly < 500? '$7/mo Render' : '$32/mo Total',
-    auto_upgrade_ready: !!(RENDER_API_KEY && RENDER_SERVICE_ID)
+    mode,
+    monthly_projection: monthly,
+    daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE,
+    linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER,
+    email: OWNER_EMAIL,
+    amazon_id: AMAZON_AFFILIATE_ID
   });
 });
 
-app.get('/api/traffic-forecast', async (req, res) => {
-  const bySource = await Brain.getRevenueBySource(7);
-  const total7d = Object.values(bySource).reduce((a,b) => a+b, 0);
-  const dailyAvg = total7d / 7;
-  const monthlyProj = dailyAvg * 30;
-  const daysTo5k = monthlyProj > 0? Math.ceil(5000 / monthlyProj * 30) : '∞';
-  const daysTo20k = monthlyProj > 0? Math.ceil(20000 / monthlyProj * 30) : '∞';
+// Auth routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
 
-  const sourceBreakdown = Object.entries(bySource).map(([src, amt]) => ({
-    source: src,
-    revenue_7d: `$${amt.toFixed(2)}`,
-    pct: total7d > 0? `${(amt/total7d*100).toFixed(1)}%` : '0%'
-  }));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-  res.json({
-    monthly_projection: `$${monthlyProj.toFixed(2)}`,
-    days_to_5k: daysTo5k,
-    days_to_20k: daysTo20k,
-    sources: sourceBreakdown,
-    top_source: sourceBreakdown[0]?.source || 'none'
-  });
-});
-
-app.get('/api/fast-forward', async (req, res) => {
-  const monthly = await Brain.getMonthlyProjection();
-  const dailyAvg = await Brain.getLast24hRevenue();
-  const daysIn = dailyAvg > 0 ? Math.min(14, Math.floor((monthly / 30) * 14 / dailyAvg)) : 0;
-  const daysLeft = Math.max(0, 14 - daysIn);
-  const revenueNeeded = Math.max(0, 300 - monthly);
-  const dailyNeeded = daysLeft > 0 ? revenueNeeded / daysLeft : 0;
-  
-  res.json({
-    micro_capex_budget: `$${MICRO_CAPEX.budget}`,
-    spent_so_far: `$${MICRO_CAPEX.spent}`,
-    days_remaining: daysLeft,
-    daily_revenue_needed: `$${dailyNeeded.toFixed(2)}`,
-    current_daily: `$${dailyAvg.toFixed(2)}`,
-    status: monthly >= 300? 'THRESHOLD HIT - UPGRADED' : daysLeft === 0? 'TARGET MISSED' : 'FAST FORWARD MODE'
-  });
-});
-
-app.get('/api/break-even', async (req, res) => {
-  const monthly = await Brain.getMonthlyProjection();
-  const fixedCosts = monthly >= 500? 32 : monthly >= 300? 7 : 0;
-  const targetRevenue = 20000;
-  const epc = 0.20;
-  const cpc = 0.022;
-
-  const clicksNeeded = targetRevenue / epc;
-  const adSpendNeeded = monthly >= 300? clicksNeeded * cpc : 0;
-
-  res.json({
-    current_mode: monthly < 300? 'ZERO CAPEX - Organic Only' : 'PAID SCALE MODE',
-    current_revenue: `$${monthly.toFixed(2)}`,
-    fixed_costs: `$${fixedCosts}`,
-    ad_spend_needed_for_20k: monthly < 300? '$0 until $300/mo' : `$${adSpendNeeded.toFixed(0)}`,
-    total_costs_at_20k: `$${(fixedCosts + adSpendNeeded).toFixed(0)}`,
-    net_profit_at_20k: `$${(targetRevenue - fixedCosts - adSpendNeeded).toFixed(0)}`,
-    roas_needed: monthly < 300? 'N/A - Organic' : `${(targetRevenue/(fixedCosts + adSpendNeeded)).toFixed(2)}x`
-  });
-});
-
-app.get('/', (req, res) => res.sendFile('public/index.html', { root: '.' }));
-
-app.listen(process.env.PORT || 3000, () => console.log('GridV21 Brain v3.0.0 Zero CapEx running on port', process.env.PORT || 3000));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`GridV21 v4.3.1 LIVE on port ${PORT}`));
