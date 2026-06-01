@@ -138,7 +138,7 @@ try {
           try {
             const permit = { value: 67000, address: '123 Main St', type: trade };
             if (permit.value > 5000) {
-              const { data: lead } = await supabase.from('leads').insert({
+              cron.schedule('*/30 *', async () => {
                 trade_type: trade, region, permit_data: permit, value_estimate: permit.value
               }).select().single();
 
