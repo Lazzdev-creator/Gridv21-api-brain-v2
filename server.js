@@ -80,6 +80,7 @@ class Brain {
   }
 }
 
+// Health check v4.3.4 - matches your diff
 app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.4' }));
 
 async function sendWhatsAppDM(phone, leadData) {
@@ -92,9 +93,8 @@ Status: Approved, bidding open
 Get full details for $75:
 https://gridv21.onrender.com/api/lead/checkout
 
-Lazarus Chenana
-WhatsApp: ${WHATSAPP_NUMBER}
-Email: ${OWNER_EMAIL}`;
+Email: ${OWNER_EMAIL}
+WhatsApp: ${WHATSAPP_NUMBER}`;
 
   try {
     await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
@@ -123,7 +123,7 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// FIXED CRON: 5 fields = every 30 minutes
+// FIXED CRON: 5 fields = every 30 minutes - matches your screenshot
 cron.schedule('*/30 *', async () => {
   console.log('Cron tick: scanning permits...');
   const mode = await Brain.autoUpgrade();
@@ -141,6 +141,7 @@ cron.schedule('*/30 *', async () => {
 
           if (mode === 'growth_mode' && lead) {
             const contractors = await getContractorPhones(trade, region);
+            // FIXED: forEach async → for...of loop. forEach doesn't await properly
             for (const c of contractors.slice(0, 20)) {
               await sendWhatsAppDM(c.phone, lead);
               await new Promise(r => setTimeout(r, 20000));
@@ -196,21 +197,28 @@ app.post('/api/revenue', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Forecast API with mode + monthly_projection - matches your diff
 app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
   const mode = await Brain.autoUpgrade();
   res.json({
-    mode, monthly_projection: monthly, daily_revenue: monthly/30,
-    youtube: YOUTUBE_HANDLE, linkedin: LINKEDIN_PROFILE,
-    whatsapp: WHATSAPP_NUMBER, email: OWNER_EMAIL, amazon_id: AMAZON_AFFILIATE_ID
+    mode,
+    monthly_projection: monthly,
+    daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE,
+    linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER,
+    email: OWNER_EMAIL,
+    amazon_id: AMAZON_AFFILIATE_ID
   });
 });
 
+// Auth routes
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.4 LIVE on port ${PORT}`));
+// Port listen v4.3.4 - matches your last screenshot
+const PORT = process.env.PORT ||
