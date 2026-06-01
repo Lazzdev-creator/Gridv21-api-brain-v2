@@ -23,7 +23,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Rate limit DMs to avoid bans
+// Rate limit DMs
 const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
 
 // YOUR DETAILS
@@ -34,10 +34,14 @@ const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
 const WHATSAPP_NUMBER = '+672049913';
 const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
 
+// REGIONS
+const REGIONS = ['US-TX-Austin', 'US-TX-Dallas', 'US-TX-Houston', 'US-CA-LA', 'US-CA-SanDiego', 'US-CA-SanFrancisco', 'US-NY-Brooklyn'];
+const TRADES = ['building', 'plumbing', 'electrical', 'roofing'];
+
 const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_KEY?.trim());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
-// Google OAuth - add keys after deploy
+// Google OAuth
 if (process.env.GOOGLE_CLIENT_ID) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -71,7 +75,7 @@ class Brain {
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (monthly >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
-      console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
+      console.log('BRAIN UPGRADE: $300 hit. Paid ads + full DM bot unlocked');
     }
     return monthly >= 300? 'growth_mode' : 'zero_capex';
   }
@@ -80,12 +84,33 @@ class Brain {
   }
 }
 
-// Health check for Render
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.1' }));
+// Health check
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), version: 'v4.3.2', regions: REGIONS.length }));
 
-// WhatsApp DM - rate limited
+// Get contractors - auto-stop if already bought
+async function getContractorPhones(trade, region) {
+  const { data } = await supabase.from('contractors')
+   .select('phone, id, dm_sent_count, bought_lead')
+   .eq('trade_type', trade)
+   .eq('region', region)
+   .eq('bought_lead', false) // Stop DMing if they bought
+   .not('phone', 'is', null)
+   .order('dm_sent_count', { ascending: true })
+   .limit(50);
+
+  if (data?.length > 0) {
+    const ids = data.map(c => c.id);
+    await supabase.from('contractors').update({
+      dm_sent_count: supabase.raw('dm_sent_count + 1'),
+      last_dm_at: new Date()
+    }).in('id', ids);
+  }
+  return data || [];
+}
+
+// WhatsApp DM
 async function sendWhatsAppDM(phone, leadData) {
-  if (!process.env.WHATSAPP_TOKEN) return;
+  if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
   const message = `🔔 New ${leadData.trade_type} permit - ${leadData.region}
 
 Project: $${leadData.value_estimate.toLocaleString()}
@@ -110,93 +135,25 @@ YouTube: ${YOUTUBE_HANDLE}`;
   } catch(e) { console.log('WhatsApp error:', e.message); }
 }
 
-// Scraper Cron - every 30 min
-cron.schedule('*/30 *', async () => {
-  const mode = await Brain.autoUpgrade();
-  const trades = ['building', 'plumbing', 'electrical', 'roofing'];
-  const regions = ['US-TX-Austin', 'US-CA-LA'];
-
-  for (const trade of trades) {
-    for (const region of regions) {
-      try {
-        // Demo permit - replace with real API
-        const permit = { value: 67000, address: '123 Lamar Blvd', type: trade };
-        if (permit.value > 5000) {
-          const { data: lead } = await supabase.from('leads').insert({
-            trade_type: trade, region, permit_data: permit, value_estimate: permit.value
-          }).select().single();
-
-          if (mode === 'growth_mode') {
-            const contractors = [{ phone: '+15125551234' }]; // Add real numbers to DB later
-            contractors.slice(0, 20).forEach(async c => {
-              await sendWhatsAppDM(c.phone, lead);
-              await new Promise(r => setTimeout(r, 20000));
-            });
-          }
-        }
-      } catch(e) { console.log('Scrape error'); }
-    }
-  }
-});
-
-// Stripe Checkout with your email
-app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
-  const { lead_id, trade, region, value } = req.body;
-  const price = Math.max(75, value * 0.01);
+// LinkedIn DM
+async function sendLinkedInDM(profileUrl, leadData) {
+  if (!process.env.LINKEDIN_COOKIE) return;
+  const message = `New ${leadData.trade_type} permit $${leadData.value_estimate} in ${leadData.region}. Full details $75: https://gridv21.onrender.com/api/lead/checkout - Lazarus ${LINKEDIN_PROFILE}`;
 
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: OWNER_EMAIL,
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `${trade.toUpperCase()} Permit ${region}`,
-            description: `$${value.toLocaleString()} project. Contact: ${OWNER_EMAIL}`
-          },
-          unit_amount: price * 100
-        },
-        quantity: 1
-      }],
-      success_url: `https://gridv21.onrender.com/api/lead/download/${lead_id}`,
-      cancel_url: 'https://gridv21.onrender.com/'
-    });
-    await Brain.logRevenue(0, `checkout_${trade}`);
-    res.json({ url: session.url });
-  } catch(e) {
-    res.json({ error: 'Add STRIPE_SECRET_KEY to Render env first' });
-  }
-});
+    await axios.post('https://api.linkedin.com/v2/messages', {
+      recipients: [profileUrl],
+      message: { text: message }
+    }, { headers: { 'Authorization': `Bearer ${process.env.LINKEDIN_COOKIE}` } });
+  } catch(e) { console.log('LinkedIn error'); }
+}
 
-// Amazon Affiliate
-app.get('/affiliate/amazon/:id', async (req, res) => {
-  await Brain.logRevenue(0, `aff_${req.params.id}`);
-  res.redirect(`https://amazon.com/dp/${req.params.id}/?tag=${AMAZON_AFFILIATE_ID}`);
-});
-
-// Forecast API
-app.get('/api/forecast', async (req, res) => {
-  const monthly = await Brain.getMonthlyProjection();
+// Scraper Cron - every 30 min across all regions
+cron.schedule('*/30 *', async () => {
   const mode = await Brain.autoUpgrade();
-  res.json({
-    mode,
-    monthly_projection: monthly,
-    daily_revenue: monthly/30,
-    youtube: YOUTUBE_HANDLE,
-    linkedin: LINKEDIN_PROFILE,
-    whatsapp: WHATSAPP_NUMBER,
-    email: OWNER_EMAIL,
-    amazon_id: AMAZON_AFFILIATE_ID
-  });
-});
+  console.log(`Cron running. Mode: ${mode}, Regions: ${REGIONS.length}`);
 
-// Auth routes
-app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
-
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.3.1 LIVE on port ${PORT}`));
+  for (const trade of TRADES) {
+    for (const region of REGIONS) {
+      try {
+        // Demo permit - replace with real API later
