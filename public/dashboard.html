@@ -1,24 +1,11 @@
 <!DOCTYPE html>
-<html><head><title>Company Dashboard</title>
-<style>body{background:#0a0a0a;color:#fff;font-family:system-ui;padding:20px}.card{background:#1a1a1a;padding:20px;margin:15px 0;border-radius:12px} button{background:#3b82f6;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer}</style></head><body>
-<h1>Company Portal</h1>
-<div class="card">
-  <h3>Available Permit Leads</h3>
-  <p>Plumbing - Austin TX - $67,000 project</p>
-  <button onclick="buyLead('demo1','plumbing','Austin TX',67000)">Buy Lead - $75</button>
-  <p>Roofing - Miami FL - $84,000 project</p>
-  <button onclick="buyLead('demo2','roofing','Miami FL',84000)">Buy Lead - $84</button>
-</div>
-<div class="card">
-  <h3>Upgrade</h3>
-  <p>Paid Ads + API Access: $99/mo</p>
-  <button onclick="alert('Add GOOGLE_CLIENT_ID to enable OAuth')">Sign in with Google</button>
-</div>
-<script>
-async function buyLead(id,trade,region,value){
-  const r = await fetch('/api/lead/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lead_id:id,trade,region,value})});
-  const d = await r.json();
-  if(d.url) location = d.url; else alert(d.error);
-}
-</script>
-</body></html>
+<html>
+<head><title>GridV21 v4.4.0</title></head>
+<body style="font-family:Arial;text-align:center;padding:50px;background:#0a0a0a;color:#0f0">
+<h1>GridV21 API Brain v4.4.0</h1>
+<p>Status: LIVE ✅</p>
+<p><a href="/api/health" style="color:#0ff">Health Check</a></p>
+<p><a href="/api/forecast" style="color:#0ff">Forecast</a></p>
+<p>Email: ltchenana.thirteen@gmail.com</p>
+</body>
+</html>
