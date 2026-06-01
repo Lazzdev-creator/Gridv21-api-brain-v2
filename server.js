@@ -84,7 +84,7 @@ class Brain {
 }
 
 // Health check for Render
-app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.2' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.3.3' }));
 
 // WhatsApp DM - rate limited
 async function sendWhatsAppDM(phone, leadData) {
@@ -121,12 +121,12 @@ async function getContractorPhones(trade, region) {
   const targetRegion = regions.includes(region)? region : regions[0];
 
   const { data } = await supabase.from('contractors')
-   .select('phone, id, dm_sent_count')
-   .eq('trade_type', trade)
-   .eq('region', targetRegion)
-   .not('phone', 'is', null)
-   .order('dm_sent_count', { ascending: true })
-   .limit(50);
+  .select('phone, id, dm_sent_count')
+  .eq('trade_type', trade)
+  .eq('region', targetRegion)
+  .not('phone', 'is', null)
+  .order('dm_sent_count', { ascending: true })
+  .limit(50);
 
   if (data && data.length > 0) {
     const ids = data.map(c => c.id);
@@ -137,8 +137,9 @@ async function getContractorPhones(trade, region) {
   return data || [];
 }
 
-// Scraper Cron - every 30 min
+// Scraper Cron - every 30 min FIXED
 cron.schedule('*/30 *', async () => {
+  console.log('Cron tick: scanning permits...');
   const mode = await Brain.autoUpgrade();
   const trades = ['building', 'plumbing', 'electrical', 'roofing'];
   const regions = ['US-TX-Austin', 'US-CA-LA', 'US-NY-Brooklyn'];
@@ -166,4 +167,75 @@ cron.schedule('*/30 *', async () => {
   }
 });
 
-// Stripe Checkout with your
+// Stripe Checkout with your email
+app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
+  const { lead_id, trade, region, value } = req.body;
+  const price = Math.max(75, value * 0.01);
+
+  if (!process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_KEY === 'sk_test_placeholder') {
+    return res.json({ error: 'Add STRIPE_SECRET_KEY to Render env first' });
+  }
+
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: OWNER_EMAIL,
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `${trade.toUpperCase()} Permit ${region}`,
+            description: `$${value.toLocaleString()} project. Contact: ${OWNER_EMAIL}`
+          },
+          unit_amount: price * 100
+        },
+        quantity: 1
+      }],
+      success_url: `https://gridv21.onrender.com/api/lead/download/${lead_id}`,
+      cancel_url: 'https://gridv21.onrender.com/'
+    });
+    await Brain.logRevenue(0, `checkout_${trade}`);
+    res.json({ url: session.url });
+  } catch(e) {
+    res.json({ error: 'Stripe error: ' + e.message });
+  }
+});
+
+// Amazon Affiliate
+app.get('/affiliate/amazon/:id', async (req, res) => {
+  await Brain.logRevenue(0, `aff_${req.params.id}`);
+  res.redirect(`https://amazon.com/dp/${req.params.id}/?tag=${AMAZON_AFFILIATE_ID}`);
+});
+
+// Test revenue endpoint
+app.post('/api/revenue', async (req, res) => {
+  const { amount, source } = req.body;
+  await Brain.logRevenue(amount, source);
+  res.json({ ok: true });
+});
+
+// Forecast API
+app.get('/api/forecast', async (req, res) => {
+  const monthly = await Brain.getMonthlyProjection();
+  const mode = await Brain.autoUpgrade();
+  res.json({
+    mode,
+    monthly_projection: monthly,
+    daily_revenue: monthly/30,
+    youtube: YOUTUBE_HANDLE,
+    linkedin: LINKEDIN_PROFILE,
+    whatsapp: WHATSAPP_NUMBER,
+    email: OWNER_EMAIL,
+    amazon_id: AMAZON_AFFILIATE_ID
+  });
+});
+
+// Auth routes
+app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
+
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`GridV21 v4.3.3 LIVE on port ${PORT}`));
