@@ -41,6 +41,7 @@ const YOUTUBE_HANDLE = '@lazarustakudzwachenana1936';
 const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
 const WHATSAPP_NUMBER = '+672049913';
 const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
+const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
 const supabase = createClient(SUPABASE_URL, process.env.SUPABASE_KEY?.trim());
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
@@ -88,6 +89,16 @@ class Brain {
     }
   }
 
+  static async getLeadCount() {
+    try {
+      const { count, error } = await supabase.from('leads').select('*', { count: 'exact', head: true });
+      if (error) return 0;
+      return count || 0;
+    } catch(e) {
+      return 0;
+    }
+  }
+
   static async autoUpgrade() {
     try {
       const monthly = await this.getMonthlyProjection();
@@ -119,7 +130,7 @@ class Brain {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.4.0' });
+  res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.4.1' });
 });
 
 async function sendWhatsAppDM(phone, leadData) {
@@ -154,12 +165,12 @@ async function getContractorPhones(trade, region) {
     const targetRegion = regions.includes(region)? region : regions[0];
 
     const { data } = await supabase.from('contractors')
-     .select('phone, id, dm_sent_count')
-     .eq('trade_type', trade)
-     .eq('region', targetRegion)
-     .not('phone', 'is', null)
-     .order('dm_sent_count', { ascending: true })
-     .limit(50);
+    .select('phone, id, dm_sent_count')
+    .eq('trade_type', trade)
+    .eq('region', targetRegion)
+    .not('phone', 'is', null)
+    .order('dm_sent_count', { ascending: true })
+    .limit(50);
 
     if (data && data.length > 0) {
       const ids = data.map(c => c.id);
@@ -172,7 +183,7 @@ async function getContractorPhones(trade, region) {
   }
 }
 
-// FIXED: 5 field cron + clean syntax + try/catch
+// FIXED: 5 field cron
 try {
   cron.schedule('*/30 *', async () => {
     console.log('Cron tick: scanning permits...');
@@ -260,16 +271,19 @@ app.post('/api/revenue', async (req, res) => {
 
 app.get('/api/forecast', async (req, res) => {
   const monthly = await Brain.getMonthlyProjection();
+  const leadCount = await Brain.getLeadCount();
   const mode = await Brain.autoUpgrade();
   res.json({
     mode,
     monthly_projection: monthly,
     daily_revenue: monthly/30,
+    total_leads: leadCount,
     youtube: YOUTUBE_HANDLE,
     linkedin: LINKEDIN_PROFILE,
     whatsapp: WHATSAPP_NUMBER,
     email: OWNER_EMAIL,
-    amazon_id: AMAZON_AFFILIATE_ID
+    amazon_id: AMAZON_AFFILIATE_ID,
+    admin_key: ADMIN_KEY
   });
 });
 
@@ -278,7 +292,8 @@ app.get('/auth/google/callback', passport.authenticate('google', { successRedire
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-// FIXED: Port binding - this kills "Port scan timeout"
+// Port binding
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.4.0 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.4.1 LIVE on port ${PORT}`));
