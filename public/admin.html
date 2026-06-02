@@ -22,7 +22,7 @@ p{color:#888;font-size:12px;margin:5px 0}
 </style>
 </head>
 <body>
-<h1>GridV21 Admin Dashboard v4.4.2</h1>
+<h1>GridV21 Admin Dashboard v4.4.3</h1>
 <div id="stats"><h2 class="loading">Loading brain data...</h2></div>
 
 <div class="card">
@@ -49,14 +49,83 @@ function showStatus(msg, color='#0f0') {
 async function scanNow() {
   showStatus('Scanning permits...', '#0ff');
   try {
-    const res = await fetch('/api/scan', {method:'POST'});
+    const res = await fetch('/api/scan?key=' + key, {method:'POST'});
     const data = await res.json();
-    showStatus(`Found ${data.leads || 0} new permits! Refreshing...`, '#0f0');
-    setTimeout(() => location.reload(), 2000);
+    showStatus(`Scan triggered! Check logs`, '#0f0');
   } catch(e) {
     showStatus('Scan failed: ' + e.message, 'red');
   }
 }
 
 async function testDM() {
-  showStatus('Sending test DM to +27672049913...
+  showStatus('Sending test DM to +27672049913...', '#0ff');
+  try {
+    const res = await fetch('/api/test-dm?key=' + key, {method:'POST'});
+    const data = await res.json();
+    showStatus(data.ok ? 'Test DM sent! Check WhatsApp' : 'DM failed', data.ok ? '#0f0' : 'red');
+  } catch(e) {
+    showStatus('DM failed: ' + e.message, 'red');
+  }
+}
+
+async function clearData() {
+  if(!confirm('Delete all test leads + revenue?')) return;
+  showStatus('Clearing...', '#ff0');
+  try {
+    await fetch('/api/clear?key=' + key, {method:'POST'});
+    showStatus('Cleared! Refreshing...', '#0f0');
+    setTimeout(() => location.reload(), 2000);
+  } catch(e) {
+    showStatus('Clear failed', 'red');
+  }
+}
+
+function toggleMode() {
+  showStatus('Change mode in Render env vars', '#ff0');
+}
+
+if(key !== ADMIN_KEY) {
+  document.getElementById('stats').innerHTML = 
+  '<div class="error">Error loading. Check ADMIN_KEY in URL.</div>';
+} else {
+  fetch('/api/forecast?key=' + key)
+  .then(r => r.json())
+  .then(d => {
+    document.getElementById('stats').innerHTML = `
+      <div class="card">
+        <h3>Total Leads</h3>
+        <h2>${d.total_leads || 0}</h2>
+        <p>Scraped from permit portals</p>
+      </div>
+      <div class="card">
+        <h3>Est. Revenue / Month</h3>
+        <h2>$${d.monthly_projection || 0}</h2>
+        <p>$150 contractor fee / $5 AI fee</p>
+      </div>
+      <div class="card">
+        <h3>Mode</h3>
+        <h2>${d.mode || 'zero_capex'}</h2>
+        <p>Switches to growth_mode at $300/mo</p>
+        <p style="margin-top:10px">Email: ${d.email}</p>
+      </div>
+      <div class="card">
+        <h3>Live Posts</h3>
+        <h2>0</h2>
+        <p>Auto-published to YouTube + LinkedIn</p>
+      </div>
+      <div class="card" style="border-color:#0ff">
+        <h3>Contacts</h3>
+        <p>YouTube: ${d.youtube}</p>
+        <p>LinkedIn: ${d.linkedin}</p>
+        <p>WhatsApp: ${d.whatsapp}</p>
+      </div>
+    `;
+  })
+  .catch(e => {
+    document.getElementById('stats').innerHTML = 
+    '<div class="error">API Error: ' + e.message + '<br>Check /api/forecast endpoint</div>';
+  });
+}
+</script>
+</body>
+  </html>
