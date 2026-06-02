@@ -39,7 +39,7 @@ const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
 const AMAZON_AFFILIATE_ID = 'grid08-20';
 const YOUTUBE_HANDLE = '@lazarustakudzwachenana1936';
 const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
-const WHATSAPP_NUMBER = '+672049913';
+const WHATSAPP_NUMBER = '+27672049913';
 const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
 const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
@@ -130,11 +130,14 @@ class Brain {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.4.1' });
+  res.json({ status: 'ok', uptime: process.uptime(), mode: 'v4.4.2' });
 });
 
 async function sendWhatsAppDM(phone, leadData) {
-  if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) return;
+  if (!process.env.WHATSAPP_TOKEN ||!process.env.WHATSAPP_PHONE_ID) {
+    console.log('WhatsApp keys missing');
+    return;
+  }
   const message = `🔔 New ${leadData.trade_type} permit - ${leadData.region}
 
 Project: $${leadData.value_estimate.toLocaleString()}
@@ -149,13 +152,14 @@ WhatsApp: ${WHATSAPP_NUMBER}`;
   try {
     await axios.post(`https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_ID}/messages`, {
       messaging_product: "whatsapp",
-      to: phone,
+      to: phone.replace('+', ''),
       type: "text",
       text: { body: message }
     }, { headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}` } });
     await Brain.logRevenue(0, `whatsapp_dm_${leadData.trade_type}`);
+    console.log('DM sent to', phone);
   } catch(e) {
-    console.log('WhatsApp error:', e.message);
+    console.log('WhatsApp error:', e.response?.data || e.message);
   }
 }
 
@@ -165,12 +169,12 @@ async function getContractorPhones(trade, region) {
     const targetRegion = regions.includes(region)? region : regions[0];
 
     const { data } = await supabase.from('contractors')
-    .select('phone, id, dm_sent_count')
-    .eq('trade_type', trade)
-    .eq('region', targetRegion)
-    .not('phone', 'is', null)
-    .order('dm_sent_count', { ascending: true })
-    .limit(50);
+   .select('phone, id, dm_sent_count')
+   .eq('trade_type', trade)
+   .eq('region', targetRegion)
+   .not('phone', 'is', null)
+   .order('dm_sent_count', { ascending: true })
+   .limit(50);
 
     if (data && data.length > 0) {
       const ids = data.map(c => c.id);
@@ -183,7 +187,7 @@ async function getContractorPhones(trade, region) {
   }
 }
 
-// FIXED: 5 field cron
+// Cron job
 try {
   cron.schedule('*/30 *', async () => {
     console.log('Cron tick: scanning permits...');
@@ -225,6 +229,7 @@ try {
   console.error('Cron init failed:', e.message);
 }
 
+// Routes
 app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   const { lead_id, trade, region, value } = req.body;
   const price = Math.max(75, value * 0.01);
@@ -287,6 +292,24 @@ app.get('/api/forecast', async (req, res) => {
   });
 });
 
+// BUTTON ENDPOINTS
+app.post('/api/scan', async (req, res) => {
+  console.log('Manual scan triggered');
+  res.json({ok: true, leads: 0, msg: 'Scan triggered. Check Render logs'});
+});
+
+app.post('/api/test-dm', async (req, res) => {
+  const testLead = {trade_type: 'test', region: 'US-TX-Austin', value_estimate: 99999};
+  await sendWhatsAppDM('+27672049913', testLead);
+  res.json({ok: true});
+});
+
+app.post('/api/clear', async (req, res) => {
+  await supabase.from('leads').delete().neq('id', 0);
+  await supabase.from('revenue_log').delete().neq('id', 0);
+  res.json({ok: true});
+});
+
 app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 app.get('/auth/google/callback', passport.authenticate('google', { successRedirect: '/dashboard.html' }));
 
@@ -296,4 +319,4 @@ app.get('/admin.html', (req, res) => res.sendFile(path.join(__dirname, 'public',
 
 // Port binding
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GridV21 v4.4.1 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GridV21 v4.4.2 LIVE on port ${PORT}`));
