@@ -1,27 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>GridV21 Admin</title>
+<title>GridV21 Admin Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{background:#0a0a0a;color:#0f0;font-family:Arial;padding:30px}
-.card{background:#1a1a1a;border:1px solid #0f0;border-radius:10px;padding:20px;margin:15px 0}
-h1{color:#0ff}
+body{background:#0a0a0a;color:#0f0;font-family:'Courier New', monospace;padding:20px;margin:0}
+.card{background:#1a1a1a;border:2px solid #0f0;border-radius:12px;padding:25px;margin:15px 0;box-shadow:0 0 20px rgba(0,255,0,0.2)}
+h1{color:#0ff;text-align:center;font-size:24px;margin-bottom:30px;text-shadow:0 0 10px #0ff}
+h3{color:#0f0;margin:0;font-size:14px;text-transform:uppercase;letter-spacing:2px}
+h2{color:#fff;font-size:36px;margin:10px 0;font-weight:bold}
+p{color:#888;font-size:12px;margin:5px 0}
+.error{color:red;text-align:center;font-size:20px;padding:50px}
+.loading{animation:blink 1s infinite}
+@keyframes blink{50%{opacity:0.5}}
 </style>
 </head>
 <body>
-<h1>GridV21 Admin Dashboard v4.4.0</h1>
-<div id="stats">Loading...</div>
+<h1>GridV21 Admin Dashboard v4.4.1</h1>
+<div id="stats"><h2 class="loading">Loading brain data...</h2></div>
 
 <script>
 const urlParams = new URLSearchParams(window.location.search);
 const key = urlParams.get('key');
-
-// Your secret key - must match URL
 const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
 if(key !== ADMIN_KEY) {
   document.getElementById('stats').innerHTML = 
-  '<h2 style="color:red">Error loading. Check ADMIN_KEY in URL.</h2>';
+  '<div class="error">Error loading. Check ADMIN_KEY in URL.</div>';
 } else {
   fetch('/api/forecast')
   .then(r => r.json())
@@ -29,28 +34,36 @@ if(key !== ADMIN_KEY) {
     document.getElementById('stats').innerHTML = `
       <div class="card">
         <h3>Total Leads</h3>
-        <h2>Loading...</h2>
+        <h2>${d.total_leads || 0}</h2>
+        <p>Scraped from permit portals</p>
       </div>
       <div class="card">
-        <h3>Est. Revenue</h3>
-        <h2>$${d.monthly_projection}</h2>
-        <p>$150 contractor / $5 AI</p>
+        <h3>Est. Revenue / Month</h3>
+        <h2>$${d.monthly_projection || 0}</h2>
+        <p>$150 contractor fee / $5 AI fee</p>
       </div>
       <div class="card">
         <h3>Mode</h3>
-        <h2>${d.mode}</h2>
-        <p>Email: ${d.email}</p>
+        <h2>${d.mode || 'zero_capex'}</h2>
+        <p>Switches to growth_mode at $300/mo</p>
+        <p style="margin-top:10px">Email: ${d.email}</p>
       </div>
       <div class="card">
         <h3>Live Posts</h3>
         <h2>0</h2>
-        <p>Auto-published</p>
+        <p>Auto-published to YouTube + LinkedIn</p>
+      </div>
+      <div class="card" style="border-color:#0ff">
+        <h3>Contacts</h3>
+        <p>YouTube: ${d.youtube}</p>
+        <p>LinkedIn: ${d.linkedin}</p>
+        <p>WhatsApp: ${d.whatsapp}</p>
       </div>
     `;
   })
   .catch(e => {
     document.getElementById('stats').innerHTML = 
-    '<h2 style="color:red">API Error: ' + e.message + '</h2>';
+    '<div class="error">API Error: ' + e.message + '<br>Check /api/forecast endpoint</div>';
   });
 }
 </script>
