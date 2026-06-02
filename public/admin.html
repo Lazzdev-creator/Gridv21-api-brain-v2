@@ -10,62 +10,53 @@ h1{color:#0ff;text-align:center;font-size:24px;margin-bottom:30px;text-shadow:0 
 h3{color:#0f0;margin:0;font-size:14px;text-transform:uppercase;letter-spacing:2px}
 h2{color:#fff;font-size:36px;margin:10px 0;font-weight:bold}
 p{color:#888;font-size:12px;margin:5px 0}
+.btn{width:100%;padding:15px;margin:8px 0;background:#0f0;color:#000;border:none;border-radius:8px;font-weight:bold;font-size:16px;cursor:pointer;font-family:'Courier New'}
+.btn:hover{background:#0ff;box-shadow:0 0 15px #0ff}
+.btn-red{background:#f00;color:#fff}
+.btn-red:hover{background:#ff0;color:#000}
 .error{color:red;text-align:center;font-size:20px;padding:50px}
 .loading{animation:blink 1s infinite}
 @keyframes blink{50%{opacity:0.5}}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+@media(max-width:600px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<h1>GridV21 Admin Dashboard v4.4.1</h1>
+<h1>GridV21 Admin Dashboard v4.4.2</h1>
 <div id="stats"><h2 class="loading">Loading brain data...</h2></div>
+
+<div class="card">
+  <h3>Quick Actions</h3>
+  <div class="grid">
+    <button class="btn" onclick="scanNow()">⚡ Force Scan Now</button>
+    <button class="btn" onclick="testDM()">📱 Send Test DM</button>
+    <button class="btn" onclick="clearData()">🗑️ Clear Test Data</button>
+    <button class="btn btn-red" onclick="toggleMode()">🔄 Toggle Mode</button>
+  </div>
+  <p id="action-status" style="text-align:center;margin-top:15px"></p>
+</div>
 
 <script>
 const urlParams = new URLSearchParams(window.location.search);
 const key = urlParams.get('key');
 const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
-if(key !== ADMIN_KEY) {
-  document.getElementById('stats').innerHTML = 
-  '<div class="error">Error loading. Check ADMIN_KEY in URL.</div>';
-} else {
-  fetch('/api/forecast')
-  .then(r => r.json())
-  .then(d => {
-    document.getElementById('stats').innerHTML = `
-      <div class="card">
-        <h3>Total Leads</h3>
-        <h2>${d.total_leads || 0}</h2>
-        <p>Scraped from permit portals</p>
-      </div>
-      <div class="card">
-        <h3>Est. Revenue / Month</h3>
-        <h2>$${d.monthly_projection || 0}</h2>
-        <p>$150 contractor fee / $5 AI fee</p>
-      </div>
-      <div class="card">
-        <h3>Mode</h3>
-        <h2>${d.mode || 'zero_capex'}</h2>
-        <p>Switches to growth_mode at $300/mo</p>
-        <p style="margin-top:10px">Email: ${d.email}</p>
-      </div>
-      <div class="card">
-        <h3>Live Posts</h3>
-        <h2>0</h2>
-        <p>Auto-published to YouTube + LinkedIn</p>
-      </div>
-      <div class="card" style="border-color:#0ff">
-        <h3>Contacts</h3>
-        <p>YouTube: ${d.youtube}</p>
-        <p>LinkedIn: ${d.linkedin}</p>
-        <p>WhatsApp: ${d.whatsapp}</p>
-      </div>
-    `;
-  })
-  .catch(e => {
-    document.getElementById('stats').innerHTML = 
-    '<div class="error">API Error: ' + e.message + '<br>Check /api/forecast endpoint</div>';
-  });
+function showStatus(msg, color='#0f0') {
+  document.getElementById('action-status').innerHTML = `<span style="color:${color}">${msg}</span>`;
+  setTimeout(() => document.getElementById('action-status').innerHTML = '', 3000);
 }
-</script>
-</body>
-</html>
+
+async function scanNow() {
+  showStatus('Scanning permits...', '#0ff');
+  try {
+    const res = await fetch('/api/scan', {method:'POST'});
+    const data = await res.json();
+    showStatus(`Found ${data.leads || 0} new permits! Refreshing...`, '#0f0');
+    setTimeout(() => location.reload(), 2000);
+  } catch(e) {
+    showStatus('Scan failed: ' + e.message, 'red');
+  }
+}
+
+async function testDM() {
+  showStatus('Sending test DM to +27672049913...
