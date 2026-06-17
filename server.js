@@ -93,10 +93,10 @@ class PermitScraper {
         const value = this.estimateValue(permitType);
 
         const { data: existing } = await supabase
-         .from('leads')
-         .select('id')
-         .eq('permit_data->>permit_no', permitNo)
-         .single();
+        .from('leads')
+        .select('id')
+        .eq('permit_data->>permit_no', permitNo)
+        .single();
 
         if (!existing) {
           await supabase.from('leads').insert({
@@ -123,7 +123,7 @@ class PermitScraper {
     try {
       console.log('Scraping LA DBS permits...');
       const url = 'https://www.ladbs.org/services/e-permitting';
-      const { data: html } = await axios.get(url, {
+      await axios.get(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 GRIDV21-Brain' },
         timeout: 30000
       });
@@ -188,7 +188,7 @@ app.get('/api/integrations', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '4.4.4', uptime: process.uptime() });
+  res.json({ status: 'ok', version: '4.4.4' });
 });
 
 app.get('/api/forecast', async (req, res) => {
@@ -222,4 +222,4 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboar
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GRIDV21
+app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4 LIVE on port ${PORT}`));
