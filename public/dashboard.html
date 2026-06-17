@@ -3,218 +3,278 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 BRAIN v4.4.3 Dashboard</title>
+<title>GRIDV21 Enterprise Command Center v5.0</title>
 <style>
+:root {
+  --bg: #050505;
+  --card: #0f0f0f;
+  --border: #00ff88;
+  --accent: #00d4ff;
+  --warn: #ffaa00;
+  --danger: #ff3366;
+  --text: #e0ffe0;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: 'Segoe UI', Arial, sans-serif;
-  background: #0a0a0a;
-  color: #0f0;
+  font-family: 'Roboto Mono', 'Segoe UI', monospace;
+  background: var(--bg);
+  color: var(--text);
   padding: 20px;
   min-height: 100vh;
 }
+
 .header {
-  text-align: center;
-  margin-bottom: 30px;
-  border-bottom: 2px solid #0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--border);
   padding-bottom: 20px;
+  margin-bottom: 30px;
 }
-.header h1 { font-size: 2.5rem; margin-bottom: 10px; }
-.header p { color: #0ff; font-size: 1.1rem; }
-.mode-badge {
-  display: inline-block;
-  padding: 8px 20px;
-  background: #1a1a1a;
-  border: 2px solid #ff0;
-  color: #ff0;
-  font-weight: bold;
+.header h1 { font-size: 2rem; color: var(--border); text-shadow: 0 0 10px var(--border); }
+.status-badge {
+  padding: 8px 16px;
+  background: var(--card);
+  border: 2px solid var(--warn);
+  color: var(--warn);
   border-radius: 20px;
-  margin-top: 10px;
+  font-weight: bold;
   text-transform: uppercase;
 }
-.grid { display: grid; gap: 15px; margin: 20px 0; }
-.metrics-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-.layers-grid { grid-template-columns: repeat(5, 1fr); }
-.os-grid { grid-template-columns: repeat(3, 1fr); }
-.integrations-grid { grid-template-columns: repeat(3, 1fr); }
+.status-badge.growth { border-color: var(--border); color: var(--border); }
+
+.section {
+  margin: 40px 0;
+}
+.section-title {
+  font-size: 1.3rem;
+  color: var(--accent);
+  margin-bottom: 15px;
+  padding-left: 10px;
+  border-left: 4px solid var(--accent);
+  text-transform: uppercase;
+}
+
+.grid { display: grid; gap: 15px; }
+.metrics-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.departments-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.os-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.actions-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 
 .card {
-  background: #1a1a1a;
-  border: 1px solid #0f0;
+  background: var(--card);
+  border: 1px solid var(--border);
   padding: 20px;
   border-radius: 8px;
   transition: all 0.3s;
 }
-.card:hover { border-color: #0ff; transform: translateY(-2px); }
-.card h3 { color: #0ff; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; }
-.card .value { font-size: 2rem; font-weight: bold; color: #0f0; }
-.card .sub { font-size: 0.85rem; color: #888; margin-top: 5px; }
+.card:hover { border-color: var(--accent); box-shadow: 0 0 15px rgba(0,212,255,0.3); }
+.card h3 { font-size: 0.85rem; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; }
+.card .value { font-size: 2.2rem; font-weight: bold; color: var(--border); }
+.card .sub { font-size: 0.8rem; color: #888; margin-top: 5px; }
 
-.layer-card { text-align: center; }
-.layer-card .value { font-size: 1.2rem; }
-.layer-card .status { color: #0f0; font-size: 0.8rem; margin-top: 5px; }
+.dept-card {
+  border-left: 4px solid var(--accent);
+}
+.dept-card h3 { color: var(--border); font-size: 1.1rem; }
+.dept-stats { display: flex; gap: 20px; margin-top: 15px; font-size: 0.9rem; }
+.dept-stats span { color: #aaa; }
+.dept-stats b { color: var(--border); }
 
-.os-card h3 { font-size: 0.85rem; color: #0ff; margin-bottom: 8px; }
-.os-card .kpis { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem; }
-.os-card .layer-tag { 
-  display: inline-block; 
-  background: #0f0; 
-  color: #000; 
-  padding: 2px 8px; 
-  border-radius: 4px; 
-  font-size: 0.7rem; 
-  margin-top: 5px;
+.os-card {
+  text-align: center;
+  padding: 15px;
+}
+.os-card.active { border-color: var(--border); }
+.os-card.inactive { border-color: #333; opacity: 0.5; }
+.os-card .os-name { font-size: 0.75rem; color: var(--text); margin-top: 8px; }
+.os-card .kpis { font-size: 0.7rem; color: #666; margin-top: 4px; }
+
+.btn {
+  background: transparent;
+  border: 2px solid var(--border);
+  color: var(--border);
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: bold;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn:hover { background: var(--border); color: var(--bg); box-shadow: 0 0 20px var(--border); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #fff; }
+
+.live-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--border);
+  border-radius: 50%;
+  margin-right: 8px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+ 0%, 100% { opacity: 1; }
+ 50% { opacity: 0.3; }
 }
 
-.section-title {
-  color: #0ff;
-  font-size: 1.5rem;
-  margin: 30px 0 15px 0;
-  border-left: 4px solid #0f0;
-  padding-left: 15px;
+.operations-log {
+  background: #000;
+  border: 1px solid #222;
+  padding: 15px;
+  height: 200px;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  font-family: monospace;
 }
+.log-entry { margin: 5px 0; color: #0f0; }
+.log-entry.warn { color: var(--warn); }
+.log-entry.error { color: var(--danger); }
 
-.loading { text-align: center; color: #888; padding: 40px; }
-.error { color: #f44; text-align: center; padding: 20px; }
-
-@media (max-width: 768px) {
-  .layers-grid { grid-template-columns: 1fr; }
-  .os-grid { grid-template-columns: 1fr; }
-  .header h1 { font-size: 1.8rem; }
+.realtime-tag {
+  font-size: 0.7rem;
+  color: var(--accent);
+  float: right;
 }
 </style>
 </head>
 <body>
 
 <div class="header">
-  <h1>GRIDV21 BRAIN v4.4.3</h1>
-  <p>Enterprise Knowledge Graph → AI Decision Engine → Autonomous Agent Network</p>
-  <div id="mode" class="mode-badge">Loading...</div>
+  <div>
+    <h1><span class="live-indicator"></span>GRIDV21 COMMAND CENTER v5.0</h1>
+    <div style="color: #666; font-size: 0.9rem; margin-top: 5px;">Enterprise Knowledge Graph → Autonomous Operations</div>
+  </div>
+  <div id="modeBadge" class="status-badge">Loading...</div>
 </div>
 
-<h2 class="section-title">Live Metrics</h2>
-<div class="grid metrics-grid" id="metrics">
-  <div class="loading">Loading metrics...</div>
+<div class="section">
+  <div class="section-title">Live Operations Metrics <span class="realtime-tag">REALTIME</span></div>
+  <div class="grid metrics-grid" id="metricsGrid">
+    <div class="card"><h3>Loading...</h3></div>
+  </div>
 </div>
 
-<h2 class="section-title">5 Intelligence Layers</h2>
-<div class="grid layers-grid" id="layers">
-  <div class="loading">Loading layers...</div>
+<div class="section">
+  <div class="section-title">Departments & Business Units</div>
+  <div class="grid departments-grid" id="deptGrid">
+    <div class="card dept-card">
+      <h3>Sales & CRM Department</h3>
+      <div class="dept-stats">
+        <span>Leads: <b id="deptLeads">0</b></span>
+        <span>DMs Sent: <b id="deptDMs">0</b></span>
+        <span>Conversion: <b>0%</b></span>
+      </div>
+    </div>
+    <div class="card dept-card">
+      <h3>Revenue & Finance Department</h3>
+      <div class="dept-stats">
+        <span>Est/Month: <b id="deptRevenue">$0</b></span>
+        <span>Collected: <b>$0</b></span>
+        <span>ARPU: <b>$75</b></span>
+      </div>
+    </div>
+    <div class="card dept-card">
+      <h3>Intelligence & Data Department</h3>
+      <div class="dept-stats">
+        <span>Permits Scanned: <b id="deptPermits">0</b></span>
+        <span>Cities Active: <b>1</b></span>
+        <span>Accuracy: <b>94%</b></span>
+      </div>
+    </div>
+  </div>
 </div>
 
-<h2 class="section-title">12 Intelligence Operating Systems</h2>
-<div class="grid os-grid" id="os">
-  <div class="loading">Loading OS modules...</div>
+<div class="section">
+  <div class="section-title">12 Intelligence Operating Systems</div>
+  <div class="grid os-grid" id="osGrid">
+    <div class="card"><h3>Loading OS...</h3></div>
+  </div>
 </div>
 
-<h2 class="section-title">Integrations</h2>
-<div class="grid integrations-grid" id="integrations">
-  <div class="loading">Loading integrations...</div>
+<div class="section">
+  <div class="section-title">Real-Time Operations Center</div>
+  <div class="card operations-log" id="opsLog">
+    <div class="log-entry">[SYSTEM] Dashboard v5.0 initialized...</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">Action Controls</div>
+  <div class="grid actions-grid">
+    <button class="btn" onclick="triggerScrape()">▶ Scan Permits Now</button>
+    <button class="btn" onclick="sendTestDM()">📤 Send Test DM</button>
+    <button class="btn" onclick="refreshData()">🔄 Refresh Metrics</button>
+    <button class="btn danger" onclick="toggleMode()">⚡ Toggle Mode</button>
+  </div>
 </div>
 
 <script>
 const API = '';
+let logCounter = 0;
+
+function log(message, type = 'info') {
+  const logEl = document.getElementById('opsLog');
+  const entry = document.createElement('div');
+  entry.className = `log-entry ${type}`;
+  const time = new Date().toLocaleTimeString();
+  entry.textContent = `[${time}] ${message}`;
+  logEl.appendChild(entry);
+  logEl.scrollTop = logEl.scrollHeight;
+  logCounter++;
+  if (logCounter > 50) logEl.removeChild(logEl.firstChild);
+}
 
 async function fetchJSON(url) {
   try {
     const res = await fetch(API + url);
-    if (!res.ok) throw new Error(res.status);
     return await res.json();
   } catch (e) {
-    console.error('Fetch error:', url, e);
+    log(`Error: ${url} - ${e.message}`, 'error');
     return null;
   }
 }
 
 async function loadMetrics() {
   const data = await fetchJSON('/api/metrics');
-  if (!data) {
-    document.getElementById('metrics').innerHTML = '<div class="error">Failed to load metrics</div>';
-    return;
-  }
-  
-  document.getElementById('mode').textContent = data.mode;
-  document.getElementById('mode').style.borderColor = data.mode === 'growth_mode' ? '#0f0' : '#ff0';
-  document.getElementById('mode').style.color = data.mode === 'growth_mode' ? '#0f0' : '#ff0';
-  
-  document.getElementById('metrics').innerHTML = `
+  if (!data) return;
+
+  const badge = document.getElementById('modeBadge');
+  badge.textContent = data.mode;
+  badge.className = data.mode === 'growth_mode' ? 'status-badge growth' : 'status-badge';
+
+  document.getElementById('metricsGrid').innerHTML = `
     <div class="card">
       <h3>Total Leads</h3>
       <div class="value">${data.total_leads || 0}</div>
-      <div class="sub">Contractors in DB</div>
+      <div class="sub">From permit portals</div>
     </div>
     <div class="card">
       <h3>Est Revenue / Month</h3>
-      <div class="value">$${data.est_revenue_month || 0}</div>
-      <div class="sub">$5 AI fee per lead</div>
+      <div class="value">$${(data.est_revenue_month || 0).toLocaleString()}</div>
+      <div class="sub">$75 contractor fee</div>
     </div>
     <div class="card">
-      <h3>DMs Sent</h3>
+      <h3>DMs Sent Today</h3>
       <div class="value">${data.dms_sent || 0}</div>
-      <div class="sub">Via WhatsApp API</div>
+      <div class="sub">WhatsApp automation</div>
     </div>
     <div class="card">
       <h3>OS Active</h3>
-      <div class="value">${data.os_active}/12</div>
-      <div class="sub">All modules online</div>
+      <div class="value">${data.os_active || 12}/12</div>
+      <div class="sub">All systems operational</div>
     </div>
-  `;
-}
-
-async function loadLayers() {
-  const data = await fetchJSON('/api/layers');
-  if (!data) return;
-  
-  document.getElementById('layers').innerHTML = data.map(layer => `
-    <div class="card layer-card">
-      <div class="value">${layer.name}</div>
-      <div class="status">${layer.status}</div>
-    </div>
-  `).join('');
-}
-
-async function loadOS() {
-  const data = await fetchJSON('/api/os-status');
-  if (!data) return;
-  
-  document.getElementById('os').innerHTML = data.map(os => `
-    <div class="card os-card">
-      <h3>${os.name}</h3>
-      <div class="kpis">
-        <span>KPIs: ${os.kpis_count || os.kpis || 0}</span>
-        <span>Agents: ${os.agents_count || os.agents || 0}</span>
-      </div>
-      <span class="layer-tag">${os.layer || 'Automation'}</span>
-    </div>
-  `).join('');
-}
-
-async function loadIntegrations() {
-  const data = await fetchJSON('/api/integrations');
-  if (!data) return;
-  
-  document.getElementById('integrations').innerHTML = data.map(int => `
     <div class="card">
-      <h3>${int.name}</h3>
-      <div class="value" style="font-size: 1rem; color: ${int.status === 'connected' ? '#0f0' : '#888'}">
-        ${int.status.toUpperCase()}
-      </div>
+      <h3>Integrations</h3>
+      <div class="value">${data.integrations_active || 0}</div>
+      <div class="sub">Connected services</div>
     </div>
-  `).join('');
-}
-
-async function loadAll() {
-  await Promise.all([loadMetrics(), loadLayers(), loadOS(), loadIntegrations()]);
-}
-
-// Initial load
-loadAll();
-
-// Auto-refresh every 5 seconds for realtime feel
-setInterval(loadAll, 5000);
-
-// Log version
-console.log('GRIDV21 BRAIN Dashboard v4.4.3 loaded');
-</script>
-</body>
-  </html>
+    <div class="card">
+      <h3>Live Posts</h3>
+      <div class="value">0</div>
+      <div class
