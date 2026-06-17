@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v4.4.3 starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v4.4.4 starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -7,6 +7,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import axios from 'axios';
+import * as cheerio from 'cheerio';
 import cron from 'node-cron';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
@@ -21,10 +22,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({ 
-  secret: process.env.SESSION_SECRET || 'gridv21-brain', 
-  resave: false, 
-  saveUninitialized: true 
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'gridv21-brain',
+  resave: false,
+  saveUninitialized: true
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -55,6 +56,93 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder'
 
 const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
 
+// ========== PERMIT SCRAPER CLASS ==========
+class PermitScraper {
+  static async scrapeAustinPermits() {
+    try {
+      console.log('Scraping Austin Build+Connect permits...');
+      const url = 'https://abc.austintexas.gov/web/permit-search';
+      const { data: html } = await axios.get(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 GRIDV21-Brain' },
+        timeout: 30000
+      });
+
+      const $ = cheerio.load(html);
+      let permitsFound = 0;
+
+      $('table.permit-results tr').each(async (i, row) => {
+        if (i === 0) return;
+
+        const cols = $(row).find('td');
+        if (cols.length < 5) return;
+
+        const permitNo = $(cols[0]).text().trim();
+        const address = $(cols[1]).text().trim();
+        const permitType = $(cols[2]).text().trim();
+        const status = $(cols[3]).text().trim();
+        const issuedDate = $(cols[4]).text().trim();
+
+        if (!status.match(/issued|active|approved/i)) return;
+
+        let trade = 'building';
+        if (permitType.match(/plumb/i)) trade = 'plumbing';
+        if (permitType.match(/elect/i)) trade = 'electrical';
+        if (permitType.match(/hvac|mech/i)) trade = 'hvac';
+        if (permitType.match(/roof/i)) trade = 'roofing';
+
+        const value = this.estimateValue(permitType);
+
+        const { data: existing } = await supabase
+         .from('leads')
+         .select('id')
+         .eq('permit_data->>permit_no', permitNo)
+         .single();
+
+        if (!existing) {
+          await supabase.from('leads').insert({
+            trade_type: trade,
+            region: 'US-TX-Austin',
+            value_estimate: value,
+            permit_data: { permit_no: permitNo, address, type: permitType, issued: issuedDate },
+            status: 'new'
+          });
+          permitsFound++;
+          console.log(`New Austin permit: ${permitNo} - ${trade} - $${value}`);
+        }
+      });
+
+      console.log(`Austin scrape complete: ${permitsFound} new permits`);
+      return permitsFound;
+    } catch (err) {
+      console.error('Austin scrape error:', err.message);
+      return 0;
+    }
+  }
+
+  static async scrapeLAPermits() {
+    try {
+      console.log('Scraping LA DBS permits...');
+      const url = 'https://www.ladbs.org/services/e-permitting';
+      const { data: html } = await axios.get(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 GRIDV21-Brain' },
+        timeout: 30000
+      });
+      console.log('LA scraper placeholder - Accela selectors TBD');
+      return 0;
+    } catch (err) {
+      console.error('LA scrape error:', err.message);
+      return 0;
+    }
+  }
+
+  static estimateValue(permitType) {
+    if (permitType.match(/new|addition/i)) return 150000;
+    if (permitType.match(/remodel|renovation/i)) return 75000;
+    if (permitType.match(/repair|replace/i)) return 15000;
+    return 35000;
+  }
+}
+
 // ========== BRAIN CLASS ==========
 class Brain {
   static async getMetrics() {
@@ -76,7 +164,7 @@ class Brain {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
       console.log('BRAIN UPGRADE: $300 hit. Paid ads unlocked');
     }
-    return metrics.est_revenue_month >= 300 ? 'growth_mode' : 'zero_capex';
+    return metrics.est_revenue_month >= 300? 'growth_mode' : 'zero_capex';
   }
 }
 
@@ -100,26 +188,38 @@ app.get('/api/integrations', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '4.4.3', uptime: process.uptime() });
+  res.json({ status: 'ok', version: '4.4.4', uptime: process.uptime() });
 });
 
 app.get('/api/forecast', async (req, res) => {
   const metrics = await Brain.getMetrics();
-  res.json({ ...metrics, email: process.env.OWNER_EMAIL });
+  res.json({...metrics, email: process.env.OWNER_EMAIL });
+});
+
+// Manual scrape trigger
+app.get('/api/scrape-now', dmLimiter, async (req, res) => {
+  const austin = await PermitScraper.scrapeAustinPermits();
+  const la = await PermitScraper.scrapeLAPermits();
+  res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
 // ========== CRON - Every 30 minutes ==========
 cron.schedule('*/30 *', async () => {
   console.log('Cron: Scanning permits...');
   const mode = await Brain.autoUpgrade();
+
   if (mode === 'growth_mode') {
-    console.log('Growth mode active');
+    await PermitScraper.scrapeAustinPermits();
+    await PermitScraper.scrapeLAPermits();
+    console.log('Growth mode: scraping active');
+  } else {
+    console.log('Zero capex mode: scraping paused');
   }
 });
 
 // ========== STATIC ROUTES ==========
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.3 LIVE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GRIDV21
