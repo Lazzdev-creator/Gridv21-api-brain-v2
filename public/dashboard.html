@@ -1,11 +1,220 @@
 <!DOCTYPE html>
-<html>
-<head><title>GridV21 v4.4.0</title></head>
-<body style="font-family:Arial;text-align:center;padding:50px;background:#0a0a0a;color:#0f0">
-<h1>GridV21 API Brain v4.4.0</h1>
-<p>Status: LIVE ✅</p>
-<p><a href="/api/health" style="color:#0ff">Health Check</a></p>
-<p><a href="/api/forecast" style="color:#0ff">Forecast</a></p>
-<p>Email: ltchenana.thirteen@gmail.com</p>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRIDV21 BRAIN v4.4.3 Dashboard</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background: #0a0a0a;
+  color: #0f0;
+  padding: 20px;
+  min-height: 100vh;
+}
+.header {
+  text-align: center;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #0f0;
+  padding-bottom: 20px;
+}
+.header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+.header p { color: #0ff; font-size: 1.1rem; }
+.mode-badge {
+  display: inline-block;
+  padding: 8px 20px;
+  background: #1a1a1a;
+  border: 2px solid #ff0;
+  color: #ff0;
+  font-weight: bold;
+  border-radius: 20px;
+  margin-top: 10px;
+  text-transform: uppercase;
+}
+.grid { display: grid; gap: 15px; margin: 20px 0; }
+.metrics-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.layers-grid { grid-template-columns: repeat(5, 1fr); }
+.os-grid { grid-template-columns: repeat(3, 1fr); }
+.integrations-grid { grid-template-columns: repeat(3, 1fr); }
+
+.card {
+  background: #1a1a1a;
+  border: 1px solid #0f0;
+  padding: 20px;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+.card:hover { border-color: #0ff; transform: translateY(-2px); }
+.card h3 { color: #0ff; margin-bottom: 10px; font-size: 0.9rem; text-transform: uppercase; }
+.card .value { font-size: 2rem; font-weight: bold; color: #0f0; }
+.card .sub { font-size: 0.85rem; color: #888; margin-top: 5px; }
+
+.layer-card { text-align: center; }
+.layer-card .value { font-size: 1.2rem; }
+.layer-card .status { color: #0f0; font-size: 0.8rem; margin-top: 5px; }
+
+.os-card h3 { font-size: 0.85rem; color: #0ff; margin-bottom: 8px; }
+.os-card .kpis { display: flex; justify-content: space-between; margin-top: 10px; font-size: 0.8rem; }
+.os-card .layer-tag { 
+  display: inline-block; 
+  background: #0f0; 
+  color: #000; 
+  padding: 2px 8px; 
+  border-radius: 4px; 
+  font-size: 0.7rem; 
+  margin-top: 5px;
+}
+
+.section-title {
+  color: #0ff;
+  font-size: 1.5rem;
+  margin: 30px 0 15px 0;
+  border-left: 4px solid #0f0;
+  padding-left: 15px;
+}
+
+.loading { text-align: center; color: #888; padding: 40px; }
+.error { color: #f44; text-align: center; padding: 20px; }
+
+@media (max-width: 768px) {
+  .layers-grid { grid-template-columns: 1fr; }
+  .os-grid { grid-template-columns: 1fr; }
+  .header h1 { font-size: 1.8rem; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>GRIDV21 BRAIN v4.4.3</h1>
+  <p>Enterprise Knowledge Graph → AI Decision Engine → Autonomous Agent Network</p>
+  <div id="mode" class="mode-badge">Loading...</div>
+</div>
+
+<h2 class="section-title">Live Metrics</h2>
+<div class="grid metrics-grid" id="metrics">
+  <div class="loading">Loading metrics...</div>
+</div>
+
+<h2 class="section-title">5 Intelligence Layers</h2>
+<div class="grid layers-grid" id="layers">
+  <div class="loading">Loading layers...</div>
+</div>
+
+<h2 class="section-title">12 Intelligence Operating Systems</h2>
+<div class="grid os-grid" id="os">
+  <div class="loading">Loading OS modules...</div>
+</div>
+
+<h2 class="section-title">Integrations</h2>
+<div class="grid integrations-grid" id="integrations">
+  <div class="loading">Loading integrations...</div>
+</div>
+
+<script>
+const API = '';
+
+async function fetchJSON(url) {
+  try {
+    const res = await fetch(API + url);
+    if (!res.ok) throw new Error(res.status);
+    return await res.json();
+  } catch (e) {
+    console.error('Fetch error:', url, e);
+    return null;
+  }
+}
+
+async function loadMetrics() {
+  const data = await fetchJSON('/api/metrics');
+  if (!data) {
+    document.getElementById('metrics').innerHTML = '<div class="error">Failed to load metrics</div>';
+    return;
+  }
+  
+  document.getElementById('mode').textContent = data.mode;
+  document.getElementById('mode').style.borderColor = data.mode === 'growth_mode' ? '#0f0' : '#ff0';
+  document.getElementById('mode').style.color = data.mode === 'growth_mode' ? '#0f0' : '#ff0';
+  
+  document.getElementById('metrics').innerHTML = `
+    <div class="card">
+      <h3>Total Leads</h3>
+      <div class="value">${data.total_leads || 0}</div>
+      <div class="sub">Contractors in DB</div>
+    </div>
+    <div class="card">
+      <h3>Est Revenue / Month</h3>
+      <div class="value">$${data.est_revenue_month || 0}</div>
+      <div class="sub">$5 AI fee per lead</div>
+    </div>
+    <div class="card">
+      <h3>DMs Sent</h3>
+      <div class="value">${data.dms_sent || 0}</div>
+      <div class="sub">Via WhatsApp API</div>
+    </div>
+    <div class="card">
+      <h3>OS Active</h3>
+      <div class="value">${data.os_active}/12</div>
+      <div class="sub">All modules online</div>
+    </div>
+  `;
+}
+
+async function loadLayers() {
+  const data = await fetchJSON('/api/layers');
+  if (!data) return;
+  
+  document.getElementById('layers').innerHTML = data.map(layer => `
+    <div class="card layer-card">
+      <div class="value">${layer.name}</div>
+      <div class="status">${layer.status}</div>
+    </div>
+  `).join('');
+}
+
+async function loadOS() {
+  const data = await fetchJSON('/api/os-status');
+  if (!data) return;
+  
+  document.getElementById('os').innerHTML = data.map(os => `
+    <div class="card os-card">
+      <h3>${os.name}</h3>
+      <div class="kpis">
+        <span>KPIs: ${os.kpis_count || os.kpis || 0}</span>
+        <span>Agents: ${os.agents_count || os.agents || 0}</span>
+      </div>
+      <span class="layer-tag">${os.layer || 'Automation'}</span>
+    </div>
+  `).join('');
+}
+
+async function loadIntegrations() {
+  const data = await fetchJSON('/api/integrations');
+  if (!data) return;
+  
+  document.getElementById('integrations').innerHTML = data.map(int => `
+    <div class="card">
+      <h3>${int.name}</h3>
+      <div class="value" style="font-size: 1rem; color: ${int.status === 'connected' ? '#0f0' : '#888'}">
+        ${int.status.toUpperCase()}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadAll() {
+  await Promise.all([loadMetrics(), loadLayers(), loadOS(), loadIntegrations()]);
+}
+
+// Initial load
+loadAll();
+
+// Auto-refresh every 5 seconds for realtime feel
+setInterval(loadAll, 5000);
+
+// Log version
+console.log('GRIDV21 BRAIN Dashboard v4.4.3 loaded');
+</script>
 </body>
-</html>
+  </html>
