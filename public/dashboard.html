@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Enterprise Command Center v5.0</title>
+<title>GRIDV21 Enterprise Command Center v5.0.1</title>
 <style>
 :root {
   --bg: #050505;
@@ -14,16 +14,14 @@
   --danger: #ff3366;
   --text: #e0ffe0;
 }
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
-  font-family: 'Roboto Mono', 'Segoe UI', monospace;
+  font-family: 'Roboto Mono', monospace;
   background: var(--bg);
   color: var(--text);
   padding: 20px;
   min-height: 100vh;
 }
-
 .header {
   display: flex;
   justify-content: space-between;
@@ -43,10 +41,7 @@ body {
   text-transform: uppercase;
 }
 .status-badge.growth { border-color: var(--border); color: var(--border); }
-
-.section {
-  margin: 40px 0;
-}
+.section { margin: 40px 0; }
 .section-title {
   font-size: 1.3rem;
   color: var(--accent);
@@ -55,13 +50,11 @@ body {
   border-left: 4px solid var(--accent);
   text-transform: uppercase;
 }
-
 .grid { display: grid; gap: 15px; }
 .metrics-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .departments-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
 .os-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .actions-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -73,24 +66,16 @@ body {
 .card h3 { font-size: 0.85rem; color: var(--accent); margin-bottom: 10px; text-transform: uppercase; }
 .card .value { font-size: 2.2rem; font-weight: bold; color: var(--border); }
 .card .sub { font-size: 0.8rem; color: #888; margin-top: 5px; }
-
-.dept-card {
-  border-left: 4px solid var(--accent);
-}
+.dept-card { border-left: 4px solid var(--accent); }
 .dept-card h3 { color: var(--border); font-size: 1.1rem; }
 .dept-stats { display: flex; gap: 20px; margin-top: 15px; font-size: 0.9rem; }
 .dept-stats span { color: #aaa; }
 .dept-stats b { color: var(--border); }
-
-.os-card {
-  text-align: center;
-  padding: 15px;
-}
+.os-card { text-align: center; padding: 15px; }
 .os-card.active { border-color: var(--border); }
 .os-card.inactive { border-color: #333; opacity: 0.5; }
 .os-card .os-name { font-size: 0.75rem; color: var(--text); margin-top: 8px; }
 .os-card .kpis { font-size: 0.7rem; color: #666; margin-top: 4px; }
-
 .btn {
   background: transparent;
   border: 2px solid var(--border);
@@ -108,7 +93,6 @@ body {
 .btn:hover { background: var(--border); color: var(--bg); box-shadow: 0 0 20px var(--border); }
 .btn.danger { border-color: var(--danger); color: var(--danger); }
 .btn.danger:hover { background: var(--danger); color: #fff; }
-
 .live-indicator {
   display: inline-block;
   width: 8px;
@@ -122,7 +106,6 @@ body {
  0%, 100% { opacity: 1; }
  50% { opacity: 0.3; }
 }
-
 .operations-log {
   background: #000;
   border: 1px solid #222;
@@ -135,7 +118,6 @@ body {
 .log-entry { margin: 5px 0; color: #0f0; }
 .log-entry.warn { color: var(--warn); }
 .log-entry.error { color: var(--danger); }
-
 .realtime-tag {
   font-size: 0.7rem;
   color: var(--accent);
@@ -147,7 +129,7 @@ body {
 
 <div class="header">
   <div>
-    <h1><span class="live-indicator"></span>GRIDV21 COMMAND CENTER v5.0</h1>
+    <h1><span class="live-indicator"></span>GRIDV21 COMMAND CENTER v5.0.1</h1>
     <div style="color: #666; font-size: 0.9rem; margin-top: 5px;">Enterprise Knowledge Graph → Autonomous Operations</div>
   </div>
   <div id="modeBadge" class="status-badge">Loading...</div>
@@ -200,7 +182,7 @@ body {
 <div class="section">
   <div class="section-title">Real-Time Operations Center</div>
   <div class="card operations-log" id="opsLog">
-    <div class="log-entry">[SYSTEM] Dashboard v5.0 initialized...</div>
+    <div class="log-entry">[SYSTEM] Dashboard v5.0.1 initialized...</div>
   </div>
 </div>
 
@@ -277,4 +259,54 @@ async function loadMetrics() {
     <div class="card">
       <h3>Live Posts</h3>
       <div class="value">0</div>
-      <div class
+      <div class="sub">YouTube + LinkedIn</div>
+    </div>
+  `;
+
+  document.getElementById('deptLeads').textContent = data.total_leads || 0;
+  document.getElementById('deptDMs').textContent = data.dms_sent || 0;
+  document.getElementById('deptRevenue').textContent = '$' + (data.est_revenue_month || 0).toLocaleString();
+  document.getElementById('deptPermits').textContent = data.total_leads || 0;
+}
+
+async function loadOS() {
+  const data = await fetchJSON('/api/os-status');
+  if (!data) return;
+
+  document.getElementById('osGrid').innerHTML = data.map(os => `
+    <div class="card os-card ${os.status === 'active' ? 'active' : 'inactive'}">
+      <div class="os-name">${os.name}</div>
+      <div class="kpis">KPIs: ${os.kpis_count || 0} | Agents: ${os.agents_count || 0}</div>
+    </div>
+  `).join('');
+}
+
+async function triggerScrape() {
+  log('Manual permit scan initiated...', 'warn');
+  const res = await fetchJSON('/api/scrape-now');
+  log(`Scan complete: ${res.austin_permits} new Austin permits`, 'info');
+  setTimeout(refreshData, 1000);
+}
+
+async function sendTestDM() {
+  log('Test DM requested...', 'warn');
+  alert('WhatsApp API keys needed in Render env. Add WHATSAPP_TOKEN + WHATSAPP_PHONE_ID first.');
+  log('Test DM failed: API keys missing', 'error');
+}
+
+async function refreshData() {
+  log('Refreshing all metrics...');
+  await Promise.all([loadMetrics(), loadOS()]);
+  log('Dashboard updated', 'info');
+}
+
+function toggleMode() {
+  alert('Mode auto-switches at $300/mo revenue. Manual override requires admin API.');
+}
+
+refreshData();
+setInterval(refreshData, 5000);
+log('Enterprise Command Center v5.0.1 online', 'info');
+</script>
+</body>
+  </html>
