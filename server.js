@@ -97,10 +97,12 @@ app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-// CRON FIXED: 5 fields minute hour day month weekday
-cron.schedule('*/30 *', async () => {
-  const mode = await Brain.autoUpgrade();
-  if (mode === 'growth_mode') { await PermitScraper.scrapeAustinPermits(); await PermitScraper.scrapeLAPermits(); }
+//1// CRON DISABLED FOR TESTING - was causing crash
+// cron.schedule('*/30 *', async () => {
+//   const mode = await Brain.autoUpgrade();
+//   if (mode === 'growth_mode') { await PermitScraper.scrapeAustinPermits(); await PermitScraper.scrapeLAPermits(); }
+// }); CRON FIXED: 5 fields minute hour day month weekday
+
 });
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
