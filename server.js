@@ -62,11 +62,10 @@ class PermitScraper {
           permitsFound++;
         }
       });
-      console.log(`Austin: ${permitsFound} new permits`);
       return permitsFound;
     } catch (err) { console.error('Austin error:', err.message); return 0; }
   }
-  static async scrapeLAPermits() { console.log('LA scraper placeholder'); return 0; }
+  static async scrapeLAPermits() { return 0; }
 }
 
 class Brain {
@@ -79,7 +78,6 @@ class Brain {
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (metrics.est_revenue_month >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
-      console.log('BRAIN UPGRADE: $300 hit');
     }
     return metrics.est_revenue_month >= 300? 'growth_mode' : 'zero_capex';
   }
@@ -90,13 +88,21 @@ app.get('/api/os-status', async (req, res) => res.json((await supabase.from('os_
 app.get('/api/layers', (req, res) => res.json(LAYERS_5.map((name, i) => ({ id: i + 1, name, status: 'operational' }))));
 app.get('/api/integrations', async (req, res) => res.json((await supabase.from('integrations').select('*')).data || INTEGRATIONS.map(name => ({ name, status: 'disconnected' }))));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4c' }));
+
+// ADDED: Forecast endpoint to kill the '<' error
+app.get('/api/forecast', async (req, res) => {
+  const metrics = await Brain.getMetrics();
+  const forecast = metrics.est_revenue_month * 3;
+  res.json({ forecast_90days: forecast, mode: metrics.mode });
+});
+
 app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   const austin = await PermitScraper.scrapeAustinPermits();
   const la = await PermitScraper.scrapeLAPermits();
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-// CRON REMOVED FOR NOW - will add back clean after server boots
+// CRON REMOVED - adding back clean after this boots
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
