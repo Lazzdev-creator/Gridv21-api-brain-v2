@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v4.4.4c STABLE starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v4.4.4d ROUTES-FIXED starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -23,7 +23,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21-brain', resave: false, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
-app.use(express.static(path.join(__dirname, 'public')));
 
 const OS_12 = ['Executive Intelligence OS','Revenue Intelligence OS','Sales & CRM OS','Marketing OS','Operations OS','Finance OS','Human Capital OS','Project Management OS','Knowledge OS','Legal & Compliance OS','Supply Chain OS','Acquisition Intelligence OS'];
 const LAYERS_5 = ['Intelligence Layer','Automation Layer','Prediction Layer','Revenue Layer','Decision Layer'];
@@ -62,10 +61,11 @@ class PermitScraper {
           permitsFound++;
         }
       });
+      console.log(`Austin: ${permitsFound} new permits`);
       return permitsFound;
     } catch (err) { console.error('Austin error:', err.message); return 0; }
   }
-  static async scrapeLAPermits() { return 0; }
+  static async scrapeLAPermits() { console.log('LA scraper placeholder'); return 0; }
 }
 
 class Brain {
@@ -78,18 +78,29 @@ class Brain {
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (metrics.est_revenue_month >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
+      console.log('BRAIN UPGRADE: $300 hit');
     }
     return metrics.est_revenue_month >= 300? 'growth_mode' : 'zero_capex';
   }
 }
 
-app.get('/api/metrics', async (req, res) => res.json(await Brain.getMetrics()));
+// ALL API ROUTES BEFORE STATIC - this fixes the '<' error
+app.get('/api/metrics', async (req, res) => {
+  const metrics = await Brain.getMetrics();
+  res.json({
+   ...metrics,
+    user: {
+      email: 'admin@gridv21.com',
+      contacts: { YouTube: 'Not connected', LinkedIn: 'Not connected', WhatsApp: 'Not connected' }
+    }
+  });
+});
+
 app.get('/api/os-status', async (req, res) => res.json((await supabase.from('os_modules').select('*').order('id')).data || OS_12.map((name, i) => ({ id: i+1, name, status: 'active' }))));
 app.get('/api/layers', (req, res) => res.json(LAYERS_5.map((name, i) => ({ id: i + 1, name, status: 'operational' }))));
 app.get('/api/integrations', async (req, res) => res.json((await supabase.from('integrations').select('*')).data || INTEGRATIONS.map(name => ({ name, status: 'disconnected' }))));
-app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4c' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4d' }));
 
-// ADDED: Forecast endpoint to kill the '<' error
 app.get('/api/forecast', async (req, res) => {
   const metrics = await Brain.getMetrics();
   const forecast = metrics.est_revenue_month * 3;
@@ -102,10 +113,12 @@ app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-// CRON REMOVED - adding back clean after this boots
+// CRON REMOVED - add back 5-field after this boots stable
 
+// STATIC FILES LAST - this was blocking /api routes before
+app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4c STABLE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4d ROUTES-FIXED on port ${PORT}`));
