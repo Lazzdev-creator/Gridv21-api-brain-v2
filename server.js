@@ -63,10 +63,11 @@ class PermitScraper {
           permitsFound++;
         }
       });
+      console.log(`Austin: ${permitsFound} new permits`);
       return permitsFound;
     } catch (err) { console.error('Austin error:', err.message); return 0; }
   }
-  static async scrapeLAPermits() { return 0; }
+  static async scrapeLAPermits() { console.log('LA scraper placeholder'); return 0; }
 }
 
 class Brain {
@@ -79,6 +80,7 @@ class Brain {
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (metrics.est_revenue_month >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
+      console.log('BRAIN UPGRADE: $300 hit');
     }
     return metrics.est_revenue_month >= 300? 'growth_mode' : 'zero_capex';
   }
@@ -95,7 +97,7 @@ app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-// CRON FIXED: 5 fields = minute hour day month weekday
+// CRON FIXED: 5 fields minute hour day month weekday
 cron.schedule('*/30 *', async () => {
   const mode = await Brain.autoUpgrade();
   if (mode === 'growth_mode') { await PermitScraper.scrapeAustinPermits(); await PermitScraper.scrapeLAPermits(); }
@@ -104,5 +106,6 @@ cron.schedule('*/30 *', async () => {
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
+// PORT FIXED: Render uses 10000, fallback 3000 for local
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4b STABLE on port ${PORT}`));
