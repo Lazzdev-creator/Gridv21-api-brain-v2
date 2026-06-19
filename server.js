@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v5.3.0 OS-CONTROL starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v5.4.0 AUTO-SCAN + DEAL-CLOSE starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -10,6 +10,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import cron from 'node-cron';
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -27,21 +28,20 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50 });
 
 const BRAIN_OS = [
-  { id: 1, name: 'Executive Intelligence OS' },
-  { id: 2, name: 'Revenue Intelligence OS' },
-  { id: 3, name: 'Sales & CRM OS' },
-  { id: 4, name: 'Marketing OS' },
-  { id: 5, name: 'Operations OS' },
-  { id: 6, name: 'Finance OS' },
-  { id: 7, name: 'Human Capital OS' },
-  { id: 8, name: 'Project Management OS' },
-  { id: 9, name: 'Knowledge OS' },
-  { id: 10, name: 'Legal & Compliance OS' },
-  { id: 11, name: 'Supply Chain OS' },
-  { id: 12, name: 'Acquisition Intelligence OS' }
+  { id: 1, name: 'Executive Intelligence OS', status: 'active' },
+  { id: 2, name: 'Revenue Intelligence OS', status: 'active' },
+  { id: 3, name: 'Sales & CRM OS', status: 'active' },
+  { id: 4, name: 'Marketing OS', status: 'active' },
+  { id: 5, name: 'Operations OS', status: 'active' },
+  { id: 6, name: 'Finance OS', status: 'active' },
+  { id: 7, name: 'Human Capital OS', status: 'active' },
+  { id: 8, name: 'Project Management OS', status: 'active' },
+  { id: 9, name: 'Knowledge OS', status: 'active' },
+  { id: 10, name: 'Legal & Compliance OS', status: 'active' },
+  { id: 11, name: 'Supply Chain OS', status: 'active' },
+  { id: 12, name: 'Acquisition Intelligence OS', status: 'active' }
 ];
 
-// OS STATUS MEMORY - toggles persist until server restart
 let OS_STATUS = {
  1: 'active', 2: 'active', 3: 'active', 4: 'active', 5: 'active', 6: 'active',
  7: 'active', 8: 'active', 9: 'active', 10: 'active', 11: 'active', 12: 'active'
@@ -67,9 +67,33 @@ class Engine {
   }
 
   static async runScan() {
-    if(OS_STATUS[12]!== 'active') return { permits_found: 0, error: 'Acquisition OS offline' };
+    if(OS_STATUS[12]!== 'active') {
+      console.log('Acquisition OS inactive, skipping scan');
+      return { permits_found: 0, skipped: true };
+    }
     const permits = await PermitScraper.scrapeAustinPermits();
     return { permits_found: permits, timestamp: new Date().toISOString() };
+  }
+
+  static async generateProposal(leadId) {
+    const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single();
+    if (!lead) return { error: 'Lead not found' };
+
+    const proposal = {
+      lead_id: leadId,
+      company: 'GRIDV21',
+      client: `${lead.region} - ${lead.trade_type}`,
+      value: lead.value_estimate,
+      setup_fee: 150,
+      ai_fee: 5,
+      performance_fee: '3% of contract',
+      total_estimate: 150 + 5 + Math.floor(lead.value_estimate * 0.03),
+      generated_at: new Date().toISOString(),
+      status: 'draft'
+    };
+
+    await supabase.from('proposals').insert(proposal);
+    return proposal;
   }
 }
 
@@ -95,10 +119,17 @@ class PermitScraper {
   }
 }
 
+// === AUTO SCAN CRON - Every 2 hours ===
+cron.schedule('0 */2 *', async () => {
+  console.log('🤖 Auto-scan triggered by Acquisition OS');
+  const result = await Engine.runScan();
+  console.log(`Auto-scan complete: ${result.permits_found} new permits`);
+});
+
 // === API ROUTES ===
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length;
-  res.json({ alive: true, version: '5.3.0', engine: 'online', os_active: activeCount });
+  res.json({ alive: true, version: '5.4.0', engine: 'online', os_active: activeCount });
 });
 
 app.get('/api/os-status', (req, res) => {
@@ -109,10 +140,9 @@ app.get('/api/os-status', (req, res) => {
 app.post('/api/os-toggle/:id', (req, res) => {
   const id = parseInt(req.params.id);
   OS_STATUS[id] = OS_STATUS[id] === 'active'? 'inactive' : 'active';
-  res.json({id, status: OS_STATUS[id], name: BRAIN_OS.find(o=>o.id===id)?.name});
+  res.json({id, status: OS_STATUS[id]});
 });
 
-// === REAL 3-STAGE REVENUE ===
 app.get('/api/metrics', async (req, res) => {
   try {
     const { count: total_leads } = await supabase.from('leads').select('*', { count: 'exact', head: true });
@@ -127,24 +157,21 @@ app.get('/api/metrics', async (req, res) => {
     const est_revenue_month = setup_revenue + ai_revenue + performance_revenue;
 
     const { count: dms_sent } = await supabase.from('dm_logs').select('*', { count: 'exact', head: true });
-    const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length;
 
     res.json({
       total_leads: total_leads || 0,
       dms_sent: dms_sent || 0,
       est_revenue_month,
       revenue_breakdown: { setup: setup_revenue, ai_fees: ai_revenue, performance: performance_revenue, won_deals: won_deals.length, won_value },
-      brain_os_active: activeCount,
+      brain_os_active: Object.values(OS_STATUS).filter(s => s === 'active').length,
       engine_status: 'online'
     });
   } catch(e) {
-    console.log('Metrics error:', e.message);
     res.json({ total_leads:0, dms_sent:0, est_revenue_month:0, brain_os_active:12, engine_status:'online' });
   }
 });
 
 app.get('/api/engine/analyze/:leadId', async (req, res) => {
-  if(OS_STATUS[2]!== 'active') return res.json({error: 'Revenue Intelligence OS offline'});
   const result = await Engine.analyzeLead(req.params.leadId);
   res.json(result);
 });
@@ -169,10 +196,8 @@ app.get('/api/leads-recent', async (req, res) => {
   } catch (e) { res.json([]); }
 });
 
-// === DM TRACKING ===
 app.post('/api/dm-sent', async (req, res) => {
   try {
-    if(OS_STATUS[4]!== 'active') return res.json({error: 'Marketing OS offline - cannot send DM'});
     const { lead_id } = req.body;
     await supabase.from('dm_logs').insert({ lead_id, sent_at: new Date().toISOString() });
     res.json({ success: true });
@@ -181,21 +206,29 @@ app.post('/api/dm-sent', async (req, res) => {
   }
 });
 
-// === BRAIN CONTROL: MARK WON ===
 app.post('/api/mark-won/:id', async (req, res) => {
   try {
     const { error } = await supabase.from('leads').update({status: 'won'}).eq('id', req.params.id);
     if(error) throw error;
     res.json({success: true});
   } catch(e) {
-    console.log('Mark won error:', e.message);
     res.status(500).json({error: e.message});
   }
 });
 
-// === STATIC LAST ===
+// === DEAL CLOSING OS ===
+app.post('/api/generate-proposal/:id', async (req, res) => {
+  try {
+    if(OS_STATUS[3]!== 'active') return res.status(403).json({error: 'Sales & CRM OS inactive'});
+    const proposal = await Engine.generateProposal(req.params.id);
+    res.json({success: true, proposal});
+  } catch(e) {
+    res.status(500).json({error: e.message});
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`v5.3.0 OS-CONTROL on port ${PORT} - All 12 OS toggleable`));
+app.listen(PORT, () => console.log(`v5.4.0 AUTO-SCAN + DEAL-CLOSE on port ${PORT}`));
