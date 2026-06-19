@@ -2,9 +2,9 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.3.0</title>
+<title>GRIDV21 Brain Control v5.4.1</title>
 <style>
-:root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; --grey: #333; }
+:root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; --grey: #333; --purple: #aa00ff; }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--dark);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:15px}
 .header{display:flex;align-items:center;gap:15px;margin-bottom:20px;border-bottom:2px solid var(--blue);padding-bottom:15px}
@@ -21,6 +21,7 @@ h1{font-size:20px;color:var(--blue)}
 .btn:active{opacity:0.7}
 .btn-green{background:var(--green)}
 .btn-pink{background:var(--pink);color:#fff}
+.btn-orange{background:var(--orange);color:#000}
 .activity-item{padding:10px 0;border-bottom:1px solid #1e2342;font-size:13px}
 .activity-time{font-size:10px;opacity:0.5}
 .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 2s infinite}
@@ -32,6 +33,7 @@ h1{font-size:20px;color:var(--blue)}
 .badge-hot{background:#ff3366;color:#fff}
 .badge-warm{background:var(--orange);color:#000}
 .badge-won{background:var(--green);color:#000}
+.badge-draft{background:var(--purple);color:#fff}
 .breakdown-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid #1e2342;font-size:13px}
 .breakdown-label{opacity:0.8}
 .breakdown-value{font-weight:bold;color:var(--blue)}
@@ -46,6 +48,9 @@ h1{font-size:20px;color:var(--blue)}
 .os-btn{padding:10px;font-size:11px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;transition:0.2s}
 .os-btn.active{background:var(--green);color:#000}
 .os-btn.inactive{background:var(--grey);color:#999}
+.proposal-row{display:flex;justify-content:space-between;padding:10px 8px;border-bottom:1px solid #1e2342;font-size:12px}
+.proposal-client{font-weight:bold}
+.proposal-amount{color:var(--green);font-weight:bold}
 </style>
 </head>
 <body>
@@ -53,8 +58,8 @@ h1{font-size:20px;color:var(--blue)}
 <div class="header">
   <div class="logo">GV</div>
   <div>
-    <h1>GRIDV21 <span id="version">v5.3.0</span></h1>
-    <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Engine Online</div>
+    <h1>GRIDV21 <span id="version">v5.4.1</span></h1>
+    <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Auto-Scan Active</div>
   </div>
 </div>
 
@@ -81,8 +86,13 @@ h1{font-size:20px;color:var(--blue)}
 </div>
 
 <div class="card full">
-  <h3>🎯 Lead Actions</h3>
-  <div id="lead_actions"><div style="opacity:0.6;text-align:center;padding:20px">Select a tenant above to control this lead</div></div>
+  <h3>🎯 Lead Actions - Deal Closing OS</h3>
+  <div id="lead_actions"><div style="opacity:0.6;text-align:center;padding:20px">Select a tenant above</div></div>
+</div>
+
+<div class="card full">
+  <h3>📄 Proposals Vault - Deal Closing OS</h3>
+  <div id="proposals"><div class="proposal-row">Loading proposals...</div></div>
 </div>
 
 <div class="card full">
@@ -134,6 +144,25 @@ async function loadMetrics() {
   } catch(e) { console.log('Error:', e) }
 }
 
+async function loadProposals() {
+  const r = await fetch('/api/proposals');
+  const props = await r.json();
+  const div = document.getElementById('proposals');
+  if(props.length > 0) {
+    div.innerHTML = props.map(p => `
+      <div class="proposal-row">
+        <span class="proposal-client">${p.client}</span>
+        <span>
+          <span class="proposal-amount">$${p.total_estimate}</span>
+          <span class="badge badge-draft">${p.status.toUpperCase()}</span>
+        </span>
+      </div>
+    `).join('');
+  } else {
+    div.innerHTML = '<div style="opacity:0.6;text-align:center;padding:15px">No proposals yet. Generate one from Lead Actions</div>';
+  }
+}
+
 async function loadOS() {
   const r = await fetch('/api/os-status');
   const osList = await r.json();
@@ -156,6 +185,7 @@ function selectLead(id, value, trade, region) {
     <button class="btn" onclick="analyzeLead()">🧠 Analyze Lead - Get Score</button>
     <button class="btn btn-green" onclick="markWon()">💰 Mark as WON - Unlock 3%</button>
     <button class="btn btn-pink" onclick="sendDM()">📱 Send WhatsApp DM</button>
+    <button class="btn btn-orange" onclick="generateProposal()">📄 Generate Proposal - Deal Closing OS</button>
   `;
   addEvent(`Selected lead ${id.slice(0,8)}...`, 'select');
 }
@@ -182,6 +212,19 @@ async function sendDM() {
   await fetch('/api/dm-sent', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lead_id: selectedLeadId})});
   addEvent('DM sent! DMS counter +1', 'success');
   loadMetrics();
+}
+
+async function generateProposal() {
+  if(!selectedLeadId) return;
+  addEvent('📄 Deal Closing OS generating proposal...', 'proposal');
+  const r = await fetch('/api/generate-proposal/' + selectedLeadId, {method:'POST'});
+  const d = await r.json();
+  if(d.success) {
+    addEvent(`Proposal generated: $${d.proposal.total_estimate} total`, 'success');
+    loadProposals();
+  } else {
+    addEvent(`Error: ${d.error}`, 'error');
+  }
 }
 
 async function toggleOS(id) {
@@ -219,9 +262,11 @@ async function checkEngine() { const r = await fetch('/api/test'); const d = awa
 
 loadMetrics();
 loadOS();
+loadProposals();
 setInterval(loadMetrics, 3000);
 setInterval(loadOS, 5000);
-addEvent('Brain Control Center v5.3.0 initialized - Full OS Control', 'boot');
+setInterval(loadProposals, 3000);
+addEvent('Brain Control Center v5.4.1 initialized - Auto-Scan + Deal Closing OS', 'boot');
 </script>
 </body>
   </html>
