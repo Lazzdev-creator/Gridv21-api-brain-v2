@@ -2,9 +2,9 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.2.0</title>
+<title>GRIDV21 Brain Control v5.3.0</title>
 <style>
-:root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; }
+:root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; --grey: #333; }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--dark);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:15px}
 .header{display:flex;align-items:center;gap:15px;margin-bottom:20px;border-bottom:2px solid var(--blue);padding-bottom:15px}
@@ -42,6 +42,10 @@ h1{font-size:20px;color:var(--blue)}
 .stage-2{background:rgba(255,170,0,0.2);color:var(--orange)}
 .stage-3{background:rgba(0,255,136,0.2);color:var(--green)}
 .selected-lead-info{padding:12px;background:rgba(0,168,255,0.1);border-radius:8px;margin-bottom:10px;font-size:13px}
+.os-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.os-btn{padding:10px;font-size:11px;border-radius:8px;border:none;cursor:pointer;font-weight:bold;transition:0.2s}
+.os-btn.active{background:var(--green);color:#000}
+.os-btn.inactive{background:var(--grey);color:#999}
 </style>
 </head>
 <body>
@@ -49,32 +53,16 @@ h1{font-size:20px;color:var(--blue)}
 <div class="header">
   <div class="logo">GV</div>
   <div>
-    <h1>GRIDV21 <span id="version">v5.2.0</span></h1>
+    <h1>GRIDV21 <span id="version">v5.3.0</span></h1>
     <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Engine Online</div>
   </div>
 </div>
 
 <div class="grid">
-  <div class="card">
-    <h3>Total Leads</h3>
-    <div class="value" id="total_leads">0</div>
-    <div class="subvalue">Permit pipeline</div>
-  </div>
-  <div class="card">
-    <h3>Est. Revenue/Month</h3>
-    <div class="value" id="revenue">$0</div>
-    <div class="subvalue">3-stage model</div>
-  </div>
-  <div class="card">
-    <h3>DMs Sent</h3>
-    <div class="value" id="dms">0</div>
-    <div class="subvalue">WhatsApp outreach</div>
-  </div>
-  <div class="card">
-    <h3>OS Active</h3>
-    <div class="value" id="os_count">12/12</div>
-    <div class="subvalue">All modules online</div>
-  </div>
+  <div class="card"><h3>Total Leads</h3><div class="value" id="total_leads">0</div><div class="subvalue">Permit pipeline</div></div>
+  <div class="card"><h3>Est. Revenue/Month</h3><div class="value" id="revenue">$0</div><div class="subvalue">3-stage model</div></div>
+  <div class="card"><h3>DMs Sent</h3><div class="value" id="dms">0</div><div class="subvalue">WhatsApp outreach</div></div>
+  <div class="card"><h3>OS Active</h3><div class="value" id="os_count">12/12</div><div class="subvalue">All modules online</div></div>
 </div>
 
 <div class="card full">
@@ -94,9 +82,14 @@ h1{font-size:20px;color:var(--blue)}
 
 <div class="card full">
   <h3>🎯 Lead Actions</h3>
-  <div id="lead_actions">
-    <div style="opacity:0.6;text-align:center;padding:20px">Select a tenant above to control this lead</div>
-  </div>
+  <div id="lead_actions"><div style="opacity:0.6;text-align:center;padding:20px">Select a tenant above to control this lead</div></div>
+</div>
+
+<div class="card full">
+  <h3>🎛️ OS Control Panel - Toggle Modules</h3>
+  <div class="os-grid" id="os_panel">Loading OS modules...</div>
+  <button class="btn btn-green" onclick="activateAllOS()" style="margin-top:10px">⚡ Activate All 12 OS</button>
+  <button class="btn" onclick="deactivateAllOS()" style="background:var(--pink);color:#fff;margin-top:5px">⛔ Deactivate All</button>
 </div>
 
 <div class="card full">
@@ -108,40 +101,23 @@ h1{font-size:20px;color:var(--blue)}
 
 <script>
 let selectedLeadId = null;
-let selectedLeadValue = 0;
 
 async function loadMetrics() {
   try {
     const r = await fetch('/api/metrics');
     const d = await r.json();
-    
     document.getElementById('total_leads').textContent = d.total_leads || 0;
     document.getElementById('revenue').textContent = '$' + (d.est_revenue_month || 0).toLocaleString();
     document.getElementById('dms').textContent = d.dms_sent || 0;
-    document.getElementById('os_count').textContent = (d.brain_os_active || 12) + '/12';
     
     if(d.revenue_breakdown) {
       const b = d.revenue_breakdown;
       document.getElementById('breakdown').innerHTML = `
-        <div class="breakdown-row">
-          <span class="breakdown-label">Stage 1: Setup <span class="stage-tag stage-1">$150/client</span></span>
-          <span class="breakdown-value">$${b.setup.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Stage 2: AI <span class="stage-tag stage-2">$5/lead</span></span>
-          <span class="breakdown-value">$${b.ai_fees.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">Stage 3: Performance <span class="stage-tag stage-3">3% won</span></span>
-          <span class="breakdown-value">$${b.performance.toLocaleString()}</span>
-        </div>
-        <div class="breakdown-row">
-          <span class="breakdown-label">${b.won_deals} Won Deals • $${b.won_value.toLocaleString()} value</span>
-        </div>
-        <div class="breakdown-row breakdown-total">
-          <span class="breakdown-label">Total Monthly Revenue</span>
-          <span class="breakdown-value">$${d.est_revenue_month.toLocaleString()}</span>
-        </div>
+        <div class="breakdown-row"><span class="breakdown-label">Stage 1: Setup <span class="stage-tag stage-1">$150/client</span></span><span class="breakdown-value">$${b.setup.toLocaleString()}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Stage 2: AI <span class="stage-tag stage-2">$5/lead</span></span><span class="breakdown-value">$${b.ai_fees.toLocaleString()}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">Stage 3: Performance <span class="stage-tag stage-3">3% won</span></span><span class="breakdown-value">$${b.performance.toLocaleString()}</span></div>
+        <div class="breakdown-row"><span class="breakdown-label">${b.won_deals} Won Deals • $${b.won_value.toLocaleString()} value</span></div>
+        <div class="breakdown-row breakdown-total"><span class="breakdown-label">Total Monthly Revenue</span><span class="breakdown-value">$${d.est_revenue_month.toLocaleString()}</span></div>
       `;
     }
     
@@ -151,26 +127,32 @@ async function loadMetrics() {
       tenantsDiv.innerHTML = leads.map(l => `
         <div class="tenant-row ${selectedLeadId === l.id ? 'selected' : ''}" onclick="selectLead('${l.id}', ${l.value_estimate}, '${l.trade_type}', '${l.region}')">
           <span>${l.region} - ${l.trade_type}</span>
-          <span class="badge ${l.status === 'won' ? 'badge-won' : l.value_estimate > 50000 ? 'badge-hot' : 'badge-warm'}">
-            $${l.value_estimate} ${l.status === 'won' ? 'WON' : ''}
-          </span>
+          <span class="badge ${l.status === 'won' ? 'badge-won' : l.value_estimate > 50000 ? 'badge-hot' : 'badge-warm'}">$${l.value_estimate} ${l.status === 'won' ? 'WON' : ''}</span>
         </div>
       `).join('');
     }
   } catch(e) { console.log('Error:', e) }
 }
 
+async function loadOS() {
+  const r = await fetch('/api/os-status');
+  const osList = await r.json();
+  const panel = document.getElementById('os_panel');
+  panel.innerHTML = osList.map(os => `
+    <button class="os-btn ${os.status}" onclick="toggleOS(${os.id})">
+      ${os.id}. ${os.name.replace(' OS','')}<br>
+      <span style="font-size:9px">${os.status.toUpperCase()}</span>
+    </button>
+  `).join('');
+  document.getElementById('os_count').textContent = osList.filter(o=>o.status==='active').length + '/12';
+}
+
 function selectLead(id, value, trade, region) {
   selectedLeadId = id;
-  selectedLeadValue = value;
   document.querySelectorAll('.tenant-row').forEach(r => r.classList.remove('selected'));
   event.currentTarget.classList.add('selected');
-  
   document.getElementById('lead_actions').innerHTML = `
-    <div class="selected-lead-info">
-      <strong>Selected:</strong> ${region} - ${trade}<br>
-      <strong>Value:</strong> $${value.toLocaleString()}
-    </div>
+    <div class="selected-lead-info"><strong>Selected:</strong> ${region} - ${trade}<br><strong>Value:</strong> $${value.toLocaleString()}</div>
     <button class="btn" onclick="analyzeLead()">🧠 Analyze Lead - Get Score</button>
     <button class="btn btn-green" onclick="markWon()">💰 Mark as WON - Unlock 3%</button>
     <button class="btn btn-pink" onclick="sendDM()">📱 Send WhatsApp DM</button>
@@ -180,7 +162,7 @@ function selectLead(id, value, trade, region) {
 
 async function analyzeLead() {
   if(!selectedLeadId) return;
-  addEvent('🧠 Revenue Intelligence OS analyzing lead...', 'analyze');
+  addEvent('🧠 Revenue Intelligence OS analyzing...', 'analyze');
   const r = await fetch('/api/engine/analyze/' + selectedLeadId);
   const d = await r.json();
   addEvent(`Score: ${d.score}/100 - Tier: ${d.tier} - OS: ${d.recommended_os}`, d.tier === 'Hot' ? 'success' : 'info');
@@ -188,9 +170,9 @@ async function analyzeLead() {
 
 async function markWon() {
   if(!selectedLeadId) return;
-  addEvent('💰 Marking lead as WON...', 'win');
+  addEvent('💰 Marking WON...', 'win');
   await fetch('/api/mark-won/' + selectedLeadId, {method:'POST'});
-  addEvent('Lead WON! Stage 3 Performance revenue unlocked', 'success');
+  addEvent('Lead WON! Stage 3 revenue unlocked', 'success');
   loadMetrics();
 }
 
@@ -198,8 +180,27 @@ async function sendDM() {
   if(!selectedLeadId) return;
   addEvent('📱 Sending WhatsApp DM...', 'dm');
   await fetch('/api/dm-sent', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({lead_id: selectedLeadId})});
-  addEvent('DM sent! Revenue Intelligence OS engaged', 'success');
+  addEvent('DM sent! DMS counter +1', 'success');
   loadMetrics();
+}
+
+async function toggleOS(id) {
+  const r = await fetch('/api/os-toggle/' + id, {method:'POST'});
+  const d = await r.json();
+  addEvent(`OS ${id} ${d.status}`, d.status==='active'?'success':'warning');
+  loadOS();
+}
+
+async function activateAllOS() {
+  for(let i=1; i<=12; i++) await fetch('/api/os-toggle/' + i, {method:'POST'});
+  addEvent('All 12 OS Activated', 'success');
+  loadOS();
+}
+
+async function deactivateAllOS() {
+  for(let i=1; i<=12; i++) await fetch('/api/os-toggle/' + i, {method:'POST'});
+  addEvent('All OS Deactivated', 'warning');
+  loadOS();
 }
 
 function addEvent(text, type='info') {
@@ -212,30 +213,15 @@ function addEvent(text, type='info') {
   if(eventsDiv.children.length > 15) eventsDiv.removeChild(eventsDiv.lastChild);
 }
 
-async function forceScan() {
-  addEvent('⚡ Acquisition Intelligence OS triggered scan...', 'scan');
-  const r = await fetch('/api/scrape-now');
-  const d = await r.json();
-  addEvent(`Scan: ${d.permits_found} new permits`, d.permits_found > 0 ? 'success' : 'info');
-  loadMetrics();
-}
-
-async function testLead() {
-  addEvent('➕ Adding test tenant...', 'add');
-  await fetch('/api/test-insert');
-  addEvent('Test lead created: $65k electrical', 'success');
-  loadMetrics();
-}
-
-async function checkEngine() {
-  const r = await fetch('/api/test');
-  const d = await r.json();
-  addEvent(`Engine v${d.version}: ${d.engine}`, 'engine');
-}
+async function forceScan() { addEvent('⚡ Scan triggered...', 'scan'); const r = await fetch('/api/scrape-now'); const d = await r.json(); addEvent(`Scan: ${d.permits_found} permits`, d.permits_found > 0 ? 'success' : 'info'); loadMetrics(); }
+async function testLead() { addEvent('➕ Adding test...', 'add'); await fetch('/api/test-insert'); addEvent('Test lead created', 'success'); loadMetrics(); }
+async function checkEngine() { const r = await fetch('/api/test'); const d = await r.json(); addEvent(`Engine v${d.version}: ${d.engine}`, 'engine'); }
 
 loadMetrics();
+loadOS();
 setInterval(loadMetrics, 3000);
-addEvent('Brain Control Center v5.2.0 initialized', 'boot');
+setInterval(loadOS, 5000);
+addEvent('Brain Control Center v5.3.0 initialized - Full OS Control', 'boot');
 </script>
 </body>
-    </html>
+  </html>
