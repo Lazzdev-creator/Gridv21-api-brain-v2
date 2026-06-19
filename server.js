@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v4.4.4b STABLE starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v4.4.4c STABLE starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -7,7 +7,6 @@ import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import cron from 'node-cron';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -90,24 +89,17 @@ app.get('/api/metrics', async (req, res) => res.json(await Brain.getMetrics()));
 app.get('/api/os-status', async (req, res) => res.json((await supabase.from('os_modules').select('*').order('id')).data || OS_12.map((name, i) => ({ id: i+1, name, status: 'active' }))));
 app.get('/api/layers', (req, res) => res.json(LAYERS_5.map((name, i) => ({ id: i + 1, name, status: 'operational' }))));
 app.get('/api/integrations', async (req, res) => res.json((await supabase.from('integrations').select('*')).data || INTEGRATIONS.map(name => ({ name, status: 'disconnected' }))));
-app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4b' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4c' }));
 app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   const austin = await PermitScraper.scrapeAustinPermits();
   const la = await PermitScraper.scrapeLAPermits();
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-//1// CRON DISABLED FOR TESTING - was causing crash
-// cron.schedule('*/30 *', async () => {
-//   const mode = await Brain.autoUpgrade();
-//   if (mode === 'growth_mode') { await PermitScraper.scrapeAustinPermits(); await PermitScraper.scrapeLAPermits(); }
-// }); CRON FIXED: 5 fields minute hour day month weekday
-
-});
+// CRON REMOVED FOR NOW - will add back clean after server boots
 
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-// PORT FIXED: Render uses 10000, fallback 3000 for local
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4b STABLE on port ${PORT}`));
+app.listen(PORT, () => console.log(`GRIDV21 BRAIN v4.4.4c STABLE on port ${PORT}`));
