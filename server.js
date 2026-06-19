@@ -63,11 +63,10 @@ class PermitScraper {
           permitsFound++;
         }
       });
-      console.log(`Austin: ${permitsFound} new permits`);
       return permitsFound;
     } catch (err) { console.error('Austin error:', err.message); return 0; }
   }
-  static async scrapeLAPermits() { console.log('LA scraper placeholder'); return 0; }
+  static async scrapeLAPermits() { return 0; }
 }
 
 class Brain {
@@ -80,7 +79,6 @@ class Brain {
     const { data: tier } = await supabase.from('settings').select('value').eq('key', 'render_tier').single();
     if (metrics.est_revenue_month >= 300 && tier?.value === 'free') {
       await supabase.from('settings').update({ value: 'starter' }).eq('key', 'render_tier');
-      console.log('BRAIN UPGRADE: $300 hit');
     }
     return metrics.est_revenue_month >= 300? 'growth_mode' : 'zero_capex';
   }
@@ -91,14 +89,13 @@ app.get('/api/os-status', async (req, res) => res.json((await supabase.from('os_
 app.get('/api/layers', (req, res) => res.json(LAYERS_5.map((name, i) => ({ id: i + 1, name, status: 'operational' }))));
 app.get('/api/integrations', async (req, res) => res.json((await supabase.from('integrations').select('*')).data || INTEGRATIONS.map(name => ({ name, status: 'disconnected' }))));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', version: '4.4.4b' }));
-app.get('/api/forecast', async (req, res) => res.json({...await Brain.getMetrics(), email: process.env.OWNER_EMAIL }));
 app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   const austin = await PermitScraper.scrapeAustinPermits();
   const la = await PermitScraper.scrapeLAPermits();
   res.json({ status: 'scraped', austin_permits: austin, la_permits: la });
 });
 
-// CRON FIXED: 5 fields minute hour day month weekday
+// CRON FIXED: 5 fields = minute hour day month weekday
 cron.schedule('*/30 *', async () => {
   const mode = await Brain.autoUpgrade();
   if (mode === 'growth_mode') { await PermitScraper.scrapeAustinPermits(); await PermitScraper.scrapeLAPermits(); }
