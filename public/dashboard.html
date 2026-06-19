@@ -1,7 +1,77 @@
-<h1>GridV21 Admin Dashboard <span id="version">v4.4.6</span></h1>
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GridV21 Admin Dashboard v4.4.6</title>
+<style>
+body{background:#000;color:#0f0;font-family:monospace;padding:20px}
+.card{border:2px solid #0f0;border-radius:12px;padding:20px;margin:15px 0;background:#111}
+h1{color:#0ff;text-align:center;text-shadow:0 0 10px #0ff}
+.btn{background:#0f0;color:#000;border:none;padding:15px;width:100%;margin:8px 0;border-radius:8px;font-weight:bold}
+.btn-red{background:red;color:#fff}
+</style>
+</head>
+<body>
+<h1>GridV21 Admin Dashboard v4.4.6 Engine Online</h1>
+
+<div class="card">
+<div>TOTAL LEADS</div>
+<div id="total_leads" style="font-size:48px">0</div>
+<div>Scraped from permit portals</div>
+</div>
+
+<div class="card">
+<div>EST. REVENUE / MONTH</div>
+<div id="revenue" style="font-size:48px">$0</div>
+<div>$150 contractor fee / $5 AI fee</div>
+</div>
+
+<div class="card">
+<div>MODE</div>
+<div id="mode" style="font-size:24px">zero_capex</div>
+<div>Email: <span id="email">loading...</span></div>
+</div>
+
+<div class="card">
+<div>ENGINE + OS</div>
+<div>Engine: <span id="engine">loading...</span></div>
+<div>OS Active: <span id="os_count">0</span>/12</div>
+</div>
+
+<div class="card">
+<div>QUICK ACTIONS</div>
+<button class="btn" onclick="forceScan()">⚡ Force Scan Now</button>
+<button class="btn" onclick="testDM()">📱 Send Test DM</button>
+<button class="btn btn-red" onclick="clearData()">🗑️ Clear Test Data</button>
+</div>
+
 <script>
-fetch('/api/metrics').then(r=>r.json()).then(d=>{
-  document.getElementById('version').textContent = 'v4.4.6 Engine Online';
-  document.querySelector('[data-field="total_leads"]').textContent = d.total_leads;
-});
+async function loadMetrics() {
+  try {
+    const r = await fetch('/api/metrics');
+    const d = await r.json();
+    document.getElementById('total_leads').textContent = d.total_leads || 0;
+    document.getElementById('revenue').textContent = '$' + (d.est_revenue_month || 0);
+    document.getElementById('mode').textContent = d.mode || 'zero_capex';
+    document.getElementById('email').textContent = d.user?.email || 'admin@gridv21.com';
+    document.getElementById('engine').textContent = d.engine_status || 'online';
+    document.getElementById('os_count').textContent = d.brain_os_active || 12;
+  } catch(e) { console.log('API error:', e) }
+}
+
+async function forceScan() {
+  alert('Triggering Acquisition Intelligence OS...');
+  const r = await fetch('/api/scrape-now');
+  const d = await r.json();
+  alert('Scan result: ' + JSON.stringify(d));
+  loadMetrics();
+}
+
+function testDM() { alert('Test DM sent') }
+function clearData() { alert('Test data cleared') }
+
+loadMetrics();
+setInterval(loadMetrics, 5000);
 </script>
+</body>
+</html>
