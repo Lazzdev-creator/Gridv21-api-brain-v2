@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v5.4.3 AUTO-SCAN + DEAL-CLOSE starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v5.4.4 AUTO-SCAN + DEAL-CLOSE starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -10,7 +10,6 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import cron from 'node-cron';
 
 dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
@@ -119,17 +118,12 @@ class PermitScraper {
   }
 }
 
-// === AUTO SCAN CRON - Fixed syntax: every 2 hours ===
-cron.schedule('0 0 */2 *', async () => {
-  console.log('🤖 Auto-scan triggered by Acquisition OS');
-  const result = await Engine.runScan();
-  console.log(`Auto-scan complete: ${result.permits_found} new permits`);
-});
+// === AUTO SCAN CRON REMOVED - Use Render Cron Job instead ===
 
 // === API ROUTES ===
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length;
-  res.json({ alive: true, version: '5.4.3', engine: 'online', os_active: activeCount });
+  res.json({ alive: true, version: '5.4.4', engine: 'online', os_active: activeCount });
 });
 
 app.get('/api/os-status', (req, res) => {
@@ -240,4 +234,4 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`v5.4.3 AUTO-SCAN + DEAL-CLOSE on port ${PORT}`));
+app.listen(PORT, () => console.log(`v5.4.4 AUTO-SCAN + DEAL-CLOSE on port ${PORT}`));
