@@ -1,6 +1,6 @@
 {
   "name": "gridv21-brain",
-  "version": "5.4.2",
+  "version": "5.4.4",
   "description": "GRIDV21 Brain OS - VC Master Build",
   "main": "server.js",
   "type": "module",
@@ -17,8 +17,7 @@
     "axios": "^1.6.2",
     "cheerio": "^1.0.0-rc.12",
     "express-rate-limit": "^7.1.5",
-    "dotenv": "^16.3.1",
-    "node-cron": "^3.0.3"
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
