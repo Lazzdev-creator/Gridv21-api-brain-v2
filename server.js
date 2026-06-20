@@ -1,4 +1,4 @@
-console.log('GRIDV21 BRAIN v5.4.0 AUTO-SCAN + DEAL-CLOSE starting... Node:', process.version);
+console.log('GRIDV21 BRAIN v5.4.3 AUTO-SCAN + DEAL-CLOSE starting... Node:', process.version);
 import express from 'express';
 import cors from 'cors';
 import session from 'express-session';
@@ -119,8 +119,8 @@ class PermitScraper {
   }
 }
 
-// === AUTO SCAN CRON - Every 2 hours ===
-cron.schedule('0 */2 *', async () => {
+// === AUTO SCAN CRON - Fixed syntax: every 2 hours ===
+cron.schedule('0 0 */2 *', async () => {
   console.log('🤖 Auto-scan triggered by Acquisition OS');
   const result = await Engine.runScan();
   console.log(`Auto-scan complete: ${result.permits_found} new permits`);
@@ -129,7 +129,7 @@ cron.schedule('0 */2 *', async () => {
 // === API ROUTES ===
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length;
-  res.json({ alive: true, version: '5.4.0', engine: 'online', os_active: activeCount });
+  res.json({ alive: true, version: '5.4.3', engine: 'online', os_active: activeCount });
 });
 
 app.get('/api/os-status', (req, res) => {
@@ -227,8 +227,17 @@ app.post('/api/generate-proposal/:id', async (req, res) => {
   }
 });
 
+app.get('/api/proposals', async (req, res) => {
+  try {
+    const { data } = await supabase.from('proposals').select('id, client, value, total_estimate, status, generated_at').order('generated_at', { ascending: false }).limit(10);
+    res.json(data || []);
+  } catch(e) {
+    res.json([]);
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`v5.4.0 AUTO-SCAN + DEAL-CLOSE on port ${PORT}`));
+app.listen(PORT, () => console.log(`v5.4.3 AUTO-SCAN + DEAL-CLOSE on port ${PORT}`));
