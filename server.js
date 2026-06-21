@@ -152,11 +152,11 @@ class Engine {
   }
 }
 
-// 4. Cron - every 30min multi-city
-cron.schedule('*/30 *', () => {
-  console.log('Brain Engine multi-city scan starting...')
-  scanAllCities()
-})
+// 4. // Schedule brain scans every 30 minutes
+cron.schedule('*/30 *', async () => {
+  console.log('Brain auto-scan triggered');
+  await brainScanAllCities();
+});
 
 // 5. API Routes
 app.get('/api/test', (req, res) => {
