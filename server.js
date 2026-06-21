@@ -49,7 +49,6 @@ async function scanAllCities() {
       yesterday.setDate(yesterday.getDate() - 1)
       const dateFilter = yesterday.toISOString().split('T')[0]
       const url = `${city.url}?$where=permit_type_description LIKE '%ELECTRICAL%' AND issued_date >= '${dateFilter}T00:00:00'&$limit=50`
-
       const res = await fetch(url)
       const permits = await res.json()
 
@@ -66,12 +65,7 @@ async function scanAllCities() {
           last_seen_at: new Date().toISOString(),
           stage: 'Stage 1 Setup'
         }
-
-        await supabase.from('permits').upsert(permitData, {
-          onConflict: 'permit_id',
-          ignoreDuplicates: false
-        })
-
+        await supabase.from('permits').upsert(permitData, { onConflict: 'permit_id', ignoreDuplicates: false })
         await supabase.from('revenue_log').upsert({
           permit_id: permitData.permit_id,
           deal_value: permitData.value,
@@ -80,7 +74,6 @@ async function scanAllCities() {
           logged_at: new Date().toISOString()
         }, { onConflict: 'permit_id' })
       }
-
       console.log(`Brain scanned ${permits.length} permits from ${city.name}`)
       await new Promise(r => setTimeout(r, 1000))
     } catch (err) {
@@ -113,6 +106,7 @@ class Engine {
   static async analyzeLead(leadId) {
     const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single()
     if (!lead) return { leadId, error: 'Lead not found', score: 0, tier: 'None' }
+
     let score = 50
     if (lead.value_estimate > 50000) score += 30
     else if (lead.value_estimate > 20000) score += 15
@@ -120,10 +114,13 @@ class Engine {
     if (lead.region?.includes('Austin')) score += 10
     if (lead.status === 'new') score += 5
     score = Math.min(100, score)
+
     const tier = score > 70? 'Hot' : score > 40? 'Warm' : 'Cold'
     const recommended_os = score > 70? 'Revenue Intelligence OS' : score > 50? 'Sales & CRM OS' : 'Acquisition Intelligence OS'
+
     return { leadId, score, tier, recommended_os, value: lead.value_estimate, trade: lead.trade_type, status: lead.status }
   }
+
   static async runScan() {
     if(OS_STATUS[12]!== 'active') {
       console.log('Acquisition OS inactive, skipping scan')
@@ -132,9 +129,11 @@ class Engine {
     await scanAllCities()
     return { permits_found: 'multi-city', timestamp: new Date().toISOString() }
   }
+
   static async generateProposal(leadId) {
     const { data: lead } = await supabase.from('leads').select('*').eq('id', leadId).single()
     if (!lead) return { error: 'Lead not found' }
+
     const proposal = {
       lead_id: leadId,
       company: 'GRIDV21',
@@ -148,13 +147,16 @@ class Engine {
       status: 'draft'
     }
     await supabase.from('proposals').insert(proposal)
-    return proposals 
-    
-    // Schedule brain scans every 30 minutes
+    return proposal
+  }
+}
+
+// 4. Schedule brain scans every 30 minutes - FIXED
 cron.schedule('*/30 *', async () => {
-  console.log('Brain auto-scan triggered');
-  await brainScanAllCities();
-});
+  console.log('Brain auto-scan triggered')
+  await scanAllCities()
+})
+
 // 5. API Routes
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length
@@ -176,8 +178,6 @@ app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   const result = await Engine.runScan()
   res.json({ status: 'scraped',...result })
 })
-
-//... keep all your other routes: /api/metrics, /api/leads-recent, /api/generate-proposal etc
 
 app.use(express.static(path.join(__dirname, 'public')))
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')))
