@@ -5,148 +5,151 @@ import passport from 'passport'
 import cron from 'node-cron'
 import { createClient } from '@supabase/supabase-js'
 import axios from 'axios'
-import * as cheerio from 'cheerio'
 import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 dotenv.config()
-
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const app = express()
-
 app.use(cors())
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'gridv21',
-  resave: false,
-  saveUninitialized: false
-}))
-
+app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21', resave: false, saveUninitialized: false }))
 app.use(passport.initialize())
 app.use(passport.session())
 
-/* ======================
-   SUPABASE
-====================== */
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY?.trim()
-)
-
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
+/* ====================== SUPABASE - FIXED ====================== */
+if (!process.env.SUPABASE_URL ||!process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Missing Supabase credentials')
 }
 
-/* ======================
-   CITIES
-====================== */
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY.trim()
+)
 
-const CITIES = [
-  { name: 'Austin', url: 'https://data.austintexas.gov/resource/3syk-w9eu.json' },
-  { name: 'Dallas', url: 'https://www.dallasopendata.com/resource/6rcc-fs8n.json' },
-  { name: 'Houston', url: 'https://data.houstontx.gov/resource/f7m3-7pxw.json' },
-  { name: 'Phoenix', url: 'https://www.phoenixopendata.com/resource/2gsx-6exx.json' },
-  { name: 'Seattle', url: 'https://data.seattle.gov/resource/cqnp-6rgi.json' },
-  { name: 'Chicago', url: 'https://data.cityofchicago.org/resource/6ij4-pg3t.json' },
-  { name: 'San Diego', url: 'https://data.sandiegoca.gov/resource/ax4p-qtjx.json' },
-  { name: 'Portland', url: 'https://data.portlandoregon.gov/resource/6w8u-tmxa.json' },
-  { name: 'Denver', url: 'https://data.denvergov.org/resource/r5jd-p7g9.json' }
-]
+/* ========================================= GRIDV21 REAL PERMIT CONNECTOR LAYER ========================================= */
+async function savePermit(permit) {
+  try {
+    const { data: lead, error } = await supabase
+  .from('leads')
+  .upsert({
+        external_id: permit.external_id,
+        trade_type: permit.trade_type,
+        region: permit.region,
+        permit_data: permit,
+        value_estimate: permit.value_estimate || 0,
+        source: permit.source,
+        contractor: permit.contractor,
+        address: permit.address,
+        permit_number: permit.permit_number,
+        issued_date: permit.issued_date,
+        status: 'new',
+        stage: 'Stage 1 Setup',
+        last_seen_at: new Date().toISOString()
+      }, { onConflict: 'external_id' })
+  .select()
+  .single()
 
-/* ======================
-   SCAN ENGINE
-====================== */
-
-async function scanAllCities() {
-
-  for (const city of CITIES) {
-
-    try {
-
-      const yesterday = new Date()
-      yesterday.setDate(yesterday.getDate() - 1)
-
-      const dateFilter =
-        yesterday.toISOString().split('T')[0]
-
-      const url =
-        `${city.url}?$limit=50`
-
-      const response = await fetch(url)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-
-      const permits = await response.json()
-
-      for (const p of permits) {
-
-        const permitData = {
-          permit_id: `${city.name}-${p.permit_number || Date.now()}`,
-          city: city.name,
-          permit_type: p.permit_type_description || 'Unknown',
-          value: Number(p.project_valuation) || 0,
-          contractor_name: p.contractor_name || null,
-          contractor_phone: p.contractor_phone || null,
-          status: 'new',
-          issued_date: p.issued_date || null,
-          last_seen_at: new Date().toISOString(),
-          stage: 'Stage 1 Setup'
-        }
-
-        await supabase
-          .from('permits')
-          .upsert(
-            permitData,
-            {
-              onConflict: 'permit_id'
-            }
-          )
-
-        await supabase
-          .from('revenue_log')
-          .upsert({
-            permit_id: permitData.permit_id,
-            deal_value: permitData.value,
-            revenue_3pct:
-              Math.round(permitData.value * 0.03),
-            stage: 'Stage 1 Setup',
-            logged_at: new Date().toISOString()
-          },
-          {
-            onConflict: 'permit_id'
-          })
-      }
-
-      console.log(
-        `Brain scanned ${permits.length} permits from ${city.name}`
-      )
-
-      await new Promise(r => setTimeout(r, 1000))
-
-    } catch (err) {
-
-      console.error(
-        `${city.name} scan error:`,
-        err.message
-      )
-
+    if (error) throw error
+    if (!lead) {
+      console.log('Lead upsert returned null')
+      return null
     }
+
+    if(lead && permit.value_estimate > 0) {
+      await supabase
+    .from('revenue_log')
+    .upsert({
+          permit_id: permit.external_id,
+          deal_value: permit.value_estimate,
+          revenue_3pct: Math.round(permit.value_estimate * 0.03),
+          stage: 'Stage 1 Setup',
+          logged_at: new Date().toISOString()
+        }, { onConflict: 'permit_id' })
+    }
+    return lead
+  } catch (e) {
+    console.log('Save permit error:', e.message)
+    return null
   }
 }
 
-/* ======================
-   OS DEFINITIONS
-====================== */
+/* ========================================= AUSTIN CONNECTOR ========================================= */
+async function scanAustin() {
+  try {
+    console.log('Scanning Austin permits...')
+    const response = await axios.get(
+      'https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=50&$order=issued_date DESC'
+    )
+    const permits = response.data
+    for (const p of permits) {
+      const permit = {
+        external_id: `AUS-${p.permit_number || Date.now()}`,
+        source: 'Austin Open Data',
+        trade_type: (p.permit_type_desc || p.work_class || 'building').toLowerCase(),
+        region: 'US-TX-Austin',
+        address: p.original_address1 || p.permit_location || 'Unknown',
+        value_estimate: parseFloat(p.total_job_val || p.project_valuation) || 0,
+        permit_number: p.permit_number,
+        issued_date: p.issued_date,
+        contractor: p.applicant || null
+      }
+      await savePermit(permit)
+    }
+    console.log(`Austin imported ${permits.length} permits`)
+    return permits.length
+  } catch (e) {
+    console.log('Austin scan error:', e.response?.status || e.message)
+    return 0
+  }
+}
 
+/* ========================================= CHICAGO CONNECTOR ========================================= */
+async function scanChicago() {
+  try {
+    console.log('Scanning Chicago permits...')
+    const response = await axios.get(
+      'https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=50&$order=issue_date DESC'
+    )
+    const permits = response.data
+    for (const p of permits) {
+      const permit = {
+        external_id: `CHI-${p.permit_ || Date.now()}`,
+        source: 'Chicago Open Data',
+        trade_type: (p.permit_type || 'building').toLowerCase(),
+        region: 'US-IL-Chicago',
+        address: `${p.street_number || ''} ${p.street_direction || ''} ${p.street_name || ''}`,
+        value_estimate: parseFloat(p.estimated_cost) || 0,
+        permit_number: p.permit_,
+        issued_date: p.issue_date,
+        contractor: p.contractor_name || null
+      }
+      await savePermit(permit)
+    }
+    console.log(`Chicago imported ${permits.length} permits`)
+    return permits.length
+  } catch (e) {
+    console.log('Chicago scan error:', e.response?.status || e.message)
+    return 0
+  }
+}
+
+/* ========================================= MASTER SCANNER ========================================= */
+async function scanRealPermits() {
+  console.log('GRIDV21 Brain multi-city scan started')
+  let total = 0
+  total += await scanAustin()
+  total += await scanChicago()
+  console.log(`GRIDV21 Brain scan complete - ${total} permits imported`)
+  return total
+}
+
+/* ====================== OS DEFINITIONS ====================== */
 const BRAIN_OS = [
   { id: 1, name: 'Executive Intelligence OS' },
   { id: 2, name: 'Revenue Intelligence OS' },
@@ -162,168 +165,222 @@ const BRAIN_OS = [
   { id: 12, name: 'Acquisition Intelligence OS' }
 ]
 
-let OS_STATUS =
-  Object.fromEntries(
-    BRAIN_OS.map(os => [os.id, 'active'])
-  )
+let OS_STATUS = Object.fromEntries(BRAIN_OS.map(os => [os.id, 'active']))
+const dmLimiter = rateLimit({ windowMs: 30 * 60 * 1000, max: 50 })
 
-const dmLimiter = rateLimit({
-  windowMs: 30 * 60 * 1000,
-  max: 50
-})
-
-/* ======================
-   ENGINE
-====================== */
-
+/* ====================== ENGINE ====================== */
 class Engine {
-
   static async runScan() {
-
-    if (OS_STATUS[12] !== 'active') {
-
-      console.log(
-        'Acquisition OS inactive'
-      )
-
-      return {
-        permits_found: 0,
-        skipped: true
-      }
+    if (OS_STATUS[12]!== 'active') {
+      console.log('Acquisition OS inactive')
+      return { permits_found: 0, skipped: true }
     }
-
-    await scanAllCities()
-
-    return {
-      permits_found: 'multi-city',
-      timestamp: new Date().toISOString()
-    }
+    const count = await scanRealPermits()
+    return { permits_found: count, timestamp: new Date().toISOString() }
   }
 }
 
-/* ======================
-   CRON FIXED
-====================== */
-
-cron.schedule('*/30 * * * *', async () => {
-
-  console.log(
-    'Brain auto-scan triggered'
-  )
-
+/* ====================== CRON FIXED - 5 FIELD FORMAT ====================== */
+cron.schedule('*/30 *', async () => {
+  console.log('Brain auto-scan triggered')
   try {
-
-    await scanAllCities()
-
+    await scanRealPermits()
   } catch (err) {
-
-    console.error(
-      'Cron error:',
-      err.message
-    )
-
+    console.error('Cron error:', err.message)
   }
-
 })
 
-/* ======================
-   ROUTES
-====================== */
-
+/* ====================== ROUTES ====================== */
 app.get('/api/test', (req, res) => {
-
-  const activeCount =
-    Object.values(OS_STATUS)
-      .filter(v => v === 'active')
-      .length
-
-  res.json({
-    alive: true,
-    version: '5.4.4',
-    os_active: activeCount
-  })
-
+  const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length
+  res.json({ alive: true, version: '5.4.4', engine: 'online', os_active: activeCount })
 })
 
 app.get('/api/os-status', (req, res) => {
-
-  res.json(
-    BRAIN_OS.map(os => ({
-      ...os,
-      status: OS_STATUS[os.id]
-    }))
-  )
-
+  res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] })))
 })
 
 app.post('/api/os-toggle/:id', (req, res) => {
-
   const id = Number(req.params.id)
-
-  OS_STATUS[id] =
-    OS_STATUS[id] === 'active'
-      ? 'inactive'
-      : 'active'
-
-  res.json({
-    id,
-    status: OS_STATUS[id]
-  })
-
+  OS_STATUS[id] = OS_STATUS[id] === 'active'? 'inactive' : 'active'
+  res.json({ id, status: OS_STATUS[id] })
 })
 
-app.get(
-  '/api/scrape-now',
-  dmLimiter,
-  async (req, res) => {
+app.get('/api/scrape-now', dmLimiter, async (req, res) => {
+  const result = await Engine.runScan()
+  res.json({ status: 'scraped',...result })
+})
 
-    const result = await Engine.runScan()
+// Get recent leads for dashboard
+app.get('/api/permits-recent', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+  .from('leads')
+  .select('*')
+  .order('issued_date', { ascending: false })
+  .limit(50)
+    if (error) throw error
+    res.json(data || [])
+  } catch (err) {
+    console.error('Leads error:', err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Alias for dashboard
+app.get('/api/leads-recent', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+  .from('leads')
+  .select('*')
+  .order('issued_date', { ascending: false })
+  .limit(20)
+    if (error) throw error
+    res.json(data || [])
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Metrics for dashboard cards
+app.get('/api/metrics', async (req, res) => {
+  try {
+    const { data: leads, error } = await supabase.from('leads').select('value_estimate,status')
+    const { data: revenue, error: revErr } = await supabase.from('revenue_log').select('revenue_3pct')
+
+    const total_leads = leads?.length || 0
+    const won_deals = leads?.filter(l => l.status === 'won').length || 0
+    const won_value = leads?.filter(l => l.status === 'won').reduce((sum,l) => sum + Number(l.value_estimate||0), 0) || 0
+    const est_revenue_month = revenue?.reduce((sum,r) => sum + Number(r.revenue_3pct||0), 0) || 0
+    const dms_sent = leads?.filter(l => l.status === 'dm_sent').length || 0
 
     res.json({
-      status: 'scraped',
-      ...result
+      total_leads,
+      est_revenue_month,
+      dms_sent,
+      revenue_breakdown: {
+        setup: 0,
+        ai_fees: 0,
+        performance: est_revenue_month,
+        won_deals,
+        won_value
+      }
     })
-
+  } catch (err) {
+    res.status(500).json({ error: err.message })
   }
-)
-
-/* ======================
-   STATIC FILES
-====================== */
-
-app.use(
-  express.static(
-    path.join(__dirname, 'public')
-  )
-)
-
-app.get('*', (req, res) => {
-  res.sendFile(
-    path.join(
-      __dirname,
-      'public',
-      'dashboard.html'
-    )
-  )
 })
 
-/* ======================
-   SERVER
-====================== */
-
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, async () => {
-
-  console.log(
-    `GRIDV21 BRAIN v5.4.4 running on ${PORT}`
-  )
-
+// Proposals vault
+app.get('/api/proposals', async (req, res) => {
   try {
-    await scanAllCities()
+    const { data, error } = await supabase.from('proposals').select('*').limit(20)
+    if (error) return res.json([])
+    res.json(data || [])
+  } catch {
+    res.json([])
   }
-  catch (err) {
+})
+
+// Mark lead as won - with 404 check
+app.post('/api/mark-won/:id', async (req, res) => {
+  try {
+    const { data: lead, error } = await supabase.from('leads').select('id').eq('id', req.params.id).single()
+    if (!lead) return res.status(404).json({ error: 'Lead not found' })
+    if (error) throw error
+
+    const { error: updateError } = await supabase.from('leads').update({ status: 'won' }).eq('id', req.params.id)
+    if (updateError) throw updateError
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// DM sent counter - with 404 check
+app.post('/api/dm-sent', async (req, res) => {
+  try {
+    const { lead_id } = req.body
+    const { data: lead, error } = await supabase.from('leads').select('id').eq('id', lead_id).single()
+    if (!lead) return res.status(404).json({ error: 'Lead not found' })
+    if (error) throw error
+
+    const { error: updateError } = await supabase.from('leads').update({ status: 'dm_sent' }).eq('id', lead_id)
+    if (updateError) throw updateError
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Generate proposal stub - with 404 check
+app.post('/api/generate-proposal/:id', async (req, res) => {
+  try {
+    const { data: lead, error } = await supabase.from('leads').select('*').eq('id', req.params.id).single()
+    if (!lead) return res.status(404).json({ error: 'Lead not found' })
+    if (error) throw error
+
+    const proposal = {
+      client: lead.region,
+      total_estimate: lead.value_estimate,
+      status: 'draft',
+      created_at: new Date().toISOString()
+    }
+    await supabase.from('proposals').insert(proposal)
+    res.json({ success: true, proposal })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Test insert
+app.get('/api/test-insert', async (req, res) => {
+  try {
+    await savePermit({
+      external_id: `TEST-${Date.now()}`,
+      source: 'Test',
+      trade_type: 'electrical',
+      region: 'US-TEST',
+      address: '123 Test St',
+      value_estimate: 50000,
+      permit_number: 'TEST001',
+      issued_date: new Date().toISOString(),
+      contractor: 'Test Contractor'
+    })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Analyze lead stub
+app.get('/api/engine/analyze/:id', async (req, res) => {
+  try {
+    const { data: lead, error } = await supabase.from('leads').select('id').eq('id', req.params.id).single()
+    if (!lead) return res.status(404).json({ error: 'Lead not found' })
+    if (error) throw error
+
+    const score = Math.floor(Math.random() * 40) + 60
+    const tier = score > 85? 'Hot' : score > 70? 'Warm' : 'Cold'
+    res.json({ score, tier, recommended_os: 'Sales & CRM OS' })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+/* ====================== STATIC FILES ====================== */
+app.use(express.static(path.join(__dirname, 'public')))
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'))
+})
+
+/* ====================== SERVER ====================== */
+const PORT = process.env.PORT || 3000
+app.listen(PORT, async () => {
+  console.log(`GRIDV21 BRAIN v5.4.4 running on ${PORT}`)
+  try {
+    await scanRealPermits()
+  } catch (err) {
     console.error(err.message)
   }
-
 })
