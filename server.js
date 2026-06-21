@@ -148,16 +148,13 @@ class Engine {
       status: 'draft'
     }
     await supabase.from('proposals').insert(proposal)
-    return proposal
-  }
-}
-
-// 4. // Schedule brain scans every 30 minutes
+    return proposals 
+    
+    // Schedule brain scans every 30 minutes
 cron.schedule('*/30 *', async () => {
   console.log('Brain auto-scan triggered');
   await brainScanAllCities();
 });
-
 // 5. API Routes
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(s => s === 'active').length
