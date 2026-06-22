@@ -111,10 +111,8 @@ async function savePermitToLeads(city, p) {
     last_seen_at: new Date().toISOString()
   };
 
-  const { error } = await supabase.from('leads').upsert(permitData, { onConflict: 'external_id' });
-  if (error) console.error('Supabase error:', error.message);
-  return!error;
-}
+  const { data, error } = await supabase.from('leads').select('*').order('last_seen_at', { ascending: false }).limit(50);
+};
 
 /* ====================== SCAN LOCK ====================== */
 let scanRunning = false;
