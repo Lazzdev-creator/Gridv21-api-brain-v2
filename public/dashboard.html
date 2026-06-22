@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.4.5</title>
+<title>GRIDV21 Brain Control v5.4.6</title>
 <style>
 :root {
   --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff;
@@ -76,7 +76,7 @@ h1{font-size:20px;color:var(--blue)}
   <div class="header-left">
     <div class="logo">GV</div>
     <div>
-      <h1>GRIDV21 <span id="version">v5.4.5</span></h1>
+      <h1>GRIDV21 <span id="version">v5.4.6</span></h1>
       <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Auto-Scan Active</div>
     </div>
   </div>
@@ -151,17 +151,20 @@ function toggleMenu() {
   document.getElementById('menuOverlay').classList.toggle('active');
 }
 
-// FIXED: Match backend 'leads' table fields: region, trade_type, value_estimate, contractor
+// v5.4.6: Added debug logs + fallback field names
 async function loadPermits() {
   try {
     const res = await fetch('/api/permits-recent')
     const permits = await res.json()
     
+    console.log('Permits data received:', permits) // DEBUG
+    
     document.getElementById('total_leads').textContent = permits.length
     
     let gridv21Cut = 0
     permits.forEach(p => {
-      if(p.value_estimate) gridv21Cut += Math.round(Number(p.value_estimate) * 0.03)
+      const value = p.value_estimate || p.value || 0
+      if(value) gridv21Cut += Math.round(Number(value) * 0.03)
     })
     document.getElementById('revenue').textContent = '$' + gridv21Cut.toLocaleString()
     
@@ -169,19 +172,29 @@ async function loadPermits() {
     if(permits.length === 0) {
       listDiv.innerHTML = '<div style="opacity:0.6;text-align:center;padding:20px">No permits yet. Hit Force Scan in menu ☰</div>'
     } else {
-      listDiv.innerHTML = permits.map(p => `
+      listDiv.innerHTML = permits.map(p => {
+        // Fallback: try both old + new field names
+        const city = p.region || p.city || 'Unknown'
+        const type = p.trade_type || p.permit_type || 'Unknown'
+        const contractor = p.contractor || p.contractor_name || 'No contractor'
+        const value = p.value_estimate || p.value || 0
+        const date = p.issued_date || p.date || null
+        const source = p.source || 'N/A'
+        
+        return `
         <div class="permit-item">
-          <div class="permit-city">${p.region || 'Unknown'}</div>
-          <div class="permit-type">${p.trade_type || 'Unknown'}</div>
+          <div class="permit-city">${city}</div>
+          <div class="permit-type">${type}</div>
           <div style="font-size:11px;opacity:0.7;margin-top:4px">
-            ${p.contractor || 'No contractor'} | ${p.source} | ${p.issued_date ? new Date(p.issued_date).toLocaleDateString() : 'N/A'}
-            ${p.value_estimate ? ` | Value: $${Number(p.value_estimate).toLocaleString()} | GRIDV21: $${Math.round(p.value_estimate*0.03).toLocaleString()}` : ''}
+            ${contractor} | ${source} | ${date ? new Date(date).toLocaleDateString() : 'N/A'}
+            ${value ? ` | Value: $${Number(value).toLocaleString()} | GRIDV21: $${Math.round(value*0.03).toLocaleString()}` : ''}
           </div>
         </div>
-      `).join('')
+      `}).join('')
     }
   } catch(e) {
-    console.log('Permits error:', e)
+    console.error('Permits error:', e)
+    document.getElementById('permitsList').innerHTML = '<div style="color:#ff3366;padding:20px">Error loading permits. Check console.</div>'
   }
 }
 
@@ -203,9 +216,9 @@ async function loadMetrics() {
     const tenantsDiv = document.getElementById('tenants');
     if(leads.length > 0) {
       tenantsDiv.innerHTML = leads.map(l => `
-        <div class="tenant-row ${selectedLeadId === l.id ? 'selected' : ''}" onclick="selectLead('${l.id}', ${l.value_estimate}, '${l.trade_type}', '${l.region}')">
-          <span>${l.region} - ${l.trade_type}</span>
-          <span class="badge ${l.status === 'won' ? 'badge-won' : l.value_estimate > 50000 ? 'badge-hot' : 'badge-warm'}">$${l.value_estimate} ${l.status === 'won' ? 'WON' : ''}</span>
+        <div class="tenant-row ${selectedLeadId === l.id ? 'selected' : ''}" onclick="selectLead('${l.id}', ${l.value_estimate || l.value}, '${l.trade_type || l.permit_type}', '${l.region || l.city}')">
+          <span>${l.region || l.city} - ${l.trade_type || l.permit_type}</span>
+          <span class="badge ${l.status === 'won' ? 'badge-won' : (l.value_estimate || l.value) > 50000 ? 'badge-hot' : 'badge-warm'}">$${l.value_estimate || l.value} ${l.status === 'won' ? 'WON' : ''}</span>
         </div>
       `).join('');
     }
@@ -244,7 +257,7 @@ function selectLead(id, value, trade, region) {
   document.querySelectorAll('.tenant-row').forEach(r => r.classList.remove('selected'));
   event.currentTarget.classList.add('selected');
   document.getElementById('lead_actions').innerHTML = `
-    <div class="selected-lead-info"><strong>Selected:</strong> ${region} - ${trade}<br><strong>Value:</strong> $${value.toLocaleString()}</div>
+    <div class="selected-lead-info"><strong>Selected:</strong> ${region} - ${trade}<br><strong>Value:</strong> $${Number(value).toLocaleString()}</div>
     <button class="btn" onclick="analyzeLead()">🧠 Analyze Lead - Get Score</button>
     <button class="btn btn-green" onclick="markWon()">💰 Mark as WON - Unlock 3%</button>
     <button class="btn btn-pink" onclick="sendDM()">📱 Send WhatsApp DM</button>
@@ -365,7 +378,7 @@ setInterval(loadPermits, 30000);
 setInterval(loadMetrics, 3000);
 setInterval(loadOS, 5000);
 setInterval(loadProposals, 3000);
-addEvent('Brain Control Center v5.4.5 initialized - Menu + Fixed field mapping', 'boot');
+addEvent('Brain Control Center v5.4.6 initialized - Fallback field mapping', 'boot');
 </script>
 </body>
   </html>
