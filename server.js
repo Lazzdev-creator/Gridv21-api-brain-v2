@@ -9,24 +9,76 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import { body, param, validationResult } from 'express-validator';
 
 dotenv.config();
+
+/* ====================== ENV VALIDATION ====================== */
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SESSION_SECRET'];
+for (const key of requiredEnv) {
+  if (!process.env[key]) {
+    console.error(`Missing environment variable: ${key}`);
+    process.exit(1);
+  }
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
+const VERSION = '5.5.0';
 
-app.use(cors());
+/* ====================== SECURITY MIDDLEWARE ====================== */
+app.use(helmet());
+app.use(compression());
+app.use(morgan('combined'));
+
+app.use(cors({
+  origin: process.env.FRONTEND_URL?.split(',') || '*',
+  credentials: true
+}));
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use(globalLimiter);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21', resave: false, saveUninitialized: false }));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 86400000
+  }
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY?.trim());
-if (!process.env.SUPABASE_URL ||!process.env.SUPABASE_SERVICE_KEY) throw new Error('Missing Supabase credentials');
+/* ====================== SUPABASE ====================== */
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY.trim());
 
-const VERSION = '5.4.9';
+/* ====================== STARTUP VERIFICATION ====================== */
+(async () => {
+  const { error } = await supabase.from('leads').select('id').limit(1);
+  if (error) {
+    console.error('Supabase connection failed:', error.message);
+    process.exit(1);
+  }
+  console.log('Supabase connected ✓');
+})();
 
+/* ====================== CITIES ====================== */
 const CITIES = [
   { name: 'Austin', url: 'https://data.austintexas.gov/resource/3syk-w9eu.json' },
   { name: 'Dallas', url: 'https://www.dallasopendata.com/resource/6rcc-fs8n.json' },
@@ -61,21 +113,35 @@ async function savePermitToLeads(city, p) {
   return!error;
 }
 
+/* ====================== SCAN LOCK ====================== */
+let scanRunning = false;
 async function scanAllCities() {
-  let totalSaved = 0;
-  for (const city of CITIES) {
-    try {
-      const url = `${city.url}?$limit=50`;
-      const response = await axios.get(url);
-      const permits = response.data;
-      let saved = 0;
-      for (const p of permits) if (await savePermitToLeads(city, p)) saved++;
-      totalSaved += saved;
-      console.log(`Brain scanned ${permits.length} from ${city.name}, saved ${saved}`);
-      await new Promise(r => setTimeout(r, 1000));
-    } catch (err) { console.error(`${city.name} scan error:`, err.message); }
+  if (scanRunning) {
+    console.log('Scan already running, skipping');
+    return 0;
   }
-  return totalSaved;
+  scanRunning = true;
+  try {
+    let totalSaved = 0;
+    for (const city of CITIES) {
+      try {
+        const response = await axios.get(`${city.url}?$limit=50`, { timeout: 15000 });
+        const permits = response.data || [];
+        let saved = 0;
+        for (const p of permits) {
+          if (await savePermitToLeads(city, p)) saved++;
+        }
+        totalSaved += saved;
+        console.log(`Brain scanned ${permits.length} from ${city.name}, saved ${saved}`);
+        await new Promise(r => setTimeout(r, 1000));
+      } catch (err) {
+        console.error(`${city.name}:`, err.message);
+      }
+    }
+    return totalSaved;
+  } finally {
+    scanRunning = false;
+  }
 }
 
 const BRAIN_OS = [
@@ -105,21 +171,39 @@ class Engine {
   }
 }
 
-/* ====================== CRON - FIXED: */30 * = every 30min ✅ ====================== */
-cron.schedule('*/30 *', async () => {
-  console.log('Brain auto-scan triggered');
-  try { await scanAllCities(); }
-  catch (err) { console.error('Cron error:', err.message); }
+/* ====================== AUTH MIDDLEWARE ====================== */
+function requireAuth(req, res, next) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+/* ====================== CRON - CORRECT SYNTAX ====================== */
+cron.schedule('*/30 ****', async () => {
+  console.log('Auto scan started');
+  await scanAllCities();
+});
+
+/* ====================== HEALTH ENDPOINT FOR RENDER ====================== */
+app.get('/health', async (req, res) => {
+  try {
+    const { error } = await supabase.from('leads').select('id').limit(1);
+    if (error) throw error;
+    res.json({ status: 'healthy', version: VERSION, uptime: process.uptime() });
+  } catch (e) {
+    res.status(500).json({ status: 'unhealthy', error: e.message });
+  }
 });
 
 /* ====================== ROUTES ====================== */
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length;
-  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.4.9' });
+  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.0' });
 });
 
 app.get('/api/os-status', (req, res) => res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] }))));
-app.post('/api/os-toggle/:id', (req, res) => {
+app.post('/api/os-toggle/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   OS_STATUS[id] = OS_STATUS[id] === 'active'? 'inactive' : 'active';
   res.json({ id, status: OS_STATUS[id] });
@@ -163,7 +247,7 @@ app.get('/api/proposals', async (req, res) => {
   } catch (e) { res.json([]); }
 });
 
-app.post('/api/mark-won/:id', async (req, res) => {
+app.post('/api/mark-won/:id', requireAuth, async (req, res) => {
   const { error } = await supabase.from('leads').update({ status: 'won' }).eq('id', req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.json({ success: true });
@@ -180,7 +264,7 @@ app.post('/api/dm-sent', dmLimiter, async (req, res) => {
   res.json({ success: true, message: 'DM logged' });
 });
 
-app.post('/api/generate-proposal/:id', async (req, res) => {
+app.post('/api/generate-proposal/:id', requireAuth, async (req, res) => {
   const { data: lead } = await supabase.from('leads').select('*').eq('id', req.params.id).single();
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
   const proposal = {
@@ -218,13 +302,29 @@ app.get('/api/test-insert', async (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/scrape-now', dmLimiter, async (req, res) => {
+app.get('/api/scrape-now', requireAuth, dmLimiter, async (req, res) => {
   const result = await Engine.runScan();
   res.json({ status: 'scraped',...result });
 });
 
+/* ====================== STATIC ====================== */
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
+/* ====================== ERROR HANDLER ====================== */
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+/* ====================== GRACEFUL SHUTDOWN ====================== */
+async function shutdown() {
+  console.log('Shutting down...');
+  process.exit(0);
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+/* ====================== SERVER ====================== */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`GRIDV21 BRAIN v${VERSION} running on ${PORT}`));
