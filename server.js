@@ -22,7 +22,7 @@ app.use(session({ secret: process.env.SESSION_SECRET || 'gridv21', resave: false
 app.use(passport.initialize())
 app.use(passport.session())
 
-/* ====================== SUPABASE - CHECK FIRST THEN INIT ====================== */
+/* ====================== SUPABASE ====================== */
 if (!process.env.SUPABASE_URL ||!process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Missing Supabase credentials')
 }
@@ -36,8 +36,8 @@ const supabase = createClient(
 async function savePermit(permit) {
   try {
     const { data: lead, error } = await supabase
-  .from('leads')
-  .upsert({
+ .from('leads')
+ .upsert({
         external_id: permit.external_id,
         trade_type: permit.trade_type,
         region: permit.region,
@@ -52,17 +52,16 @@ async function savePermit(permit) {
         stage: 'Stage 1 Setup',
         last_seen_at: new Date().toISOString()
       }, { onConflict: 'external_id' })
-  .select()
-  .single()
+ .select()
+ .single()
 
     if (error) throw error
     if (!lead) return null
 
-    // Log revenue for GRIDV21 3% cut
     if(permit.value_estimate > 0) {
       await supabase
-    .from('revenue_log')
-    .upsert({
+   .from('revenue_log')
+   .upsert({
           permit_id: permit.external_id,
           deal_value: permit.value_estimate,
           revenue_3pct: Math.round(permit.value_estimate * 0.03),
@@ -147,7 +146,7 @@ async function scanRealPermits() {
   return total
 }
 
-/* ====================== OS DEFINITIONS - 12 INTELLIGENT SYSTEMS ====================== */
+/* ====================== OS DEFINITIONS ====================== */
 const BRAIN_OS = [
   { id: 1, name: 'Executive Intelligence OS' },
   { id: 2, name: 'Revenue Intelligence OS' },
@@ -178,20 +177,43 @@ class Engine {
   }
 }
 
-/* ====================== CRON FIXED - 6 FIELD FORMAT ====================== */
-cron.schedule('0 */30', async () => {
-  console.log('Brain auto-scan triggered')
-  try {
-    await scanRealPermits()
-  } catch (err) {
-    console.error('Cron error:', err.message)
-  }
-})
+/* ====================== CRON SCHEDULER - YOUR VERSION MERGED ====================== */
+const AUTO_SCAN_SCHEDULE = '0 */30' // Every 30 minutes with seconds
 
-/* ====================== ROUTES - ALL ENDPOINTS FOR DASHBOARD ====================== */
+if (cron.validate(AUTO_SCAN_SCHEDULE)) {
+  cron.schedule(
+    AUTO_SCAN_SCHEDULE,
+    async () => {
+      console.log('GRIDV21 Brain auto-scan triggered')
+      try {
+        const total = await scanRealPermits()
+        console.log(
+          `GRIDV21 Brain auto-scan completed successfully. ${total} permits imported`
+        )
+      } catch (err) {
+        console.error(
+          'GRIDV21 Brain cron error:', err.message
+        )
+      }
+    },
+    {
+      scheduled: true,
+      timezone: 'UTC'
+    }
+  )
+  console.log(
+    `GRIDV21 Scheduler initialized: ${AUTO_SCAN_SCHEDULE}`
+  )
+} else {
+  console.error(
+    `Invalid cron schedule: ${AUTO_SCAN_SCHEDULE}`
+  )
+}
+
+/* ====================== ROUTES ====================== */
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length
-  res.json({ alive: true, version: '5.4.4', engine: 'online', os_active: activeCount })
+  res.json({ alive: true, version: '5.4.5', engine: 'online', os_active: activeCount })
 })
 
 app.get('/api/os-status', (req, res) => {
@@ -209,14 +231,13 @@ app.get('/api/scrape-now', dmLimiter, async (req, res) => {
   res.json({ status: 'scraped',...result })
 })
 
-// Live permits feed for dashboard
 app.get('/api/permits-recent', async (req, res) => {
   try {
     const { data, error } = await supabase
-  .from('leads')
-  .select('*')
-  .order('issued_date', { ascending: false })
-  .limit(50)
+ .from('leads')
+ .select('*')
+ .order('issued_date', { ascending: false })
+ .limit(50)
     if (error) throw error
     res.json(data || [])
   } catch (err) {
@@ -225,14 +246,13 @@ app.get('/api/permits-recent', async (req, res) => {
   }
 })
 
-// Alias for dashboard tenant list
 app.get('/api/leads-recent', async (req, res) => {
   try {
     const { data, error } = await supabase
-  .from('leads')
-  .select('*')
-  .order('issued_date', { ascending: false })
-  .limit(20)
+ .from('leads')
+ .select('*')
+ .order('issued_date', { ascending: false })
+ .limit(20)
     if (error) throw error
     res.json(data || [])
   } catch (err) {
@@ -240,7 +260,6 @@ app.get('/api/leads-recent', async (req, res) => {
   }
 })
 
-// Metrics for dashboard cards - Live feeds
 app.get('/api/metrics', async (req, res) => {
   try {
     const { data: leads } = await supabase.from('leads').select('value_estimate,status')
@@ -269,7 +288,6 @@ app.get('/api/metrics', async (req, res) => {
   }
 })
 
-// Proposals vault - Deal Closing OS
 app.get('/api/proposals', async (req, res) => {
   try {
     const { data, error } = await supabase.from('proposals').select('*').order('created_at', { ascending: false }).limit(20)
@@ -280,12 +298,10 @@ app.get('/api/proposals', async (req, res) => {
   }
 })
 
-// Mark lead as WON - with 404 check
 app.post('/api/mark-won/:id', async (req, res) => {
   try {
     const { data: lead } = await supabase.from('leads').select('id').eq('id', req.params.id).single()
     if (!lead) return res.status(404).json({ error: 'Lead not found' })
-
     const { error } = await supabase.from('leads').update({ status: 'won' }).eq('id', req.params.id)
     if (error) throw error
     res.json({ success: true })
@@ -294,13 +310,11 @@ app.post('/api/mark-won/:id', async (req, res) => {
   }
 })
 
-// DM sent counter - with 404 check
 app.post('/api/dm-sent', async (req, res) => {
   try {
     const { lead_id } = req.body
     const { data: lead } = await supabase.from('leads').select('id').eq('id', lead_id).single()
     if (!lead) return res.status(404).json({ error: 'Lead not found' })
-
     const { error } = await supabase.from('leads').update({ status: 'dm_sent' }).eq('id', lead_id)
     if (error) throw error
     res.json({ success: true })
@@ -309,12 +323,10 @@ app.post('/api/dm-sent', async (req, res) => {
   }
 })
 
-// Generate proposal - Deal Closing OS - with 404 check
 app.post('/api/generate-proposal/:id', async (req, res) => {
   try {
     const { data: lead } = await supabase.from('leads').select('*').eq('id', req.params.id).single()
     if (!lead) return res.status(404).json({ error: 'Lead not found' })
-
     const proposal = {
       client: lead.region,
       total_estimate: lead.value_estimate,
@@ -329,7 +341,6 @@ app.post('/api/generate-proposal/:id', async (req, res) => {
   }
 })
 
-// Test insert for debugging
 app.get('/api/test-insert', async (req, res) => {
   try {
     await savePermit({
@@ -349,12 +360,10 @@ app.get('/api/test-insert', async (req, res) => {
   }
 })
 
-// Intelligent Knowledge Brain - Analyze lead
 app.get('/api/engine/analyze/:id', async (req, res) => {
   try {
     const { data: lead } = await supabase.from('leads').select('id,value_estimate').eq('id', req.params.id).single()
     if (!lead) return res.status(404).json({ error: 'Lead not found' })
-
     const score = Math.min(100, Math.floor((lead.value_estimate / 1000)) + Math.floor(Math.random() * 30) + 50)
     const tier = score > 85? 'Hot' : score > 70? 'Warm' : 'Cold'
     res.json({ score, tier, recommended_os: 'Sales & CRM OS' })
@@ -363,7 +372,7 @@ app.get('/api/engine/analyze/:id', async (req, res) => {
   }
 })
 
-/* ====================== STATIC FILES - DASHBOARD APP ====================== */
+/* ====================== STATIC FILES ====================== */
 app.use(express.static(path.join(__dirname, 'public')))
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'dashboard.html'))
@@ -372,7 +381,7 @@ app.get('*', (req, res) => {
 /* ====================== SERVER ====================== */
 const PORT = process.env.PORT || 3000
 app.listen(PORT, async () => {
-  console.log(`GRIDV21 BRAIN v5.4.4 running on ${PORT}`)
+  console.log(`GRIDV21 BRAIN v5.4.5 running on ${PORT}`)
   console.log(`12 OS Modules: ${BRAIN_OS.map(o => o.name).join(', ')}`)
   try {
     await scanRealPermits()
