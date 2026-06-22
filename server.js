@@ -27,14 +27,14 @@ for (const key of requiredEnv) {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
-const VERSION = '5.5.0';
+const VERSION = '5.5.1';
 
 /* ====================== SECURITY MIDDLEWARE ====================== */
 app.use(helmet());
 app.use(compression());
 app.use(morgan('combined'));
-
 app.use(cors({
   origin: process.env.FRONTEND_URL?.split(',') || '*',
   credentials: true
@@ -47,7 +47,6 @@ const globalLimiter = rateLimit({
   legacyHeaders: false
 });
 app.use(globalLimiter);
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -62,11 +61,15 @@ app.use(session({
     maxAge: 86400000
   }
 }));
+
 app.use(passport.initialize());
 app.use(passport.session());
 
 /* ====================== SUPABASE ====================== */
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY.trim());
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY.trim()
+);
 
 /* ====================== STARTUP VERIFICATION ====================== */
 (async () => {
@@ -115,12 +118,14 @@ async function savePermitToLeads(city, p) {
 
 /* ====================== SCAN LOCK ====================== */
 let scanRunning = false;
+
 async function scanAllCities() {
   if (scanRunning) {
     console.log('Scan already running, skipping');
     return 0;
   }
   scanRunning = true;
+
   try {
     let totalSaved = 0;
     for (const city of CITIES) {
@@ -128,9 +133,11 @@ async function scanAllCities() {
         const response = await axios.get(`${city.url}?$limit=50`, { timeout: 15000 });
         const permits = response.data || [];
         let saved = 0;
+
         for (const p of permits) {
           if (await savePermitToLeads(city, p)) saved++;
         }
+
         totalSaved += saved;
         console.log(`Brain scanned ${permits.length} from ${city.name}, saved ${saved}`);
         await new Promise(r => setTimeout(r, 1000));
@@ -145,10 +152,17 @@ async function scanAllCities() {
 }
 
 const BRAIN_OS = [
-  { id: 1, name: 'Executive Intelligence OS' }, { id: 2, name: 'Revenue Intelligence OS' },
-  { id: 3, name: 'Sales & CRM OS' }, { id: 4, name: 'Marketing OS' }, { id: 5, name: 'Operations OS' },
-  { id: 6, name: 'Finance OS' }, { id: 7, name: 'Human Capital OS' }, { id: 8, name: 'Project Management OS' },
-  { id: 9, name: 'Knowledge OS' }, { id: 10, name: 'Legal & Compliance OS' }, { id: 11, name: 'Supply Chain OS' },
+  { id: 1, name: 'Executive Intelligence OS' },
+  { id: 2, name: 'Revenue Intelligence OS' },
+  { id: 3, name: 'Sales & CRM OS' },
+  { id: 4, name: 'Marketing OS' },
+  { id: 5, name: 'Operations OS' },
+  { id: 6, name: 'Finance OS' },
+  { id: 7, name: 'Human Capital OS' },
+  { id: 8, name: 'Project Management OS' },
+  { id: 9, name: 'Knowledge OS' },
+  { id: 10, name: 'Legal & Compliance OS' },
+  { id: 11, name: 'Supply Chain OS' },
   { id: 12, name: 'Acquisition Intelligence OS' }
 ];
 
@@ -161,6 +175,7 @@ class Engine {
     const saved = await scanAllCities();
     return { permits_found: saved, timestamp: new Date().toISOString() };
   }
+
   static async analyzeLead(leadId) {
     const { data } = await supabase.from('leads').select('*').eq('id', leadId).single();
     if (!data) return { error: 'Lead not found' };
@@ -179,16 +194,20 @@ function requireAuth(req, res, next) {
   next();
 }
 
-/* ====================== CRON - CORRECT SYNTAX ====================== */
-const schedule = process.env.CRON_SCHEDULE || '*/30 *';
+/* ====================== CRON - FIXED 6-FIELD SYNTAX v5.5.1 ====================== */
+const schedule = process.env.CRON_SCHEDULE || '0 */30 *';
 if (!schedule) {
   throw new Error('CRON_SCHEDULE is missing');
 }
+
 cron.schedule(schedule, async () => {
-  console.log('Auto scan started');
+  console.log('Auto scan started at', new Date().toISOString());
   await scanAllCities();
+}, {
+  timezone: "America/Chicago"
 });
 
+/* ====================== HEALTH ENDPOINT FOR RENDER ====================== */
 app.get('/health', async (req, res) => {
   try {
     const { error } = await supabase.from('leads').select('id').limit(1);
@@ -202,10 +221,11 @@ app.get('/health', async (req, res) => {
 /* ====================== ROUTES ====================== */
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length;
-  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.0' });
+  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.1' });
 });
 
 app.get('/api/os-status', (req, res) => res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] }))));
+
 app.post('/api/os-toggle/:id', requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   OS_STATUS[id] = OS_STATUS[id] === 'active'? 'inactive' : 'active';
@@ -217,7 +237,9 @@ app.get('/api/permits-recent', async (req, res) => {
     const { data, error } = await supabase.from('leads').select('*').order('issued_date', { ascending: false }).limit(50);
     if (error) throw error;
     res.json(data || []);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/leads-recent', async (req, res) => {
@@ -225,7 +247,9 @@ app.get('/api/leads-recent', async (req, res) => {
     const { data, error } = await supabase.from('leads').select('*').order('last_seen_at', { ascending: false }).limit(20);
     if (error) throw error;
     res.json(data || []);
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get('/api/metrics', async (req, res) => {
@@ -239,7 +263,9 @@ app.get('/api/metrics', async (req, res) => {
       est_revenue_month: performanceRevenue,
       revenue_breakdown: { setup: 0, ai_fees: 0, performance: performanceRevenue, won_deals: wonDeals, won_value: wonValue }
     });
-  } catch (e) { res.json({ dms_sent: 0, est_revenue_month: 0, revenue_breakdown: { setup: 0, ai_fees: 0, performance: 0, won_deals: 0, won_value: 0 } }); }
+  } catch (e) {
+    res.json({ dms_sent: 0, est_revenue_month: 0, revenue_breakdown: { setup: 0, ai_fees: 0, performance: 0, won_deals: 0, won_value: 0 } });
+  }
 });
 
 app.get('/api/proposals', async (req, res) => {
@@ -247,7 +273,9 @@ app.get('/api/proposals', async (req, res) => {
     const { data } = await supabase.from('leads').select('contractor, value_estimate, status').eq('status', 'proposal').limit(20);
     const props = data?.map(d => ({ client: d.contractor, total_estimate: d.value_estimate, status: 'draft' })) || [];
     res.json(props);
-  } catch (e) { res.json([]); }
+  } catch (e) {
+    res.json([]);
+  }
 });
 
 app.post('/api/mark-won/:id', requireAuth, async (req, res) => {
@@ -270,6 +298,7 @@ app.post('/api/dm-sent', dmLimiter, async (req, res) => {
 app.post('/api/generate-proposal/:id', requireAuth, async (req, res) => {
   const { data: lead } = await supabase.from('leads').select('*').eq('id', req.params.id).single();
   if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
   const proposal = {
     client: lead.contractor,
     value: lead.value_estimate,
@@ -281,6 +310,7 @@ app.post('/api/generate-proposal/:id', requireAuth, async (req, res) => {
     ],
     total_estimate: 150 + 50 + Math.round(lead.value_estimate * 0.03)
   };
+
   await supabase.from('leads').update({ status: 'proposal' }).eq('id', req.params.id);
   res.json({ success: true, proposal });
 });
@@ -290,7 +320,7 @@ app.get('/api/test-insert', async (req, res) => {
     external_id: `TEST-${Date.now()}`,
     trade_type: 'ELECTRICAL',
     region: 'Chicago',
-    permit_data: {test: true},
+    permit_data: { test: true },
     value_estimate: 50000,
     source: 'Manual Test',
     contractor: 'Test Contractor LLC',
@@ -301,6 +331,7 @@ app.get('/api/test-insert', async (req, res) => {
     stage: 'scanned',
     last_seen_at: new Date().toISOString()
   };
+
   await supabase.from('leads').upsert(testPermit, { onConflict: 'external_id' });
   res.json({ success: true });
 });
