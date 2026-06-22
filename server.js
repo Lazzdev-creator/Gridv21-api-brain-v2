@@ -111,8 +111,10 @@ async function savePermitToLeads(city, p) {
     last_seen_at: new Date().toISOString()
   };
 
-  const { data, error } = await supabase.from('leads').select('*').order('last_seen_at', { ascending: false }).limit(50);
-};
+  const { error } = await supabase.from('leads').upsert(permitData, { onConflict: 'external_id' });
+  if (error) console.error('Supabase error:', error.message);
+  return!error;
+}
 
 /* ====================== SCAN LOCK ====================== */
 let scanRunning = false;
@@ -193,7 +195,7 @@ function requireAuth(req, res, next) {
 }
 
 /* ====================== CRON - FIXED 6-FIELD SYNTAX v5.5.1 ====================== */
-const schedule = process.env.CRON_SCHEDULE || '0 */30 * *';
+const schedule = process.env.CRON_SCHEDULE || '0 */30 *';
 if (!schedule) {
   throw new Error('CRON_SCHEDULE is missing');
 }
