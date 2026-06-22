@@ -178,8 +178,8 @@ class Engine {
   }
 }
 
-/* ====================== CRON FIXED - 5 FIELD FORMAT ====================== */
-cron.schedule('*/30 *', async () => {
+/* ====================== CRON FIXED - 6 FIELD FORMAT ====================== */
+cron.schedule('0 */30', async () => {
   console.log('Brain auto-scan triggered')
   try {
     await scanRealPermits()
