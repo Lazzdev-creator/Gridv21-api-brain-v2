@@ -7,17 +7,17 @@
 :root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; --grey: #333; --purple: #aa00ff; }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--dark);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:15px}
-.header{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:20px;border-bottom:2px solid var(--blue);padding-bottom:15px}
+.header{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:20px;border-bottom:2px solid var(--blue);padding-bottom:15px;position:relative;z-index:2003}
 .header-left{display:flex;align-items:center;gap:15px}
 .logo{width:50px;height:50px;background:radial-gradient(circle,var(--blue),#0066cc);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;color:#fff}
 h1{font-size:20px;color:var(--blue)}
 .sub{font-size:11px;opacity:0.7}
-.menu-btn{width:42px;height:42px;background:var(--card);border:1px solid #1e2342;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--blue)}
-.menu-btn:active{opacity:0.7}
-.side-menu{position:fixed;top:0;right:-300px;width:300px;height:100vh;background:var(--card);border-left:1px solid #1e2342;transition:right 0.3s;z-index:1000;padding:20px;overflow-y:auto}
+.menu-btn{width:42px;height:42px;background:var(--card);border:1px solid #1e2342;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--blue);position:relative;z-index:2001;pointer-events:auto;touch-action:manipulation}
+.menu-btn:active{opacity:0.7;transform:scale(0.95)}
+.side-menu{position:fixed;top:0;right:-300px;width:300px;height:100vh;background:var(--card);border-left:1px solid #1e2342;transition:right 0.3s ease;z-index:2002;padding:20px;overflow-y:auto}
 .side-menu.active{right:0}
-.menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:none;z-index:999}
-.menu-overlay.active{display:block}
+.menu-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:2000;opacity:0;transition:opacity 0.3s;pointer-events:none}
+.menu-overlay.active{opacity:1;pointer-events:auto}
 .menu-section{margin-bottom:25px}
 .menu-section h3{color:var(--blue);font-size:11px;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
 .menu-item{width:100%;padding:12px;background:#1a1f3a;border:1px solid #1e2342;border-radius:8px;color:var(--text);margin-bottom:8px;cursor:pointer;font-size:13px;text-align:left;font-weight:600}
@@ -65,11 +65,6 @@ h1{font-size:20px;color:var(--blue)}
 .permit-item{border:1px solid #1e2342;padding:10px;margin:6px 0;border-radius:8px;background:rgba(0,168,255,0.05)}
 .permit-city{font-weight:bold;color:var(--blue)}
 .permit-type{font-size:12px;opacity:0.8}
-
-/* ====================== Z-INDEX FIX v5.5.7 ====================== */
-.menu-btn { position: relative; z-index: 2001; }
-.side-menu { z-index: 2002; }
-.menu-overlay { z-index: 2000; }
 </style>
 </head>
 <body>
@@ -81,9 +76,9 @@ h1{font-size:20px;color:var(--blue)}
       <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Auto-Scan Active</div>
     </div>
   </div>
-  <div class="menu-btn" id="menuBtn">☰</div>
+  <div class="menu-btn" onclick="toggleMenu()">☰</div>
 </div>
-<div class="menu-overlay" id="menuOverlay"></div>
+<div class="menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
 <div class="side-menu" id="sideMenu">
   <div class="menu-section">
     <h3>Quick Actions</h3>
@@ -143,19 +138,7 @@ h1{font-size:20px;color:var(--blue)}
 
 <script>
 let selectedLeadId = null;
-
-/* ====================== UI STATE + EVENT PROTECTION v5.5.7 ====================== */
-const UI = { menuOpen: false, lock: false, lastAction: 0 };
-
-function safeAction(fn) {
-  const now = Date.now();
-  if (UI.lock && now - UI.lastAction < 150) return;
-  UI.lock = true;
-  UI.lastAction = now;
-  try { fn(); } 
-  catch (e) { console.error("UI Error:", e); }
-  setTimeout(() => UI.lock = false, 120);
-}
+let menuOpen = false;
 
 /* ====================== 1. SAFE FETCH WRAPPER ====================== */
 async function safeFetch(url, options = {}, fallback = null) {
@@ -181,57 +164,27 @@ const S = {
 /* ====================== 3. RACE CONDITION LOCKS ====================== */
 const locks = { permits: false, metrics: false, os: false, proposals: false };
 
-/* ====================== MENU TOGGLE WITH SAFE ACTION ====================== */
+/* ====================== 4. FIXED MENU TOGGLE v5.5.7 ====================== */
 function toggleMenu() {
-  safeAction(() => {
-    const sideMenu = document.getElementById('sideMenu');
-    const overlay = document.getElementById('menuOverlay');
-    if (!sideMenu || !overlay) return;
-    const open = sideMenu.classList.contains('active');
-    if (open) {
-      sideMenu.classList.remove('active');
-      overlay.classList.remove('active');
-      UI.menuOpen = false;
-    } else {
-      sideMenu.classList.add('active');
-      overlay.classList.add('active');
-      UI.menuOpen = true;
-    }
-  });
+  menuOpen = !menuOpen;
+  const sideMenu = document.getElementById('sideMenu');
+  const menuOverlay = document.getElementById('menuOverlay');
+  if (!sideMenu || !menuOverlay) return;
+  
+  sideMenu.classList.toggle('active');
+  menuOverlay.classList.toggle('active');
+  
+  // Mobile fix: control display + pointer events
+  if (menuOpen) {
+    menuOverlay.style.display = 'block';
+    document.body.style.overflow = 'hidden'; // lock scroll when menu open
+  } else {
+    document.body.style.overflow = 'auto';
+    setTimeout(() => { menuOverlay.style.display = 'none'; }, 300);
+  }
 }
 
-/* ====================== ESCAPE KEY FORCE CLOSE ====================== */
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    const sideMenu = document.getElementById('sideMenu');
-    const overlay = document.getElementById('menuOverlay');
-    sideMenu?.classList.remove('active');
-    overlay?.classList.remove('active');
-    UI.menuOpen = false;
-  }
-});
-
-/* ====================== CLICK DEADLOCK BREAKER ====================== */
-setInterval(() => {
-  const overlay = document.getElementById('menuOverlay');
-  const menu = document.getElementById('sideMenu');
-  if (!overlay || !menu) return;
-  const shouldBeOpen = menu.classList.contains('active');
-  if (!shouldBeOpen && overlay.classList.contains('active')) {
-    overlay.classList.remove('active');
-  }
-  if (!shouldBeOpen && menu.classList.contains('active')) {
-    menu.classList.remove('active');
-  }
-}, 2000);
-
-/* ====================== HARD EVENT BINDING ====================== */
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("menuBtn")?.addEventListener("click", toggleMenu);
-  document.getElementById("menuOverlay")?.addEventListener("click", toggleMenu);
-});
-
-/* ====================== HARDENED LOAD FUNCTIONS ====================== */
+/* ====================== 5. HARDENED LOAD FUNCTIONS ====================== */
 async function loadPermits() {
   if (locks.permits) return;
   locks.permits = true;
@@ -324,7 +277,7 @@ async function loadProposals() {
   }
 }
 
-/* ====================== CRASH PROOF EVENT SYSTEM ====================== */
+/* ====================== 6. CRASH PROOF EVENT SYSTEM ====================== */
 function addEvent(text, type = "info") {
   const el = document.getElementById("events");
   if (!el) return;
@@ -332,12 +285,10 @@ function addEvent(text, type = "info") {
   item.className = "activity-item";
   item.innerHTML = `${S.str(text)}<div class="activity-time">${new Date().toLocaleTimeString()}</div>`;
   el.prepend(item);
-  while (el.children.length > 15) {
-    el.removeChild(el.lastChild);
-  }
+  while (el.children.length > 15) el.removeChild(el.lastChild);
 }
 
-/* ====================== SAFE SELECT LEAD ====================== */
+/* ====================== 7. SAFE SELECT LEAD ====================== */
 function selectLead(id, value, trade, region, element) {
   selectedLeadId = String(id);
   document.querySelectorAll(".tenant-row").forEach(r => r.classList.remove("selected"));
@@ -444,7 +395,7 @@ async function refreshAll() {
   toggleMenu();
 }
 
-/* ====================== POLLING FIX ====================== */
+/* ====================== 8. POLLING FIX ====================== */
 loadPermits();
 loadMetrics();
 loadOS();
@@ -454,7 +405,7 @@ setInterval(loadOS, 10000);
 setInterval(loadPermits, 30000);
 setInterval(loadProposals, 12000);
 
-addEvent('Brain Control Center v5.5.7 initialized - Menu deadlock protection active', 'boot');
+addEvent('Brain Control Center v5.5.7 initialized - Menu button fixed', 'boot');
 </script>
 </body>
   </html>
