@@ -185,33 +185,126 @@ cron.schedule('*/30 * * * *', async () => {
 });
 
 /* ====================== ROUTES ====================== */
-app.get('/health', (_, res) =>
-  res.json({ status: 'ok', version: VERSION })
-);
+
+app.get('/health', (_, res) => {
+  res.json({
+    status: 'ok',
+    version: VERSION,
+    uptime: process.uptime()
+  });
+});
 
 app.get('/api/revenue', async (_, res) => {
-  const { data } = await supabase.from('revenue_events').select('*');
+  try {
+    const { data } = await supabase
+      .from('revenue_events')
+      .select('*');
 
-  const byOS = {};
-  for (const e of data || []) {
-    byOS[e.os_id] = (byOS[e.os_id] || 0) + Number(e.amount || 0);
+    const byOS = {};
+
+    for (const e of data || []) {
+      byOS[e.os_id] =
+        (byOS[e.os_id] || 0) + Number(e.amount || 0);
+    }
+
+    res.json({
+      success: true,
+      byOS
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
   }
-
-  res.json({ byOS });
 });
 
 app.get('/api/leads', async (_, res) => {
-  const { data } = await supabase.from('leads').select('*').limit(50);
-  res.json(data || []);
+  try {
+    const { data } = await supabase
+      .from('leads')
+      .select('*')
+      .limit(50);
+
+    res.json(data || []);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
 });
 
 app.post('/api/run-scan', async (_, res) => {
-  const result = await Engine.runScan();
-  res.json(result);
+  try {
+    const result = await Engine.runScan();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
+  }
+});
+
+/* ====================== STATIC FILES ====================== */
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+/* Dashboard */
+
+app.get('/', (req, res) => {
+  res.sendFile(
+    path.join(__dirname, 'public', 'dashboard.html')
+  );
+});
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile(
+    path.join(__dirname, 'public', 'dashboard.html')
+  );
+});
+
+app.get('/admin', (req, res) => {
+  res.sendFile(
+    path.join(__dirname, 'public', 'admin.html')
+  );
+});
+
+app.get('/affiliates', (req, res) => {
+  res.sendFile(
+    path.join(__dirname, 'public', 'affiliates.html')
+  );
+});
+
+/* SPA fallback - MUST BE LAST */
+
+app.get('*', (req, res) => {
+  res.sendFile(
+    path.join(__dirname, 'public', 'dashboard.html')
+  );
+});
+
+/* ====================== ERROR HANDLER ====================== */
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+
+  res.status(500).json({
+    success: false,
+    error: 'Internal server error'
+  });
 });
 
 /* ====================== SERVER ====================== */
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`GRIDV21 v${VERSION} running on ${PORT}`)
-);
+
+app.listen(PORT, () => {
+  console.log(
+    `GRIDV21 v${VERSION} running on ${PORT}`
+  );
+
+  console.log(
+    'Dashboard:',
+    `http://localhost:${PORT}/`
+  );
+});
