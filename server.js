@@ -12,7 +12,6 @@ import { fileURLToPath } from 'url';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
-import { body, param, validationResult } from 'express-validator';
 
 dotenv.config();
 
@@ -29,14 +28,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const VERSION = '5.5.1';
+const VERSION = '5.5.4';
 
 /* ====================== SECURITY MIDDLEWARE ====================== */
 app.use(helmet());
 app.use(compression());
 app.use(morgan('combined'));
 app.use(cors({
-  origin: process.env.FRONTEND_URL?.split(',') || '*',
+  origin: process.env.FRONTEND_URL? process.env.FRONTEND_URL.split(',') : false,
   credentials: true
 }));
 
@@ -177,8 +176,14 @@ class Engine {
   }
 
   static async analyzeLead(leadId) {
-    const { data } = await supabase.from('leads').select('*').eq('id', leadId).single();
-    if (!data) return { error: 'Lead not found' };
+    const { data, error } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', leadId)
+    .single();
+    if (error ||!data) {
+      return { error: 'Lead not found' };
+    }
     const value = Number(data.value_estimate || 0);
     const score = Math.min(100, Math.round(value / 1000));
     const tier = score > 70? 'Hot' : score > 40? 'Warm' : 'Cold';
@@ -186,20 +191,13 @@ class Engine {
   }
 }
 
-/* ====================== AUTH MIDDLEWARE ====================== */
+/* ====================== AUTH MIDDLEWARE - DISABLED ====================== */
 function requireAuth(req, res, next) {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
+  return next();
 }
 
-/* ====================== CRON - FIXED 6-FIELD SYNTAX v5.5.1 ====================== */
-const schedule = process.env.CRON_SCHEDULE || '0 */30 * * * *';
-if (!schedule) {
-  throw new Error('CRON_SCHEDULE is missing');
-}
-
+/* ====================== CRON - 5 FIELD SYNTAX v5.5.4 ====================== */
+const schedule = process.env.CRON_SCHEDULE || '*/30 * * * *;
 cron.schedule(schedule, async () => {
   console.log('Auto scan started at', new Date().toISOString());
   await scanAllCities();
@@ -221,7 +219,7 @@ app.get('/health', async (req, res) => {
 /* ====================== ROUTES ====================== */
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length;
-  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.1' });
+  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.4' });
 });
 
 app.get('/api/os-status', (req, res) => res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] }))));
@@ -234,7 +232,7 @@ app.post('/api/os-toggle/:id', requireAuth, async (req, res) => {
 
 app.get('/api/permits-recent', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('leads').select('*').order('issued_date', { ascending: false }).limit(50);
+    const { data, error } = await supabase.from('leads').select('*').order('last_seen_at', { ascending: false }).limit(50);
     if (error) throw error;
     res.json(data || []);
   } catch (e) {
