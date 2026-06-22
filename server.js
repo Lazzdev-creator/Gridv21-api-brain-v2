@@ -180,12 +180,15 @@ function requireAuth(req, res, next) {
 }
 
 /* ====================== CRON - CORRECT SYNTAX ====================== */
-cron.schedule('*/30 ****', async () => {
+const schedule = process.env.CRON_SCHEDULE || '*/30 *';
+if (!schedule) {
+  throw new Error('CRON_SCHEDULE is missing');
+}
+cron.schedule(schedule, async () => {
   console.log('Auto scan started');
   await scanAllCities();
 });
 
-/* ====================== HEALTH ENDPOINT FOR RENDER ====================== */
 app.get('/health', async (req, res) => {
   try {
     const { error } = await supabase.from('leads').select('id').limit(1);
