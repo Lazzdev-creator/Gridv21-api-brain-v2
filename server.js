@@ -195,7 +195,7 @@ function requireAuth(req, res, next) {
 }
 
 /* ====================== CRON - FIXED 6-FIELD SYNTAX v5.5.1 ====================== */
-const schedule = process.env.CRON_SCHEDULE || '0 */30 *';
+const schedule = process.env.CRON_SCHEDULE || '0 */30 * *';
 if (!schedule) {
   throw new Error('CRON_SCHEDULE is missing');
 }
