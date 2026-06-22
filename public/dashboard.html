@@ -2,156 +2,97 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.5.8</title>
+<title>GRIDV21 v5.5.9 DEBUG</title>
 <style>
-/* ...same styles as v5.5.7... */
+body{background:#0a0e27;color:#e0e6ff;font-family:system-ui;padding:15px}
+.card{background:#11152b;border:1px solid #1e2342;border-radius:12px;padding:15px;margin:10px 0}
+.menu-btn{position:fixed;top:15px;right:15px;z-index:9999;background:#00a8ff;color:#000;border:none;padding:10px 15px;border-radius:8px;font-size:20px}
 </style>
 </head>
 <body>
-<!-- ...same HTML... -->
+<button class="menu-btn" onclick="alert('Button works!')">☰</button>
+<h1>GRIDV21 v5.5.9 DEBUG MODE</h1>
+
+<div class="card">
+  <h3>Total Leads: <span id="total_leads">0</span></h3>
+  <h3>Revenue: <span id="revenue">$0</span></h3>
+  <h3>DMs: <span id="dms">0</span></h3>
+  <h3>OS: <span id="os_count">0/12</span></h3>
+</div>
+
+<div class="card">
+  <h3>Permits</h3>
+  <div id="permitsList">Loading...</div>
+</div>
+
+<div class="card">
+  <h3>Events</h3>
+  <div id="events">Booting...</div>
+</div>
 
 <script>
-let selectedLeadId = null;
-let menuOpen = false;
+console.log('🚀 v5.5.9 script started');
 
-async function safeFetch(url, options = {}, fallback = null) {
+// SAFE DOM GETTER
+function getEl(id) {
+  const el = document.getElementById(id);
+  if (!el) console.warn('Element not found:', id);
+  return el;
+}
+
+function addEvent(text) {
+  const el = getEl('events');
+  if (el) el.innerHTML += `<div>${new Date().toLocaleTimeString()}: ${text}</div>`;
+}
+
+async function safeFetch(url, fallback = []) {
   try {
     console.log('Fetching:', url);
-    const res = await fetch(url, options);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const contentType = res.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) return await res.json();
-    return fallback;
+    addEvent('Fetching ' + url);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    console.log('Success:', url, data);
+    addEvent(url + ' OK');
+    return data;
   } catch (err) {
-    console.error("API Error:", url, err);
-    addEvent(`API Error: ${url} - ${err.message}`, 'error');
+    console.error('Fetch failed:', url, err);
+    addEvent(url + ' FAILED: ' + err.message);
     return fallback;
   }
 }
 
-const S = {
-  str: (v) => (v ?? "").toString(),
-  num: (v) => { const n = Number(v); return isNaN(n) ? 0 : n; },
-  money: (v) => { const n = Number(v); return "$" + (isNaN(n) ? 0 : n).toLocaleString(); }
-};
-
-const locks = { permits: false, metrics: false, os: false, proposals: false };
-
-function addEvent(text, type = "info") {
-  try {
-    const el = document.getElementById("events");
-    if (!el) return;
-    const item = document.createElement("div");
-    item.className = 'activity-item';
-    item.innerHTML = `${S.str(text)}<div class="activity-time">${new Date().toLocaleTimeString()}</div>`;
-    el.prepend(item);
-    while (el.children.length > 15) el.removeChild(el.lastChild);
-  } catch(e) { console.error('addEvent error:', e) }
-}
-
-function toggleMenu() {
-  try {
-    menuOpen = !menuOpen;
-    const sideMenu = document.getElementById('sideMenu');
-    const menuOverlay = document.getElementById('menuOverlay');
-    if (!sideMenu || !menuOverlay) return;
-    sideMenu.classList.toggle('active');
-    menuOverlay.classList.toggle('active');
-    menuOverlay.style.display = menuOpen ? 'block' : 'none';
-    document.body.style.overflow = menuOpen ? 'hidden' : 'auto';
-  } catch(e) { console.error('toggleMenu error:', e) }
-}
-
-// WRAP ALL LOADERS IN TRY/CATCH
-async function loadPermits() {
-  if (locks.permits) return;
-  locks.permits = true;
-  try {
-    const permits = await safeFetch("/api/permits-recent", {}, []);
-    const el = document.getElementById("total_leads");
-    if (el) el.textContent = permits.length;
-    let cut = 0;
-    const html = permits.map(p => {
-      const value = S.num(p.value_estimate || p.value);
-      cut += value * 0.03;
-      return `<div class="permit-item"><div class="permit-city">${S.str(p.region || p.city)}</div><div class="permit-type">${S.str(p.trade_type || p.permit_type)}</div><div style="font-size:11px;opacity:0.7">${S.str(p.contractor)} | ${value ? `Value: ${S.money(value)}` : ""}</div></div>`;
-    }).join("");
-    const listEl = document.getElementById("permitsList");
-    if (listEl) listEl.innerHTML = permits.length ? html : `<div style="opacity:0.6;text-align:center;padding:20px">No permits yet</div>`;
-    const revEl = document.getElementById("revenue");
-    if (revEl) revEl.textContent = S.money(cut);
-  } catch(e) { console.error('loadPermits crashed:', e); addEvent('Permits load failed', 'error') } 
-  finally { locks.permits = false }
-}
-
-async function loadMetrics() {
-  if (locks.metrics) return;
-  locks.metrics = true;
-  try {
-    const d = await safeFetch("/api/metrics", {}, {});
-    const dmsEl = document.getElementById("dms");
-    if (dmsEl) dmsEl.textContent = S.num(d.dms_sent);
-    if (d.revenue_breakdown) {
-      const b = d.revenue_breakdown;
-      const breakEl = document.getElementById("breakdown");
-      if (breakEl) breakEl.innerHTML = `<div class="breakdown-row"><span>Total</span><span>${S.money(d.est_revenue_month)}</span></div>`;
-    }
-    const leads = await safeFetch("/api/leads-recent", {}, []);
-    const tenEl = document.getElementById("tenants");
-    if (tenEl) tenEl.innerHTML = leads.length ? leads.map(l => `<div class="tenant-row" onclick="selectLead('${l.id}', ${S.num(l.value_estimate || l.value)}, '${S.str(l.trade_type)}', '${S.str(l.region)}', this)">${S.str(l.region)} - ${S.str(l.trade_type)}</div>`).join("") : '<div style="opacity:0.6">No leads</div>';
-  } catch(e) { console.error('loadMetrics crashed:', e); addEvent('Metrics load failed', 'error') }
-  finally { locks.metrics = false }
-}
-
-async function loadOS() {
-  if (locks.os) return;
-  locks.os = true;
-  try {
-    const osList = await safeFetch("/api/os-status", {}, []);
-    const panel = document.getElementById("os_panel");
-    if (panel) panel.innerHTML = osList.length ? osList.map(os => `<button class="os-btn ${os.status}">${os.id}. ${S.str(os.name)}</button>`).join("") : '<div>No OS data</div>';
-    const countEl = document.getElementById("os_count");
-    if (countEl) countEl.textContent = osList.filter(o => o.status === "active").length + "/12";
-  } catch(e) { console.error('loadOS crashed:', e); addEvent('OS load failed', 'error') }
-  finally { locks.os = false }
-}
-
-async function loadProposals() {
-  if (locks.proposals) return;
-  locks.proposals = true;
-  try {
-    const props = await safeFetch("/api/proposals", {}, []);
-    const div = document.getElementById("proposals");
-    if (div) div.innerHTML = props.length ? props.map(p => `<div class="proposal-row"><span>${S.str(p.client)}</span><span>${S.money(p.total_estimate)}</span></div>`).join("") : '<div>No proposals</div>';
-  } catch(e) { console.error('loadProposals crashed:', e) }
-  finally { locks.proposals = false }
-}
-
-function selectLead(id, value, trade, region, element) {
-  try {
-    selectedLeadId = String(id);
-    document.querySelectorAll(".tenant-row").forEach(r => r.classList.remove("selected"));
-    if (element) element.classList.add("selected");
-    const actions = document.getElementById("lead_actions");
-    if (actions) actions.innerHTML = `<div class="selected-lead-info"><strong>Selected:</strong> ${region} - ${trade}<br><strong>Value:</strong> ${S.money(value)}</div>`;
-    addEvent(`Selected ${String(id).slice(0,8)}`, 'select');
-  } catch(e) { console.error('selectLead error:', e) }
-}
-
-// SAFE BOOT - don't let one fail kill all
+// TEST 1: Does DOM work?
 window.addEventListener('load', () => {
-  console.log('GRIDV21 v5.5.8 booting...');
-  addEvent('Brain booting v5.5.8...', 'boot');
-  setTimeout(() => { loadPermits().catch(console.error) }, 100);
-  setTimeout(() => { loadMetrics().catch(console.error) }, 500);
-  setTimeout(() => { loadOS().catch(console.error) }, 1000);
-  setTimeout(() => { loadProposals().catch(console.error) }, 1500);
-  
-  setInterval(() => loadMetrics().catch(console.error), 8000);
-  setInterval(() => loadOS().catch(console.error), 10000);
-  setInterval(() => loadPermits().catch(console.error), 30000);
-  setInterval(() => loadProposals().catch(console.error), 12000);
+  addEvent('DOM loaded');
+  getEl('total_leads').textContent = '999'; // test write
+  setTimeout(testAPIs, 1000);
 });
+
+// TEST 2: Do APIs work?
+async function testAPIs() {
+  addEvent('Testing APIs...');
+  
+  const permits = await safeFetch('/api/permits-recent');
+  getEl('total_leads').textContent = permits.length;
+  getEl('permitsList').innerHTML = permits.length ? 
+    permits.map(p => `<div>${p.city || 'Unknown'} - ${p.value || 0}</div>`).join('') : 
+    'No permits - API returned empty array';
+  
+  const metrics = await safeFetch('/api/metrics', {});
+  getEl('dms').textContent = metrics.dms_sent || 0;
+  getEl('revenue').textContent = '$' + (metrics.est_revenue_month || 0);
+  
+  const os = await safeFetch('/api/os-status');
+  getEl('os_count').textContent = os.filter(o => o.status === 'active').length + '/12';
+  
+  addEvent('All tests done. If you see this, JS is alive!');
+}
+
+// MOCK DATA IF APIs FAIL
+if (typeof fetch === 'undefined') {
+  addEvent('ERROR: fetch not supported on this browser');
+}
 </script>
 </body>
 </html>
