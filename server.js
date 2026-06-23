@@ -15,38 +15,25 @@ import morgan from 'morgan';
 
 dotenv.config();
 
-/* ====================== WHATSAPP NOTIFIER ====================== */
-async function sendWhatsApp(message) {
-  const apiKey = process.env.CALLMEBOT_KEY;
+/* === WHATSAPP NOTIFIER === */
+async function sendWhatsApp(msg) {
+  const key = process.env.CALLMEBOT_KEY;
   const phone = process.env.CALLMEBOT_PHONE;
-  
-  if (!apiKey || !phone) {
-    console.warn("⚠️ CALLMEBOT_KEY or CALLMEBOT_PHONE missing - skipping WhatsApp");
-    return false;
-  }
-
-  const text = encodeURIComponent(message);
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${text}&apikey=${apiKey}`;
-
+  if (!key || !phone) return console.warn('⚠️ CallMeBot creds missing');
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${key}`;
   try {
-    const res = await axios.get(url, { timeout: 10000 });
-    if (res.status === 200) {
-      console.log(`✅ WhatsApp sent: ${message}`);
-      return true;
-    }
-    console.error(`❌ CallMeBot error: ${res.status}`);
-    return false;
+    await axios.get(url);
+    console.log('✅ WhatsApp sent:', msg);
   } catch (e) {
-    console.error("❌ WhatsApp failed:", e.message);
-    return false;
+    console.error('❌ WhatsApp failed:', e.message);
   }
 }
 
-/* ====================== ENV ====================== */
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'SESSION_SECRET', 'CALLMEBOT_KEY', 'CALLMEBOT_PHONE'];
-for (const key of requiredEnv) {
-  if (!process.env[key]) {
-    console.error(`Missing env: ${key}`);
+/* === ENV CHECK === */
+const required = ['SUPABASE_URL', 'SUPABASE_KEY', 'SESSION_SECRET', 'CALLMEBOT_KEY', 'CALLMEBOT_PHONE'];
+for (const k of required) {
+  if (!process.env[k]) {
+    console.error(`Missing env: ${k}`);
     process.exit(1);
   }
 }
@@ -54,9 +41,9 @@ for (const key of requiredEnv) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '5.6.1'; // bumped version for WhatsApp alerts
+const VERSION = '1.0.1';
 
-/* ====================== MIDDLEWARE ====================== */
+/* === MIDDLEWARE === */
 app.use(helmet());
 app.use(compression());
 app.use(morgan('combined'));
@@ -68,66 +55,57 @@ app.use(session({ secret: process.env.SESSION_SECRET, resave: false, saveUniniti
 app.use(passport.initialize());
 app.use(passport.session());
 
-/* ====================== SUPABASE ====================== */
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY.trim()
-);
+/* === SUPABASE === */
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY.trim());
 
-/* ====================== OS + REVENUE ENGINE ====================== */
+/* === OS MODULES - FIXED SYNTAX === */
 const BRAIN_OS = [
-  { id: 1, name: 'Executive Intelligence OS' },
-  { id: 2, name: 'Revenue Intelligence OS' },
-  { id: 3, name: 'Sales OS' },
-  { id: 4, name: 'Marketing OS' },
-  { id: 5, name: 'Operations OS' },
-  { id: 6, name: 'Finance OS' },
-  { id: 7, name: 'Human Capital OS' },
-  { id: 8, name: 'Project OS' },
-  { id: 9, name: 'Knowledge OS' },
-  { id: 10, name: 'Compliance OS' },
-  { id: 11, name: 'Supply Chain OS' },
-  { id: 12, 'Acquisition OS' }
+  { id: 1, name: 'Revenue OS' },
+  { id: 2, name: 'Customer OS' },
+  { id: 3, name: 'Operations OS' },
+  { id: 4, name: 'Decision OS' },
+  { id: 5, name: 'Knowledge Graph OS' },
+  { id: 6, name: 'Forecasting OS' },
+  { id: 7, name: 'Marketing OS' },
+  { id: 8, name: 'Customer Intelligence OS' },
+  { id: 9, name: 'Deal Closing OS' },
+  { id: 10, name: 'Risk OS' },
+  { id: 11, name: 'Automation OS' },
+  { id: 12, name: 'Acquisition OS' }  // ← was broken: { id: 12, 'Acquisition OS' }
 ];
 let OS_STATUS = Object.fromEntries(BRAIN_OS.map(o => [o.id, 'active']));
 
-/* ====================== REVENUE EVENT TRACKER ====================== */
-async function trackRevenueEvent({ os_id, lead_id, amount, type }) {
-  const { error } = await supabase.from('revenue_events').insert({ 
-    os_id, 
-    lead_id, 
-    amount, 
-    type, 
-    created_at: new Date().toISOString() 
+/* === REVENUE TRACKER === */
+async function trackRevenue({ os_id, lead_id, amount, type }) {
+  const { error } = await supabase.from('revenue_events').insert({
+    os_id, lead_id, amount, type, created_at: new Date().toISOString()
   });
   if (error) {
     console.error('Revenue tracking error:', error.message);
-    await sendWhatsApp(`⚠️ Gridv21: Revenue tracking failed - ${error.message}`);
+    await sendWhatsApp(`⚠️ GridV21: Revenue tracking failed - ${error.message}`);
   }
 }
 
-/* ====================== LEAD SCORING ====================== */
+/* === LEAD SCORING === */
 async function scoreLead(lead) {
   const value = Number(lead.value_estimate || 0);
   const score = Math.min(100, Math.round(value / 1000));
   const tier = score > 70 ? 'Hot' : score > 40 ? 'Warm' : 'Cold';
+  await trackRevenue({ os_id: 2, lead_id: lead.id, amount: value * 0.03, type: 'lead_scored' });
   
-  await trackRevenueEvent({ os_id: 2, lead_id: lead.id, amount: value * 0.03, type: 'lead_scored' });
-  
-  // ALERT 1: Hot lead notification
+  // WhatsApp alert for hot leads
   if (tier === 'Hot') {
-    await sendWhatsApp(`🔥 Gridv21 Hot Lead: ${lead.region} - $${value.toLocaleString()} | Score: ${score}`);
+    await sendWhatsApp(`🔥 GridV21 Hot Lead: ${lead.region} - $${value.toLocaleString()} | Score: ${score}`);
   }
-  
   return { score, tier };
 }
 
-/* ====================== SCANNER ====================== */
+/* === CITY SCANNER === */
 let scanLock = false;
 async function scanCities() {
   if (scanLock) return 0;
   scanLock = true;
-  const cities = [ 'Austin','Dallas','Houston','Phoenix','Seattle', 'Chicago','San Diego','Portland','Denver' ];
+  const cities = ['Austin','Dallas','Houston','Phoenix','Seattle','Chicago','San Diego','Portland','Denver'];
   let total = 0;
   try {
     for (const city of cities) {
@@ -139,7 +117,7 @@ async function scanCities() {
           const lead = { external_id: `${city}-${p.id || Date.now()}`, region: city, value_estimate: Number(p.value || 0) };
           const { error } = await supabase.from('leads').upsert(lead);
           if (!error) total++;
-          await trackRevenueEvent({ os_id: 12, lead_id: lead.external_id, amount: lead.value_estimate * 0.03, type: 'lead_ingested' });
+          await trackRevenue({ os_id: 12, lead_id: lead.external_id, amount: lead.value_estimate * 0.03, type: 'lead_ingested' });
         }
       } catch {}
     }
@@ -149,50 +127,41 @@ async function scanCities() {
   return total;
 }
 
-/* ====================== ENGINE ====================== */
+/* === ENGINE === */
 class Engine {
   static async runScan() {
     const saved = await scanCities();
-    await trackRevenueEvent({ os_id: 5, lead_id: null, amount: saved * 10, type: 'scan_cycle' });
-    
-    // ALERT 2: Scan complete summary
-    if (saved > 0) {
-      await sendWhatsApp(`📊 Gridv21 Scan Done: ${saved} new leads ingested`);
-    }
-    
+    await trackRevenue({ os_id: 5, lead_id: null, amount: saved * 10, type: 'scan_cycle' });
+    if (saved > 0) await sendWhatsApp(`📊 GridV21 Scan Complete: ${saved} new leads ingested`);
     return { saved };
   }
 }
 
-/* ====================== CRON ====================== */
+/* === CRON JOBS === */
 cron.schedule('*/30 *', async () => {
   console.log('cron scan running');
   await Engine.runScan();
 });
 
-// ALERT 3: Daily summary at 8PM SAST
+// Daily summary 8PM SAST
 cron.schedule('0 18 *', async () => {
   try {
     const { data } = await supabase.from('revenue_events').select('amount').gte('created_at', new Date().toISOString().split('T')[0]);
-    const total = (data || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
-    await sendWhatsApp(`📈 Gridv21 Daily: $${total.toFixed(2)} revenue tracked today`);
+    const total = (data || []).reduce((s, e) => s + Number(e.amount || 0), 0);
+    await sendWhatsApp(`📈 GridV21 Daily: $${total.toFixed(2)} revenue tracked today`);
   } catch (e) {
     console.error('Daily summary error:', e.message);
   }
 });
 
-/* ====================== ROUTES ====================== */
-app.get('/health', (_, res) => {
-  res.json({ status: 'ok', version: VERSION, uptime: process.uptime() });
-});
+/* === ROUTES === */
+app.get('/health', (_, res) => res.json({ status: 'ok', version: VERSION, uptime: process.uptime() }));
 
 app.get('/api/revenue', async (_, res) => {
   try {
     const { data } = await supabase.from('revenue_events').select('*');
     const byOS = {};
-    for (const e of data || []) {
-      byOS[e.os_id] = (byOS[e.os_id] || 0) + Number(e.amount || 0);
-    }
+    for (const e of data || []) byOS[e.os_id] = (byOS[e.os_id] || 0) + Number(e.amount ||  0);
     res.json({ success: true, byOS });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -217,41 +186,25 @@ app.post('/api/run-scan', async (_, res) => {
   }
 });
 
-/* ====================== STATIC FILES ====================== */
+/* === STATIC + SPA === */
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
+app.get('/affiliates', (req, res) => res.sendFile(path.join(__dirname, 'public', 'affiliates.html')));
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
-/* Dashboard */
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-app.get('/dashboard', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
-app.get('/affiliates', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'affiliates.html'));
-});
-
-/* SPA fallback - MUST BE LAST */
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-/* ====================== ERROR HANDLER ====================== */
+/* === ERROR HANDLER === */
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  sendWhatsApp(`🚨 Gridv21 Crash: ${err.message}`); // WhatsApp alert on crash
+  sendWhatsApp(`🚨 GridV21 Crash: ${err.message}`);
   res.status(500).json({ success: false, error: 'Internal server error' });
 });
 
-/* ====================== SERVER ====================== */
+/* === START === */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`GRIDV21 v${VERSION} running on ${PORT}`);
   console.log('Dashboard:', `http://localhost:${PORT}/`);
-  
-  // Startup alert to confirm WhatsApp works on Render
-  await sendWhatsApp(`✅ Gridv21 v${VERSION} started on Render`);
+  await sendWhatsApp(`✅ GridV21 v${VERSION} started on Render`);
 });
