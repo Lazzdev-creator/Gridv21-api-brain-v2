@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.7.0</title>
+<title>GRIDV21 Brain Control v5.7.1</title>
 <style>
 :root {
   --blue: #00a8ff;
@@ -36,16 +36,32 @@ h1{font-size:20px;color:var(--blue)}
 .menu-btn.active .menu-icon::before{top:0;transform:rotate(45deg)}
 .menu-btn.active .menu-icon::after{top:0;transform:rotate(-45deg)}
 
-/* Slide menu */
+/* Overlay */
 .overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:0.3s;z-index:998}
 .overlay.show{opacity:1;pointer-events:all}
-.slide-menu{position:fixed;top:0;right:-320px;width:300px;height:100vh;background:var(--glass);backdrop-filter:blur(20px);border-left:1px solid #1e2342;transition:0.3s;z-index:999;overflow-y:auto;padding:20px;box-shadow:-10px 0 40px rgba(0,0,0,0.5)}
-.slide-menu.open{right:0}
+
+/* Slide menu - FIXED CSS WITH TRANSITION */
+.slide-menu {
+  position: fixed;
+  top: 0;
+  right: -320px;
+  width: 300px;
+  height: 100vh;
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border-left: 1px solid #1e2342;
+  transition: right 0.3s ease;
+  z-index: 999;
+  overflow-y: auto;
+  padding: 20px;
+  box-shadow: -10px 0 40px rgba(0,0,0,0.5);
+}
+.slide-menu.open { right: 0; }
+
 .slide-menu h3{font-size:14px;color:var(--blue);margin-bottom:15px;text-transform:uppercase;letter-spacing:1px}
 .slide-menu-section{margin-bottom:25px;padding-bottom:20px;border-bottom:1px solid #1e2342}
 .slide-menu-section:last-child{border:none}
 
-/* OS Grid in menu */
 .os-grid-menu{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .os-btn{padding:10px;font-size:10px;border-radius:8px;border:1px solid #1e2342;cursor:pointer;font-weight:bold;transition:0.2s;background:var(--card);color:#999}
 .os-btn.active{background:var(--green);color:#000;border-color:var(--green);box-shadow:0 0 15px rgba(0,255,136,0.3)}
@@ -95,7 +111,6 @@ h1{font-size:20px;color:var(--blue)}
 .proposal-client{font-weight:bold}
 .proposal-amount{color:var(--green);font-weight:bold}
 
-/* Scrollbar */
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:var(--dark)}
 ::-webkit-scrollbar-thumb{background:var(--blue);border-radius:3px}
@@ -107,7 +122,7 @@ h1{font-size:20px;color:var(--blue)}
   <div class="header-left">
     <div class="logo">GV</div>
     <div>
-      <h1>GRIDV21 <span id="version">v5.7.0</span></h1>
+      <h1>GRIDV21 <span id="version">v5.7.1</span></h1>
       <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Auto-Scan Active</div>
     </div>
   </div>
@@ -116,10 +131,8 @@ h1{font-size:20px;color:var(--blue)}
   </div>
 </div>
 
-<!-- Overlay -->
 <div class="overlay" id="overlay"></div>
 
-<!-- Slide Menu -->
 <div class="slide-menu" id="slideMenu">
   <div class="slide-menu-section">
     <h3>🎛️ OS Control Panel</h3>
@@ -145,7 +158,6 @@ h1{font-size:20px;color:var(--blue)}
   </div>
 </div>
 
-<!-- Main Content -->
 <div class="grid">
   <div class="card"><h3>Total Leads</h3><div class="value" id="total_leads">0</div><div class="subvalue">Permit pipeline</div></div>
   <div class="card"><h3>Est. Revenue/Month</h3><div class="value" id="revenue">$0</div><div class="subvalue">3-stage model</div></div>
@@ -181,16 +193,18 @@ h1{font-size:20px;color:var(--blue)}
 <script>
 let selectedLeadId = null;
 
-// Menu toggle
+// Menu toggle - ADDED CONSOLE.LOG FOR DEBUG
 const menuBtn = document.getElementById('menuBtn');
 const slideMenu = document.getElementById('slideMenu');
 const overlay = document.getElementById('overlay');
 
 menuBtn.onclick = () => {
+  console.log('MENU CLICKED'); // DEBUG LINE
   menuBtn.classList.toggle('active');
   slideMenu.classList.toggle('open');
   overlay.classList.toggle('show');
 }
+
 overlay.onclick = () => {
   menuBtn.classList.remove('active');
   slideMenu.classList.remove('open');
@@ -205,7 +219,6 @@ async function loadMetrics() {
     document.getElementById('revenue').textContent = '$' + (d.est_revenue_month || 0).toLocaleString();
     document.getElementById('dms').textContent = d.dms_sent || 0;
     
-    // Update menu stats
     document.getElementById('menu_leads').textContent = d.total_leads || 0;
     document.getElementById('menu_revenue').textContent = '$' + (d.est_revenue_month || 0).toLocaleString();
 
@@ -224,7 +237,7 @@ async function loadMetrics() {
     const tenantsDiv = document.getElementById('tenants');
     if(leads.length > 0) {
       tenantsDiv.innerHTML = leads.map(l => `
-        <div class="tenant-row ${selectedLeadId === l.id ? 'selected' : ''}" onclick="selectLead('${l.id}', ${l.value_estimate}, '${l.trade_type || 'N/A'}', '${l.region}')">
+        <div class="tenant-row" onclick="selectLead(this,'${l.id}',${l.value_estimate},'${l.trade_type || 'N/A'}','${l.region}')">
           <span>${l.region} - ${l.trade_type || 'N/A'}</span>
           <span class="badge ${l.status === 'won' ? 'badge-won' : l.value_estimate > 50000 ? 'badge-hot' : 'badge-warm'}">$${l.value_estimate} ${l.status === 'won' ? 'WON' : ''}</span>
         </div>
@@ -255,8 +268,6 @@ async function loadProposals() {
 async function loadOS() {
   const r = await fetch('/api/os-status');
   const osList = await r.json();
-  
-  // Main panel removed, only menu now
   const panel = document.getElementById('os_panel_menu');
   panel.innerHTML = osList.map(os => `
     <button class="os-btn ${os.status}" onclick="toggleOS(${os.id})">
@@ -264,16 +275,16 @@ async function loadOS() {
       <span style="font-size:9px">${os.status.toUpperCase()}</span>
     </button>
   `).join('');
-  
   const activeCount = osList.filter(o=>o.status==='active').length;
   document.getElementById('os_count').textContent = activeCount + '/12';
   document.getElementById('menu_os').textContent = activeCount + '/12';
 }
 
-function selectLead(id, value, trade, region) {
+// FIXED: Added 'el' parameter, removed event.currentTarget
+function selectLead(el, id, value, trade, region) {
   selectedLeadId = id;
   document.querySelectorAll('.tenant-row').forEach(r => r.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
+  el.classList.add('selected');
   document.getElementById('lead_actions').innerHTML = `
     <div class="selected-lead-info"><strong>Selected:</strong> ${region} - ${trade}<br><strong>Value:</strong> $${value.toLocaleString()}</div>
     <button class="btn" onclick="analyzeLead()">🧠 Analyze Lead - Get Score</button>
@@ -371,14 +382,13 @@ async function checkEngine() {
   addEvent(`Engine v${d.version}: ${d.engine}`, 'engine');
 }
 
-// Init
 loadMetrics();
 loadOS();
 loadProposals();
 setInterval(loadMetrics, 3000);
 setInterval(loadOS, 5000);
 setInterval(loadProposals, 3000);
-addEvent('Brain Control Center v5.7.0 initialized - Slide Menu + Deal Closing OS', 'boot');
+addEvent('Brain Control Center v5.7.1 initialized - Menu + Event Fix', 'boot');
 </script>
 </body>
   </html>
