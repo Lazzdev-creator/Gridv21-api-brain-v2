@@ -114,28 +114,31 @@ class Engine {
   }
 }
 
-/* === CRON FIXED - 5 FIELDS EXACTLY AS YOU WROTE === */
 // Every 30 minutes
-cron.schedule('*/30 *', async () => {
+cron.schedule('*/30 * * * *', async () => {
   console.log('cron scan running');
   await Engine.runScan();
 });
 
 // Daily at 18:00 UTC
-cron.schedule('0 18 *', async () => {
+cron.schedule('0 18 * * *', async () => {
   try {
     const { data } = await supabase
       .from('revenue_events')
       .select('amount')
       .gte('created_at', new Date().toISOString().split('T')[0]);
+
     const total = (data || []).reduce(
       (sum, e) => sum + Number(e.amount || 0),
       0
     );
+
     await sendWhatsApp(
       `📈 Daily: $${total.toFixed(2)} tracked`
     );
-  } catch (e) { console.error(e.message); }
+  } catch (e) {
+    console.error(e.message);
+  }
 });
 
 /* === CORE ROUTES === */
