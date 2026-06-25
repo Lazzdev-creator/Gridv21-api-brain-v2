@@ -25,20 +25,10 @@ h1{font-size:20px;color:var(--blue)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 .permit-row{display:flex;justify-content:space-between;padding:12px 8px;border-bottom:1px solid #1e2342;cursor:pointer}
 .permit-row:hover{background:rgba(0,168,255,0.1)}
-.permit-row.selected{background:rgba(0,168,255,0.2);border-left:3px solid var(--blue)}
 .os-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .os-btn{padding:10px;font-size:11px;border-radius:8px;border:none;cursor:pointer;font-weight:bold}
 .os-btn.active{background:var(--green);color:#000}
 .os-btn.inactive{background:var(--grey);color:#999}
-
-.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:1000;align-items:center;justify-content:center}
-.modal-content{background:var(--card);padding:20px;border-radius:12px;width:90%;max-width:380px;max-height:90vh;overflow-y:auto}
-.close{font-size:28px;float:right;cursor:pointer}
-
-@media (max-width: 600px) {
-  .grid { grid-template-columns: 1fr; }
-  .value { font-size: 28px; }
-}
 </style>
 </head>
 <body>
@@ -50,7 +40,7 @@ h1{font-size:20px;color:var(--blue)}
     <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span> LIVE</div>
   </div>
   <div style="margin-left:auto">
-    <button class="btn" style="width:auto;padding:8px 16px" onclick="showMenu()">☰ MENU</button>
+    <button class="btn" onclick="showMenu()">☰ MENU</button>
   </div>
 </div>
 
@@ -61,50 +51,36 @@ h1{font-size:20px;color:var(--blue)}
   <div class="card"><h3>OS Active</h3><div class="value" id="os_count">12/12</div></div>
 </div>
 
-<div class="card full">
-  <h3>📄 Permit Feed - Live</h3>
-  <div id="permitFeed"><div class="activity-item">Loading permits...</div></div>
-</div>
-
-<div class="card full">
-  <h3>🧠 Live Events Feed</h3>
-  <div id="events"><div class="activity-item">Booting brain...</div></div>
-</div>
+<div class="card full"><h3>📄 Permit Feed</h3><div id="permitFeed">Loading...</div></div>
+<div class="card full"><h3>🧠 Live Events</h3><div id="events">Booting...</div></div>
 
 <div class="card full">
   <h3>⚡ Quick Actions</h3>
-  <button class="btn" onclick="forceScan()">⚡ Force Scan - Acquisition OS</button>
-  <button class="btn" onclick="checkEngine()">🧠 Engine Health</button>
+  <button class="btn" onclick="forceScan()">Force Scan</button>
+  <button class="btn" onclick="checkEngine()">Engine Health</button>
 </div>
 
-<!-- MENU MODAL -->
-<div id="menuModal" class="modal">
-  <div class="modal-content">
-    <span class="close" onclick="hideMenu()">×</span>
-    <h3>🎛️ Full OS Control</h3>
-    <div class="os-grid" id="modal_os_panel"></div>
-    <button class="btn btn-green" onclick="activateAllOS()" style="margin-top:15px">⚡ Activate All 12 OS</button>
-    <button class="btn btn-pink" onclick="deactivateAllOS()" style="margin-top:8px">⛔ Deactivate All OS</button>
+<!-- MENU -->
+<div id="menuModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:#11152b;padding:20px;border-radius:12px;width:90%;max-width:400px">
+    <h3>OS Control</h3>
+    <div id="modalOS" class="os-grid"></div>
+    <button class="btn btn-green" onclick="activateAllOS()">Activate All</button>
+    <button class="btn btn-pink" onclick="deactivateAllOS()">Deactivate All</button>
+    <button onclick="hideMenu()" style="margin-top:10px">Close</button>
   </div>
 </div>
 
 <script>
-// ==================== CORE ====================
-let selectedPermitId = null;
 let loading = false;
 
-function escapeHTML(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function addEvent(text, type='info') {
-  const time = new Date().toLocaleTimeString();
-  const div = document.getElementById('events');
+function addEvent(text) {
+  const ev = document.getElementById('events');
   const item = document.createElement('div');
   item.className = 'activity-item';
-  item.innerHTML = `${escapeHTML(text)} <span style="font-size:10px;opacity:0.5">(${time})</span>`;
-  div.insertBefore(item, div.firstChild);
-  if (div.children.length > 20) div.removeChild(div.lastChild);
+  item.innerHTML = text + ' <small>' + new Date().toLocaleTimeString() + '</small>';
+  ev.insertBefore(item, ev.firstChild);
+  if (ev.children.length > 15) ev.removeChild(ev.lastChild);
 }
 
 async function loadDashboard() {
@@ -112,115 +88,54 @@ async function loadDashboard() {
   loading = true;
   try {
     const res = await fetch('/api/dashboard');
-    if (!res.ok) throw new Error('Network error');
     const data = await res.json();
 
-    if (!data.success) throw new Error('API error');
+    document.getElementById('total_leads').textContent = data.metrics?.total_leads || 0;
+    document.getElementById('revenue').textContent = '$' + Number(data.metrics?.est_revenue_month || 0).toLocaleString();
+    document.getElementById('dms').textContent = data.metrics?.dms_sent || 0;
+    document.getElementById('os_count').textContent = (data.metrics?.os_active || 0) + '/12';
 
-    // Update metrics
-    const m = data.metrics || {};
-    document.getElementById('total_leads').textContent = m.total_leads || 0;
-    document.getElementById('revenue').textContent = '$' + Number(m.est_revenue_month || 0).toLocaleString();
-    document.getElementById('dms').textContent = m.dms_sent || 0;
-    document.getElementById('os_count').textContent = `${m.os_active || 0}/12`;
-
-    // Permit Feed
+    // Permit feed
     const feed = document.getElementById('permitFeed');
-    feed.innerHTML = '';
-    if (data.permits?.length) {
-      data.permits.forEach(p => {
-        const row = document.createElement('div');
-        row.className = `permit-row ${selectedPermitId === p.permit_id ? 'selected' : ''}`;
-        row.innerHTML = `<span><strong>${escapeHTML(p.city)}</strong> - ${escapeHTML(p.permit_type)}</span>
-                         <span style="color:var(--green)">${p.status?.toUpperCase()}</span>`;
-        row.onclick = () => { selectedPermitId = p.permit_id; loadDashboard(); };
-        feed.appendChild(row);
-      });
-    } else {
-      feed.innerHTML = '<div class="activity-item" style="opacity:0.6">No permits yet. Run a scan.</div>';
-    }
+    feed.innerHTML = data.permits?.length ? data.permits.map(p => 
+      `<div class="permit-row">${p.city} - ${p.permit_type}</div>`
+    ).join('') : 'No permits yet';
 
-    // Update OS in modal
-    updateOSPanel(data.osModules || []);
+    addEvent('Dashboard updated');
   } catch(e) {
     console.error(e);
-    addEvent('Dashboard refresh failed', 'error');
+    addEvent('❌ Dashboard error - check server logs');
   } finally {
     loading = false;
   }
 }
 
-function updateOSPanel(osModules) {
-  const container = document.getElementById('modal_os_panel');
-  container.innerHTML = '';
-  osModules.forEach(os => {
-    const btn = document.createElement('button');
-    btn.className = `os-btn ${os.status}`;
-    btn.textContent = `${os.id}. ${os.name.replace(' OS','')}`;
-    btn.onclick = () => toggleOS(os.id);
-    container.appendChild(btn);
-  });
-}
-
-async function toggleOS(id) {
-  try {
-    const r = await fetch(`/api/os-toggle/${id}`, { method: 'POST' });
-    const d = await r.json();
-    addEvent(`OS ${id} → ${d.status}`);
-    loadDashboard();
-  } catch(e) { addEvent('OS toggle failed', 'error'); }
-}
-
-async function activateAllOS() {
-  for(let i=1; i<=12; i++) {
-    try { await fetch(`/api/os-toggle/${i}`, { method: 'POST' }); } catch(e){}
-  }
-  addEvent('All 12 OS Activated', 'success');
-  loadDashboard();
-  hideMenu();
-}
-
-async function deactivateAllOS() {
-  for(let i=1; i<=12; i++) {
-    try { await fetch(`/api/os-toggle/${i}`, { method: 'POST' }); } catch(e){}
-  }
-  addEvent('All OS Deactivated', 'warning');
-  loadDashboard();
-  hideMenu();
-}
-
 async function forceScan() {
-  addEvent('⚡ Force Scan started...');
+  addEvent('⚡ Starting scan...');
   try {
-    const r = await fetch('/api/scrape-now', { method: 'POST' });
+    const r = await fetch('/api/scrape-now', {method:'POST'});
     const d = await r.json();
-    addEvent(`Scan complete: ${d.permits_found} permits`, 'success');
+    addEvent(`✅ Scan done: ${d.permits_found} permits`);
     loadDashboard();
-  } catch(e) {
-    addEvent('Scan failed', 'error');
-  }
+  } catch(e) { addEvent('❌ Scan failed'); }
 }
 
 async function checkEngine() {
-  try {
-    const r = await fetch('/api/test');
-    const d = await r.json();
-    addEvent(`Engine v${d.version} | OS Active: ${d.os_active}/12`);
-  } catch(e) { addEvent('Engine check failed'); }
+  const r = await fetch('/api/test');
+  const d = await r.json();
+  addEvent(`Engine OK | OS: ${d.os_active}/12`);
 }
 
-function showMenu() {
-  document.getElementById('menuModal').style.display = 'flex';
-  loadDashboard(); // refresh OS list
-}
-function hideMenu() {
-  document.getElementById('menuModal').style.display = 'none';
-}
+function showMenu() { document.getElementById('menuModal').style.display = 'flex'; loadDashboard(); }
+function hideMenu() { document.getElementById('menuModal').style.display = 'none'; }
 
-// Boot
-addEvent('GRIDV21 v5.5.8 Brain Control Started', 'boot');
+async function activateAllOS() { for(let i=1;i<=12;i++) try{await fetch(`/api/os-toggle/${i}`,{method:'POST'})}catch(e){} addEvent('All OS Activated'); loadDashboard(); hideMenu(); }
+async function deactivateAllOS() { for(let i=1;i<=12;i++) try{await fetch(`/api/os-toggle/${i}`,{method:'POST'})}catch(e){} addEvent('All OS Deactivated'); loadDashboard(); hideMenu(); }
+
+// Start
+addEvent('🚀 GRIDV21 v5.5.8 Started');
 loadDashboard();
-setInterval(loadDashboard, 7000);
+setInterval(loadDashboard, 8000);
 </script>
 </body>
   </html>
