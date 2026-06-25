@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GRIDV21 Brain Control v5.5.6</title>
+<title>GRIDV21 Brain Control v5.5.7</title>
 <style>
 :root { --blue: #00a8ff; --dark: #0a0e27; --card: #11152b; --text: #e0e6ff; --green: #00ff88; --orange: #ffaa00; --pink: #ff3366; --grey: #333; --purple: #aa00ff; }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -41,8 +41,11 @@ h1{font-size:20px;color:var(--blue)}
 <div class="header">
   <div class="logo">GV</div>
   <div>
-    <h1>GRIDV21 <span id="version">v5.5.6</span></h1>
+    <h1>GRIDV21 <span id="version">v5.5.7</span></h1>
     <div class="sub">BRAIN CONTROL CENTER • <span class="status-dot"></span>Production Build</div>
+  </div>
+  <div style="margin-left:auto;">
+    <button class="btn" style="width:auto;padding:8px 12px" onclick="toggleMenu()">☰</button>
   </div>
 </div>
 
@@ -80,7 +83,6 @@ h1{font-size:20px;color:var(--blue)}
 let selectedPermitId = null;
 let loading = false;
 let scanInProgress = false;
-let controller;
 
 function escapeHTML(str='') {
   return str
@@ -106,6 +108,10 @@ function addEvent(text, type='info') {
   if(eventsDiv.children.length > 15) eventsDiv.removeChild(eventsDiv.lastChild);
 }
 
+function toggleMenu() {
+  addEvent('Menu opened - v5.5.7');
+}
+
 function selectPermit(element, id, city, type) {
   selectedPermitId = id;
   document.querySelectorAll('.permit-row').forEach(r => r.classList.remove('selected'));
@@ -116,13 +122,11 @@ function selectPermit(element, id, city, type) {
 async function loadDashboard() {
   if (loading) return;
   loading = true;
-  if (controller) controller.abort();
-  controller = new AbortController();
   
   try {
-    const res = await fetch('/api/dashboard', { signal: controller.signal });
+    const res = await fetch('/api/dashboard');
     if (!res.ok) {
-      addEvent(`Dashboard load failed (${res.status})`, 'warning');
+      addEvent(`Dashboard failed (${res.status})`, 'warning');
       setStatusDot(false);
       return;
     }
@@ -168,11 +172,9 @@ async function loadDashboard() {
       });
     }
   } catch(e) {
-    if (e.name !== 'AbortError') {
-      console.log('Error:', e);
-      addEvent('Dashboard error: ' + e.message, 'error');
-      setStatusDot(false);
-    }
+    console.log('Error:', e);
+    addEvent('Dashboard error: ' + e.message, 'error');
+    setStatusDot(false);
   } finally {
     loading = false;
   }
@@ -253,7 +255,7 @@ async function checkEngine() {
 
 loadDashboard();
 setInterval(loadDashboard, 5000);
-addEvent('Brain Control Center v5.5.6 initialized - AbortController + DOM safety', 'boot');
+addEvent('Brain Control Center v5.5.7 initialized - No AbortController, stable refresh', 'boot');
 </script>
 </body>
   </html>
