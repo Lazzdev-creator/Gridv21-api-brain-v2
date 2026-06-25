@@ -48,12 +48,14 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.set('trust proxy', 1);
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
+  proxy: true,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: false, // <-- change from true to false
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 86400000
