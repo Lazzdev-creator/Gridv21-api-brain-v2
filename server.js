@@ -26,14 +26,14 @@ for (const key of requiredEnv) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '5.5.7';
+const VERSION = '5.5.8';
 
 /* ====================== SECURITY MIDDLEWARE ====================== */
 app.use(helmet());
 app.use(compression());
 app.use(morgan('combined'));
 
-const corsOrigin = process.env.FRONTEND_URL? process.env.FRONTEND_URL.split(',') : true;
+const corsOrigin = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : true;
 app.use(cors({
   origin: corsOrigin,
   credentials: true
@@ -48,23 +48,21 @@ const globalLimiter = rateLimit({
 app.use(globalLimiter);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.set('trust proxy', 1);
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  proxy: true,
   cookie: {
-    secure: false, // <-- change from true to false
+    secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 86400000
   }
 }));
 
-// ADD THIS RIGHT AFTER app.use(session({...}))
-app.use((req,res,next)=>{
-  if(!req.session.authenticated){
+// Auto-auth for demo
+app.use((req, res, next) => {
+  if (!req.session.authenticated) {
     req.session.authenticated = true;
   }
   next();
@@ -99,29 +97,42 @@ let OS_STATUS = Object.fromEntries(BRAIN_OS.map(os => [os.id, 'active']));
 
 /* ====================== SESSION AUTH MIDDLEWARE ====================== */
 function requireSession(req, res, next) {
-  if(req.session.authenticated){
+  if (req.session.authenticated) {
     return next();
   }
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-/* ====================== STARTUP VERIFICATION ====================== */
-(async () => {
-  const { error } = await supabase.from('permits').select('permit_id').limit(1);
-  if (error) {
-    console.error('Supabase connection failed:', error.message);
-    process.exit(1);
-  }
-  console.log('Supabase connected ✓');
+/* ====================== DATABASE INIT ====================== */
+async function initDatabase() {
+  try {
+    // Seed OS modules if needed
+    const { data: existingOS } = await supabase
+      .from('os_modules')
+      .select('id')
+      .limit(1);
 
-  const { data: osData } = await supabase.from('os_modules').select('id,status');
-  if (osData) {
-    osData.forEach(os => {
-      OS_STATUS[os.id] = os.status;
-    });
-    console.log('OS status loaded from DB ✓');
+    if (!existingOS || existingOS.length === 0) {
+      const osData = BRAIN_OS.map(os => ({
+        id: os.id,
+        name: os.name,
+        status: 'active',
+        last_run: new Date().toISOString()
+      }));
+      await supabase.from('os_modules').insert(osData);
+      console.log('✅ OS modules seeded');
+    } else {
+      console.log('✅ OS modules loaded');
+    }
+  } catch (e) {
+    console.error('DB init warning:', e.message);
   }
-})();
+}
+
+/* ====================== STARTUP ====================== */
+initDatabase().then(() => {
+  console.log('GRIDV21 Brain initialized');
+});
 
 /* ====================== CITIES ====================== */
 const CITIES = [
@@ -137,61 +148,58 @@ const CITIES = [
 ];
 
 async function savePermit(city, p) {
-  const permit_id = `${city.name}-${p.permit_number || p.id || Date.now()}`;
+  const permit_id = `${city.name.toLowerCase()}-${p.permit_number || p.id || Date.now()}`;
 
   const { data: existing } = await supabase
-.from('permits')
-.select('permit_id')
-.eq('permit_id', permit_id)
-.maybeSingle();
+    .from('permits')
+    .select('permit_id')
+    .eq('permit_id', permit_id)
+    .maybeSingle();
 
   if (existing) return { inserted: false, permit_id };
 
   const permitData = {
     permit_id,
     city: city.name,
-    permit_type: p.permit_type_description || p.permit_type || 'Unknown',
+    permit_type: p.permit_type_description || p.permit_type || p.type || 'Unknown',
     status: 'new',
-    issued_date: p.issued_date || p.issue_date || null
+    issued_date: p.issued_date || p.issue_date || p.date_issued || null,
+    raw_data: p
   };
 
   const { error } = await supabase.from('permits').insert(permitData);
   if (error) {
-    console.error('Supabase error:', error.message);
+    console.error('Supabase insert error:', error.message);
     return null;
   }
   return { inserted: true, permit_id };
 }
 
 async function logRevenue(permit_id, value) {
-  const amount = Math.round(Number(value) * 0.03);
+  const amount = Math.round(Number(value || 0) * 0.03);
   if (amount <= 0) return;
-
-  const { error } = await supabase.from('revenue_log').insert({
+  await supabase.from('revenue_log').insert({
     amount,
-    source: permit_id
-  });
-
-  if (error) console.error('Revenue log error:', error.message);
+    source: permit_id,
+    created_at: new Date().toISOString()
+  }).catch(e => console.error('Revenue log:', e.message));
 }
 
-/* ====================== SCAN LOCK ====================== */
+/* ====================== SCAN ====================== */
 let scanRunning = false;
+
 async function scanAllCities() {
-  if (scanRunning) {
-    console.log('Scan already running, skipping');
-    return 0;
-  }
+  if (scanRunning) return 0;
   scanRunning = true;
+  let totalSaved = 0;
   try {
-    let totalSaved = 0;
     for (const city of CITIES) {
       try {
-        const response = await axios.get(`${city.url}?$limit=50`, { timeout: 15000 });
+        const response = await axios.get(`${city.url}?$limit=30&$order=issue_date:desc`, { timeout: 12000 });
         const permits = response.data || [];
         let saved = 0;
         for (const p of permits) {
-          const value = Number(p.project_valuation || p.estimated_cost || p.value || 0);
+          const value = Number(p.project_valuation || p.estimated_cost || p.value || p.amount || 0);
           const result = await savePermit(city, p);
           if (result?.inserted) {
             saved++;
@@ -199,11 +207,11 @@ async function scanAllCities() {
           }
         }
         totalSaved += saved;
-        console.log(`Brain scanned ${permits.length} from ${city.name}, saved ${saved}`);
-        await new Promise(r => setTimeout(r, 1000));
+        console.log(`✅ ${city.name}: ${permits.length} scanned, ${saved} saved`);
       } catch (err) {
-        console.error(`${city.name}:`, err.message);
+        console.error(`❌ ${city.name}:`, err.message);
       }
+      await new Promise(r => setTimeout(r, 800));
     }
     return totalSaved;
   } finally {
@@ -211,63 +219,47 @@ async function scanAllCities() {
   }
 }
 
-const dmLimiter = rateLimit({ windowMs: 30 * 60 * 1000, max: 50 });
-
 class Engine {
   static async runScan() {
-    if (OS_STATUS[12]!== 'active') return { permits_found: 0, skipped: true };
+    if (OS_STATUS[12] !== 'active') {
+      return { permits_found: 0, skipped: true, message: "Acquisition OS inactive" };
+    }
     const saved = await scanAllCities();
     return { permits_found: saved, timestamp: new Date().toISOString() };
   }
 }
 
-/* ====================== CRON FIX - 5 FIELDS ====================== */
-const schedule = process.env.CRON_SCHEDULE || '*/30 * * * *';
-cron.schedule(schedule, async () => {
-  console.log('Auto scan started at', new Date().toISOString());
+/* ====================== CRON ====================== */
+cron.schedule('*/45 * * * *', async () => {
+  console.log('🔄 Auto-scan started');
   await scanAllCities();
 }, { timezone: "America/Chicago" });
 
-/* ====================== HEALTH ENDPOINT ====================== */
-app.get('/health', async (req, res) => {
-  try {
-    const { error } = await supabase.from('permits').select('permit_id').limit(1);
-    if (error) throw error;
-    res.json({ status: 'healthy', version: VERSION, uptime: process.uptime() });
-  } catch (e) {
-    res.status(500).json({ status: 'unhealthy', error: e.message });
-  }
+/* ====================== API ROUTES ====================== */
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', version: VERSION, uptime: process.uptime() });
 });
 
-/* ====================== DASHBOARD API ====================== */
 app.get('/api/dashboard', async (req, res) => {
   try {
     const { data: permits } = await supabase
- .from('permits')
- .select('*')
- .order('created_at', { ascending: false })
- .limit(25);
+      .from('permits')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(20);
 
     const { data: osModules } = await supabase
- .from('os_modules')
- .select('*')
- .order('id');
+      .from('os_modules')
+      .select('*')
+      .order('id');
 
     const { data: revenue } = await supabase
- .from('revenue_log')
- .select('*')
- .order('created_at', { ascending: false })
- .limit(100);
+      .from('revenue_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
 
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const est_revenue_month = (revenue || [])
- .filter(r => {
-       const d = new Date(r.created_at);
-       return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-     })
- .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const est_revenue_month = (revenue || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
     const metrics = {
       total_leads: permits?.length || 0,
@@ -276,42 +268,61 @@ app.get('/api/dashboard', async (req, res) => {
       os_active: osModules?.filter(o => o.status === 'active').length || 0
     };
 
-    res.json({ success: true, metrics, permits, osModules, revenue });
+    res.json({ 
+      success: true, 
+      metrics, 
+      permits: permits || [], 
+      osModules: osModules || BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] })) 
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-app.get('/api/os-status', (req, res) =>
-  res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] })))
-);
-
 app.post('/api/os-toggle/:id', requireSession, async (req, res) => {
   const id = Number(req.params.id);
-  const current = OS_STATUS[id] === 'active'? 'inactive' : 'active';
+  if (!BRAIN_OS.find(o => o.id === id)) {
+    return res.status(404).json({ error: 'OS not found' });
+  }
+
+  const current = OS_STATUS[id] === 'active' ? 'inactive' : 'active';
   OS_STATUS[id] = current;
 
   await supabase
-.from('os_modules')
-.update({ status: current, last_run: new Date().toISOString() })
-.eq('id', id);
+    .from('os_modules')
+    .update({ status: current, last_run: new Date().toISOString() })
+    .eq('id', id)
+    .catch(() => {});
 
   res.json({ id, status: current });
 });
 
-app.post('/api/scrape-now', requireSession, dmLimiter, async (req, res) => {
-  const result = await Engine.runScan();
-  res.json({ status: 'scraped',...result });
+app.post('/api/scrape-now', requireSession, async (req, res) => {
+  try {
+    const result = await Engine.runScan();
+    res.json({ status: 'success', ...result });
+  } catch (e) {
+    res.status(500).json({ status: 'error', message: e.message });
+  }
 });
 
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length;
-  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.7' });
+  res.json({ 
+    alive: true, 
+    version: VERSION, 
+    os_active: activeCount, 
+    engine: 'Gridv21 v5.5.8' 
+  });
 });
 
-/* ====================== STATIC ====================== */
+/* ====================== STATIC FILES ====================== */
 app.use(express.static(path.join(__dirname, 'public')));
-app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
 
 /* ====================== ERROR HANDLER ====================== */
 app.use((err, req, res, next) => {
@@ -319,6 +330,8 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-/* ====================== SERVER ====================== */
+/* ====================== START SERVER ====================== */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`GRIDV21 BRAIN v${VERSION} running on ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 GRIDV21 BRAIN v${VERSION} running on http://localhost:${PORT}`);
+});
