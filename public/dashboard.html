@@ -13,7 +13,7 @@ h1{font-size:20px;color:var(--blue)}
 .sub{font-size:11px;opacity:0.7}
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:15px}
 .card{background:var(--card);border:1px solid #1e2342;border-radius:12px;padding:15px;box-shadow:0 0 20px rgba(0,168,255,0.1)}
-.card h3{font-size:12px;opacity:0.6;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.card h3{font-size:12px;opacity:0.6;margin-bottom:8px;text-transform:uppercase}
 .card .value{font-size:32px;font-weight:bold;color:var(--blue)}
 .full{grid-column:1/-1}
 .btn{background:var(--blue);color:#000;border:none;padding:12px;border-radius:8px;font-weight:bold;width:100%;margin:5px 0;cursor:pointer}
@@ -29,6 +29,9 @@ h1{font-size:20px;color:var(--blue)}
 .os-btn{padding:10px;font-size:11px;border-radius:8px;border:none;cursor:pointer;font-weight:bold}
 .os-btn.active{background:var(--green);color:#000}
 .os-btn.inactive{background:var(--grey);color:#999}
+
+.modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:1000;align-items:center;justify-content:center}
+.modal-content{background:var(--card);padding:20px;border-radius:12px;width:90%;max-width:420px;max-height:90vh;overflow-y:auto}
 </style>
 </head>
 <body>
@@ -52,22 +55,22 @@ h1{font-size:20px;color:var(--blue)}
 </div>
 
 <div class="card full"><h3>📄 Permit Feed</h3><div id="permitFeed">Loading...</div></div>
-<div class="card full"><h3>🧠 Live Events</h3><div id="events">Booting...</div></div>
+<div class="card full"><h3>🧠 Live Events Feed</h3><div id="events">Booting brain...</div></div>
 
 <div class="card full">
   <h3>⚡ Quick Actions</h3>
-  <button class="btn" onclick="forceScan()">Force Scan</button>
-  <button class="btn" onclick="checkEngine()">Engine Health</button>
+  <button class="btn" onclick="forceScan()">⚡ Force Scan</button>
+  <button class="btn" onclick="checkEngine()">🧠 Engine Health</button>
 </div>
 
-<!-- MENU -->
-<div id="menuModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center">
-  <div style="background:#11152b;padding:20px;border-radius:12px;width:90%;max-width:400px">
-    <h3>OS Control</h3>
-    <div id="modalOS" class="os-grid"></div>
-    <button class="btn btn-green" onclick="activateAllOS()">Activate All</button>
-    <button class="btn btn-pink" onclick="deactivateAllOS()">Deactivate All</button>
-    <button onclick="hideMenu()" style="margin-top:10px">Close</button>
+<!-- MENU MODAL -->
+<div id="menuModal" class="modal">
+  <div class="modal-content">
+    <h3>🎛️ OS Control Panel</h3>
+    <div id="modalOS" class="os-grid" style="margin:15px 0"></div>
+    <button class="btn btn-green" onclick="activateAllOS()">Activate All OS</button>
+    <button class="btn btn-pink" onclick="deactivateAllOS()">Deactivate All OS</button>
+    <button onclick="hideMenu()" style="margin-top:10px;width:100%">Close Menu</button>
   </div>
 </div>
 
@@ -78,9 +81,9 @@ function addEvent(text) {
   const ev = document.getElementById('events');
   const item = document.createElement('div');
   item.className = 'activity-item';
-  item.innerHTML = text + ' <small>' + new Date().toLocaleTimeString() + '</small>';
+  item.innerHTML = `${text} <small>${new Date().toLocaleTimeString()}</small>`;
   ev.insertBefore(item, ev.firstChild);
-  if (ev.children.length > 15) ev.removeChild(ev.lastChild);
+  if (ev.children.length > 20) ev.removeChild(ev.lastChild);
 }
 
 async function loadDashboard() {
@@ -88,54 +91,82 @@ async function loadDashboard() {
   loading = true;
   try {
     const res = await fetch('/api/dashboard');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
 
-    document.getElementById('total_leads').textContent = data.metrics?.total_leads || 0;
-    document.getElementById('revenue').textContent = '$' + Number(data.metrics?.est_revenue_month || 0).toLocaleString();
-    document.getElementById('dms').textContent = data.metrics?.dms_sent || 0;
-    document.getElementById('os_count').textContent = (data.metrics?.os_active || 0) + '/12';
+    // Update metrics
+    const m = data.metrics || {};
+    document.getElementById('total_leads').textContent = m.total_leads || 0;
+    document.getElementById('revenue').textContent = '$' + Number(m.est_revenue_month || 0).toLocaleString();
+    document.getElementById('dms').textContent = m.dms_sent || 0;
+    document.getElementById('os_count').textContent = (m.os_active || 12) + '/12';
 
     // Permit feed
     const feed = document.getElementById('permitFeed');
-    feed.innerHTML = data.permits?.length ? data.permits.map(p => 
-      `<div class="permit-row">${p.city} - ${p.permit_type}</div>`
-    ).join('') : 'No permits yet';
+    feed.innerHTML = (data.permits && data.permits.length) 
+      ? data.permits.map(p => `<div class="permit-row">${p.city || ''} - ${p.permit_type || 'Unknown'}</div>`).join('')
+      : '<div style="opacity:0.6;padding:15px;text-align:center">No permits yet • Run Force Scan</div>';
 
-    addEvent('Dashboard updated');
+    addEvent('✅ Dashboard updated');
   } catch(e) {
     console.error(e);
-    addEvent('❌ Dashboard error - check server logs');
+    addEvent('⚠️ Dashboard error — check Render logs');
   } finally {
     loading = false;
   }
 }
 
 async function forceScan() {
-  addEvent('⚡ Starting scan...');
+  addEvent('⚡ Force Scan started...');
   try {
-    const r = await fetch('/api/scrape-now', {method:'POST'});
+    const r = await fetch('/api/scrape-now', {method: 'POST'});
     const d = await r.json();
-    addEvent(`✅ Scan done: ${d.permits_found} permits`);
+    addEvent(`✅ Scan finished: ${d.permits_found || 0} permits`);
     loadDashboard();
   } catch(e) { addEvent('❌ Scan failed'); }
 }
 
 async function checkEngine() {
-  const r = await fetch('/api/test');
-  const d = await r.json();
-  addEvent(`Engine OK | OS: ${d.os_active}/12`);
+  try {
+    const r = await fetch('/api/test');
+    const d = await r.json();
+    addEvent(`Engine OK | OS Active: ${d.os_active}/12`);
+  } catch(e) { addEvent('Engine check failed'); }
 }
 
-function showMenu() { document.getElementById('menuModal').style.display = 'flex'; loadDashboard(); }
-function hideMenu() { document.getElementById('menuModal').style.display = 'none'; }
+// Menu
+function showMenu() {
+  document.getElementById('menuModal').style.display = 'flex';
+  loadDashboard();
+}
+function hideMenu() {
+  document.getElementById('menuModal').style.display = 'none';
+}
 
-async function activateAllOS() { for(let i=1;i<=12;i++) try{await fetch(`/api/os-toggle/${i}`,{method:'POST'})}catch(e){} addEvent('All OS Activated'); loadDashboard(); hideMenu(); }
-async function deactivateAllOS() { for(let i=1;i<=12;i++) try{await fetch(`/api/os-toggle/${i}`,{method:'POST'})}catch(e){} addEvent('All OS Deactivated'); loadDashboard(); hideMenu(); }
+async function activateAllOS() {
+  addEvent('Activating all 12 OS...');
+  for(let i=1; i<=12; i++) {
+    try { await fetch(`/api/os-toggle/${i}`, {method:'POST'}); } catch(e){}
+  }
+  addEvent('All OS Activated');
+  hideMenu();
+  loadDashboard();
+}
 
-// Start
-addEvent('🚀 GRIDV21 v5.5.8 Started');
+async function deactivateAllOS() {
+  addEvent('Deactivating all OS...');
+  for(let i=1; i<=12; i++) {
+    try { await fetch(`/api/os-toggle/${i}`, {method:'POST'}); } catch(e){}
+  }
+  addEvent('All OS Deactivated');
+  hideMenu();
+  loadDashboard();
+}
+
+// BOOT
+addEvent('🚀 GRIDV21 v5.5.8 Brain Control Started');
 loadDashboard();
 setInterval(loadDashboard, 8000);
 </script>
 </body>
-  </html>
+      </html>
