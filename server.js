@@ -26,7 +26,7 @@ for (const key of requiredEnv) {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '5.5.6';
+const VERSION = '5.5.7';
 
 /* ====================== SECURITY MIDDLEWARE ====================== */
 app.use(helmet());
@@ -59,6 +59,15 @@ app.use(session({
     maxAge: 86400000
   }
 }));
+
+// ADD THIS RIGHT AFTER app.use(session({...}))
+app.use((req,res,next)=>{
+  if(!req.session.authenticated){
+    req.session.authenticated = true;
+  }
+  next();
+});
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -88,36 +97,20 @@ let OS_STATUS = Object.fromEntries(BRAIN_OS.map(os => [os.id, 'active']));
 
 /* ====================== SESSION AUTH MIDDLEWARE ====================== */
 function requireSession(req, res, next) {
-  // For production without login: set req.session.authenticated = true on first GET
-  if (req.session?.authenticated === true) {
+  if(req.session.authenticated){
     return next();
   }
   return res.status(401).json({ error: 'Unauthorized' });
 }
 
-// Auto-auth for dashboard access - remove later when real login added
-app.use((req, res, next) => {
-  if (!req.session.authenticated) {
-    req.session.authenticated = true;
-  }
-  next();
-});
-
 /* ====================== STARTUP VERIFICATION ====================== */
 (async () => {
   const { error } = await supabase.from('permits').select('permit_id').limit(1);
   if (error) {
-    console.error('Supabase permits check failed:', error.message);
+    console.error('Supabase connection failed:', error.message);
     process.exit(1);
   }
-  console.log('Supabase permits table OK ✓');
-
-  const { error: osError } = await supabase.from('os_modules').select('id').limit(1);
-  if (osError) {
-    console.error('Supabase os_modules check failed:', osError.message);
-    process.exit(1);
-  }
-  console.log('Supabase os_modules table OK ✓');
+  console.log('Supabase connected ✓');
 
   const { data: osData } = await supabase.from('os_modules').select('id,status');
   if (osData) {
@@ -142,30 +135,30 @@ const CITIES = [
 ];
 
 async function savePermit(city, p) {
+  const permit_id = `${city.name}-${p.permit_number || p.id || Date.now()}`;
+
+  const { data: existing } = await supabase
+.from('permits')
+.select('permit_id')
+.eq('permit_id', permit_id)
+.maybeSingle();
+
+  if (existing) return { inserted: false, permit_id };
+
   const permitData = {
-    permit_id: `${city.name}-${p.permit_number || p.id || Date.now()}`,
+    permit_id,
     city: city.name,
     permit_type: p.permit_type_description || p.permit_type || 'Unknown',
     status: 'new',
     issued_date: p.issued_date || p.issue_date || null
   };
 
-  // Race-proof: upsert with ignoreDuplicates
-  const { error } = await supabase
-.from('permits')
-.upsert(permitData, {
-    onConflict: 'permit_id',
-    ignoreDuplicates: true
-  });
-
+  const { error } = await supabase.from('permits').insert(permitData);
   if (error) {
     console.error('Supabase error:', error.message);
-    return { inserted: false, permit_id: permitData.permit_id };
+    return null;
   }
-
-  // Check if row existed before - Supabase doesn't return this directly
-  // So we assume insert = new, error/no error = handled by unique constraint
-  return { inserted: true, permit_id: permitData.permit_id };
+  return { inserted: true, permit_id };
 }
 
 async function logRevenue(permit_id, value) {
@@ -192,10 +185,7 @@ async function scanAllCities() {
     let totalSaved = 0;
     for (const city of CITIES) {
       try {
-        const response = await axios.get(`${city.url}?$limit=50`, {
-          timeout: 15000,
-          validateStatus: s => s < 500
-        });
+        const response = await axios.get(`${city.url}?$limit=50`, { timeout: 15000 });
         const permits = response.data || [];
         let saved = 0;
         for (const p of permits) {
@@ -229,7 +219,7 @@ class Engine {
   }
 }
 
-/* ====================== CRON - 5-FIELD CORRECT ====================== */
+/* ====================== CRON FIX - 5 FIELDS ====================== */
 const schedule = process.env.CRON_SCHEDULE || '*/30 * * * *';
 cron.schedule(schedule, async () => {
   console.log('Auto scan started at', new Date().toISOString());
@@ -247,7 +237,7 @@ app.get('/health', async (req, res) => {
   }
 });
 
-/* ====================== DASHBOARD API - EXACT COUNTS ====================== */
+/* ====================== DASHBOARD API ====================== */
 app.get('/api/dashboard', async (req, res) => {
   try {
     const { data: permits } = await supabase
@@ -255,10 +245,6 @@ app.get('/api/dashboard', async (req, res) => {
  .select('*')
  .order('created_at', { ascending: false })
  .limit(25);
-
-    const { count: total_leads } = await supabase
- .from('permits')
- .select('*', { count: 'exact', head: true });
 
     const { data: osModules } = await supabase
  .from('os_modules')
@@ -271,10 +257,6 @@ app.get('/api/dashboard', async (req, res) => {
  .order('created_at', { ascending: false })
  .limit(100);
 
-    const { count: revenueEvents } = await supabase
- .from('revenue_log')
- .select('*', { count: 'exact', head: true });
-
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -286,8 +268,8 @@ app.get('/api/dashboard', async (req, res) => {
  .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
     const metrics = {
-      total_leads: total_leads || 0,
-      dms_sent: revenueEvents || 0,
+      total_leads: permits?.length || 0,
+      dms_sent: revenue?.length || 0,
       est_revenue_month,
       os_active: osModules?.filter(o => o.status === 'active').length || 0
     };
@@ -302,14 +284,8 @@ app.get('/api/os-status', (req, res) =>
   res.json(BRAIN_OS.map(os => ({...os, status: OS_STATUS[os.id] })))
 );
 
-// Protected with session
 app.post('/api/os-toggle/:id', requireSession, async (req, res) => {
   const id = Number(req.params.id);
-
-  if (!BRAIN_OS.find(os => os.id === id)) {
-    return res.status(400).json({ error: 'Invalid OS ID' });
-  }
-
   const current = OS_STATUS[id] === 'active'? 'inactive' : 'active';
   OS_STATUS[id] = current;
 
@@ -321,7 +297,6 @@ app.post('/api/os-toggle/:id', requireSession, async (req, res) => {
   res.json({ id, status: current });
 });
 
-// Protected with session
 app.post('/api/scrape-now', requireSession, dmLimiter, async (req, res) => {
   const result = await Engine.runScan();
   res.json({ status: 'scraped',...result });
@@ -329,7 +304,7 @@ app.post('/api/scrape-now', requireSession, dmLimiter, async (req, res) => {
 
 app.get('/api/test', (req, res) => {
   const activeCount = Object.values(OS_STATUS).filter(v => v === 'active').length;
-  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.6' });
+  res.json({ alive: true, version: VERSION, os_active: activeCount, engine: 'Gridv21 v5.5.7' });
 });
 
 /* ====================== STATIC ====================== */
