@@ -1,145 +1,50 @@
-let loading = false;
-
-function addEvent(text) {
-
-  const events =
-    document.getElementById('events');
-
-  if (!events) return;
-
-  const div = document.createElement('div');
-
-  div.className = 'activity-item';
-
-  div.innerHTML =
-    `${text}
-    <small>
-    ${new Date().toLocaleTimeString()}
-    </small>`;
-
-  events.prepend(div);
-}
-
-async function loadDashboard() {
-
-  if (loading) return;
-
-  loading = true;
-
+async function fetchDashboard() {
   try {
+    const res = await fetch('/api/dashboard');
+    const data = await res.json();
 
-    const response =
-      await fetch('/api/dashboard');
+    const m = data.metrics;
 
-    const data =
-      await response.json();
+    document.getElementById('total_leads').innerText = m.total_leads;
+    document.getElementById('revenue').innerText = '$' + Number(m.est_revenue_month).toLocaleString();
+    document.getElementById('dms').innerText = m.dms_sent;
+    document.getElementById('os_count').innerText = m.os_active + '/12';
 
-    if (!data.success)
-      throw new Error();
+    const feed = document.getElementById('permitFeed');
 
-    document.getElementById(
-      'total_leads'
-    ).textContent =
-      data.metrics.total_leads || 0;
-
-    document.getElementById(
-      'revenue'
-    ).textContent =
-      '$' +
-      Number(
-        data.metrics.est_revenue_month || 0
-      ).toLocaleString();
-
-    document.getElementById(
-      'dms'
-    ).textContent =
-      data.metrics.dms_sent || 0;
-
-    document.getElementById(
-      'os_count'
-    ).textContent =
-      (data.metrics.os_active || 0)
-      + '/12';
-
-    const feed =
-      document.getElementById(
-        'permitFeed'
-      );
-
-    if (data.permits.length) {
-
-      feed.innerHTML =
-        data.permits.map(p => `
-
-          <div class="permit-row">
-
-            <div>
-              <b>${p.city}</b><br>
-              ${p.permit_type}
-            </div>
-
-          </div>
-
-        `).join('');
-
-    } else {
-
-      feed.innerHTML =
-        'No permits available';
-    }
-
-    const os =
-      document.getElementById('modalOS');
-
-    if (os) {
-
-      os.innerHTML =
-        data.osModules.map(o => `
-
-          <button
-            class="os-btn ${o.status}">
-
-            ${o.name}
-
-          </button>
-
-        `).join('');
-    }
-
-    addEvent(
-      'Dashboard refreshed'
-    );
+    feed.innerHTML = data.permits.length
+      ? data.permits.map(p =>
+          `<div class="permit-row">
+            ${p.city} — ${p.permit_type} — ${p.status}
+          </div>`
+        ).join('')
+      : 'No permits found';
 
   } catch (e) {
-
     console.log(e);
-
-    addEvent(
-      'Dashboard API error'
-    );
-
   }
-
-  loading = false;
 }
 
+/* MENU FIX */
 function showMenu() {
-
-  document.getElementById(
-    'menuModal'
-  ).style.display = 'flex';
+  const modal = document.getElementById('menuModal');
+  modal.style.display = 'flex';
 }
 
-function hideMenu() {
-
-  document.getElementById(
-    'menuModal'
-  ).style.display = 'none';
+/* OS CONTROL */
+async function toggleOS(id) {
+  await fetch('/api/os-toggle/' + id, { method: 'POST' });
+  fetchDashboard();
 }
 
-loadDashboard();
+/* FORCE SCAN */
+async function forceScan() {
+  await fetch('/api/scrape-now', { method: 'POST' });
+  fetchDashboard();
+}
 
-setInterval(
-  loadDashboard,
-  10000
-);
+/* BOOT */
+document.addEventListener('DOMContentLoaded', () => {
+  fetchDashboard();
+  setInterval(fetchDashboard, 5000);
+});
