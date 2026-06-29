@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const VERSION = '5.5.9';
+const VERSION = '5.6.0';
 
 /* ================= MIDDLEWARE ================= */
 
@@ -22,6 +22,7 @@ app.use(cors({
 }));
 
 app.use(express.json({ limit: '10mb' }));
+
 app.use(express.urlencoded({
   extended: true,
   limit: '10mb'
@@ -31,10 +32,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 /* ================= ENV CHECK ================= */
 
-if (!process.env.SUPABASE_URL ||
-    !process.env.SUPABASE_SERVICE_KEY) {
-
-  console.error('❌ Missing Supabase environment variables');
+if (
+  !process.env.SUPABASE_URL ||
+  !process.env.SUPABASE_SERVICE_KEY
+) {
+  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
   process.exit(1);
 }
 
@@ -45,7 +47,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY.trim()
 );
 
-/* ================= DASHBOARD API ================= */
+/* ================= DASHBOARD ================= */
 
 app.get('/api/dashboard', async (req, res) => {
 
@@ -59,65 +61,74 @@ app.get('/api/dashboard', async (req, res) => {
 
     const { data: permits } = await supabase
       .from('permits')
-      .select('id, city, permit_type, status, created_at')
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(10);
 
     const { data: osModules } = await supabase
       .from('os_modules')
-      .select('id, name, status, last_run')
+      .select('*')
       .order('id');
 
     res.json({
       success: true,
 
       metrics: metrics || {
-        total_leads: 0,
+        total_leads: permits?.length || 0,
         est_revenue_month: 0,
         dms_sent: 0,
-        os_active: 12
+        os_active: osModules?.filter(
+          o => o.status === 'active'
+        ).length || 12
       },
 
       permits: permits || [],
       osModules: osModules || []
-
     });
 
   } catch (e) {
 
-    console.error('Dashboard API Error:', e.message);
+    console.error('Dashboard API Error:', e);
 
     res.status(500).json({
       success: false,
-
+      error: e.message,
       metrics: {
         total_leads: 0,
         est_revenue_month: 0,
         dms_sent: 0,
         os_active: 12
       },
-
       permits: [],
-      osModules: [],
+      osModules: []
+    });
+  }
+});
+
+/* ================= SCRAPER ================= */
+
+app.post('/api/scrape-now', async (req, res) => {
+
+  try {
+
+    const permitsFound = Math.floor(Math.random() * 5);
+
+    res.json({
+      success: true,
+      permits_found: permitsFound,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (e) {
+
+    res.status(500).json({
+      success: false,
       error: e.message
     });
   }
 });
 
-/* ================= MANUAL SCAN ================= */
-
-app.post('/api/scrape-now', async (req, res) => {
-
-  const permitsFound = Math.floor(Math.random() * 5);
-
-  res.json({
-    success: true,
-    permits_found: permitsFound,
-    timestamp: new Date().toISOString()
-  });
-});
-
-/* ================= INTERNAL RUN CYCLE ================= */
+/* ================= INTERNAL ENGINE ================= */
 
 app.get('/internal/run-cycle', async (req, res) => {
 
@@ -127,7 +138,7 @@ app.get('/internal/run-cycle', async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Cycle completed',
+      message: 'GridV21 cycle completed',
       permits_found: permitsFound,
       timestamp: new Date().toISOString()
     });
@@ -198,12 +209,13 @@ app.get('/api/health', (req, res) => {
 
 /* ================= ROUTES ================= */
 
-app.get('/', (req, res) => {
+/* Redirect root to dashboard */
 
-  res.sendFile(
-    path.join(__dirname, 'public', 'index.html')
-  );
+app.get('/', (req, res) => {
+  return res.redirect('/admin');
 });
+
+/* Dashboard */
 
 app.get('/admin', (req, res) => {
 
@@ -211,7 +223,19 @@ app.get('/admin', (req, res) => {
     path.join(
       __dirname,
       'public',
-      'dashboard',
+      'index.html'
+    )
+  );
+});
+
+/* Optional alias */
+
+app.get('/dashboard', (req, res) => {
+
+  res.sendFile(
+    path.join(
+      __dirname,
+      'public',
       'index.html'
     )
   );
@@ -232,11 +256,11 @@ app.use((req, res) => {
 app.listen(PORT, () => {
 
   console.log(`
-===================================
+========================================
 GRIDV21 v${VERSION} RUNNING
 Port: ${PORT}
 Dashboard: /admin
 Health: /api/health
-===================================
+========================================
 `);
 });
