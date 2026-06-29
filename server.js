@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const VERSION = '5.6.0';
+const VERSION = '5.6.1';
 
 /* ================= MIDDLEWARE ================= */
 
@@ -21,14 +21,22 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb'
+}));
 
 app.use(express.urlencoded({
   extended: true,
   limit: '10mb'
 }));
 
-app.use(express.static(path.join(__dirname, 'public')));
+/* ================= STATIC FILES ================= */
+
+app.use(
+  express.static(
+    path.join(__dirname, 'public', 'dashboard')
+  )
+);
 
 /* ================= ENV CHECK ================= */
 
@@ -36,7 +44,9 @@ if (
   !process.env.SUPABASE_URL ||
   !process.env.SUPABASE_SERVICE_KEY
 ) {
-  console.error('❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY');
+  console.error(
+    '❌ Missing SUPABASE_URL or SUPABASE_SERVICE_KEY'
+  );
   process.exit(1);
 }
 
@@ -47,7 +57,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY.trim()
 );
 
-/* ================= DASHBOARD ================= */
+/* ================= DASHBOARD API ================= */
 
 app.get('/api/dashboard', async (req, res) => {
 
@@ -70,6 +80,11 @@ app.get('/api/dashboard', async (req, res) => {
       .select('*')
       .order('id');
 
+    const activeOS =
+      osModules?.filter(
+        os => os.status === 'active'
+      ).length || 0;
+
     res.json({
       success: true,
 
@@ -77,9 +92,7 @@ app.get('/api/dashboard', async (req, res) => {
         total_leads: permits?.length || 0,
         est_revenue_month: 0,
         dms_sent: 0,
-        os_active: osModules?.filter(
-          o => o.status === 'active'
-        ).length || 12
+        os_active: activeOS
       },
 
       permits: permits || [],
@@ -93,25 +106,28 @@ app.get('/api/dashboard', async (req, res) => {
     res.status(500).json({
       success: false,
       error: e.message,
+
       metrics: {
         total_leads: 0,
         est_revenue_month: 0,
         dms_sent: 0,
-        os_active: 12
+        os_active: 0
       },
+
       permits: [],
       osModules: []
     });
   }
 });
 
-/* ================= SCRAPER ================= */
+/* ================= MANUAL SCRAPER ================= */
 
 app.post('/api/scrape-now', async (req, res) => {
 
   try {
 
-    const permitsFound = Math.floor(Math.random() * 5);
+    const permitsFound =
+      Math.floor(Math.random() * 5);
 
     res.json({
       success: true,
@@ -128,13 +144,14 @@ app.post('/api/scrape-now', async (req, res) => {
   }
 });
 
-/* ================= INTERNAL ENGINE ================= */
+/* ================= INTERNAL RUN CYCLE ================= */
 
 app.get('/internal/run-cycle', async (req, res) => {
 
   try {
 
-    const permitsFound = Math.floor(Math.random() * 5);
+    const permitsFound =
+      Math.floor(Math.random() * 5);
 
     res.json({
       success: true,
@@ -166,8 +183,15 @@ app.post('/api/os-toggle/:id', async (req, res) => {
       .eq('id', id)
       .single();
 
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        error: 'OS not found'
+      });
+    }
+
     const newStatus =
-      data?.status === 'active'
+      data.status === 'active'
         ? 'inactive'
         : 'active';
 
@@ -209,13 +233,9 @@ app.get('/api/health', (req, res) => {
 
 /* ================= ROUTES ================= */
 
-/* Redirect root to dashboard */
-
 app.get('/', (req, res) => {
   return res.redirect('/admin');
 });
-
-/* Dashboard */
 
 app.get('/admin', (req, res) => {
 
@@ -223,20 +243,32 @@ app.get('/admin', (req, res) => {
     path.join(
       __dirname,
       'public',
+      'dashboard',
       'index.html'
     )
   );
 });
 
-/* Optional alias */
-
-app.get('/dashboard', (req, res) => {
+app.get('/admin.html', (req, res) => {
 
   res.sendFile(
     path.join(
       __dirname,
       'public',
-      'index.html'
+      'dashboard',
+      'admin.html'
+    )
+  );
+});
+
+app.get('/affiliates.html', (req, res) => {
+
+  res.sendFile(
+    path.join(
+      __dirname,
+      'public',
+      'dashboard',
+      'affiliates.html'
     )
   );
 });
