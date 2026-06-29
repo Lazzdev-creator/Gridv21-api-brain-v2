@@ -1,31 +1,92 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dashboard</title>
-  <link rel="stylesheet" href="styles.css"/>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRIDV21 Control Dashboard</title>
+
+    <!-- Absolute paths -->
+    <link rel="stylesheet" href="/styles.css">
 </head>
+
 <body>
 
-  <div id="app">
-    <h1>Control Dashboard</h1>
+    <div id="app">
 
-    <div id="auth">
-      <input id="email" placeholder="email"/>
-      <input id="password" type="password" placeholder="password"/>
-      <button onclick="login()">Login</button>
-      <button onclick="signup()">Signup</button>
+        <header>
+            <h1>🧠 GRIDV21 Control Dashboard</h1>
+        </header>
+
+        <!-- Authentication -->
+        <section id="auth">
+
+            <input
+                id="email"
+                type="email"
+                placeholder="Email address"
+                autocomplete="email"
+            />
+
+            <input
+                id="password"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+            />
+
+            <div class="button-group">
+                <button onclick="login()">
+                    Login
+                </button>
+
+                <button onclick="signup()">
+                    Signup
+                </button>
+            </div>
+
+        </section>
+
+        <!-- Dashboard Panel -->
+        <section id="panel" style="display:none;">
+
+            <div class="top-actions">
+                <button onclick="logout()">
+                    Logout
+                </button>
+
+                <button onclick="loadDashboard()">
+                    Refresh
+                </button>
+
+                <button onclick="runScan()">
+                    Run Scan
+                </button>
+            </div>
+
+            <h2>System Metrics</h2>
+
+            <div id="metrics">
+                Loading metrics...
+            </div>
+
+            <h2>Operating Systems</h2>
+
+            <div id="osModules">
+                Loading OS modules...
+            </div>
+
+            <h2>Recent Permits</h2>
+
+            <div id="data">
+                Loading permits...
+            </div>
+
+        </section>
+
     </div>
 
-    <div id="panel" style="display:none;">
-      <button onclick="logout()">Logout</button>
-      <h2>Status Feed</h2>
-      <div id="data"></div>
-    </div>
+    <!-- Absolute paths -->
+    <script type="module" src="/app.js"></script>
 
-  </div>
-
-  <script type="module" src="app.js"></script>
 </body>
 </html>
