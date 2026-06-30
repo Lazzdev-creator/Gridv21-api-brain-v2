@@ -1,20 +1,8 @@
-body {
-  font-family: Arial;
-  background: #0a0e27;
-  color: #e0e6ff;
-}
-
-#app {
-  padding: 20px;
-}
-
-input, button {
-  margin: 5px;
-  padding: 10px;
-}
-.card {
-  background: #11152b;
-  margin: 10px 0;
-  padding: 10px;
-  border-radius: 8px;
-}
+body { font-family: system-ui; background:#0b0c10; color:#fff; margin:0; }
+header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:12px; }
+.card { background:#1f2833; padding:12px; border-radius:12px; border:1px solid #45a29e; }
+.card.active { border-color:#66fcf1; }
+button { background:#45a29e; border:none; padding:10px 16px; border-radius:8px; color:#fff; cursor:pointer; }
+input { padding:8px; border-radius:8px; border:1px solid #45a29e; background:#1f2833; color:#fff; }
