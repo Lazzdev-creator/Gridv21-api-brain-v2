@@ -1,12 +1,10 @@
 {
   "name": "gridv21-brain",
-  "version": "5.5.10",
-  "description": "GRIDV21 Acquisition Intelligence OS",
+  "version": "5.5.11",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node server.js"
   },
   "engines": {
     "node": "20.x"
@@ -23,6 +21,7 @@
     "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "ws": "^8.18.0"
   }
 }
