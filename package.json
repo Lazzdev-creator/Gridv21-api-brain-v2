@@ -1,26 +1,28 @@
 {
   "name": "gridv21-brain",
-  "version": "5.5.7",
+  "version": "5.5.10",
+  "description": "GRIDV21 Acquisition Intelligence OS",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": "20.x"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
-    "axios": "^1.7.7",
-    "compression": "^1.7.5",
+    "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "express-rate-limit": "^7.4.1",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.2.0",
     "express-session": "^1.18.0",
-    "helmet": "^8.0.0",
+    "helmet": "^7.1.0",
     "morgan": "^1.10.0",
     "node-cron": "^3.0.3",
-    "passport": "^0.7.0"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   }
 }
