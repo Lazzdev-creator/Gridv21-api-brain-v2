@@ -1,92 +1,41 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GRIDV21 Control Dashboard</title>
-
-    <!-- Absolute paths -->
-    <link rel="stylesheet" href="/styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GRIDV21 Brain Dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
 </head>
-
 <body>
+  <div id="authBox" style="display:none; padding:40px;">
+    <h2>GRIDV21 Login</h2>
+    <input id="email" type="email" placeholder="Email"><br><br>
+    <input id="password" type="password" placeholder="Password"><br><br>
+    <button onclick="login()">Login</button>
+    <button onclick="signup()">Sign Up</button>
+    <a href="/auth/google"><button>Login with Google</button></a>
+  </div>
 
-    <div id="app">
+  <div id="panel" style="display:none; padding:20px;">
+    <header>
+      <h1>GRIDV21 Brain v5.5.10</h1>
+      <button onclick="logout()">Logout</button>
+    </header>
 
-        <header>
-            <h1>🧠 GRIDV21 Control Dashboard</h1>
-        </header>
+    <section class="metrics">
+      <div class="card"><b>Total Leads</b><div id="total_leads">0</div></div>
+      <div class="card"><b>Revenue MTD</b><div id="est_revenue">$0</div></div>
+      <div class="card"><b>OS Active</b><div id="os_active">0</div></div>
+      <div class="card"><b>DMS Sent</b><div id="dms_sent">0</div></div>
+    </section>
 
-        <!-- Authentication -->
-        <section id="auth">
+    <h2>Recent Permits - Denver</h2>
+    <div id="data" class="grid"></div>
 
-            <input
-                id="email"
-                type="email"
-                placeholder="Email address"
-                autocomplete="email"
-            />
+    <h2>12 OS Modules</h2>
+    <div id="os_grid" class="grid"></div>
+  </div>
 
-            <input
-                id="password"
-                type="password"
-                placeholder="Password"
-                autocomplete="current-password"
-            />
-
-            <div class="button-group">
-                <button onclick="login()">
-                    Login
-                </button>
-
-                <button onclick="signup()">
-                    Signup
-                </button>
-            </div>
-
-        </section>
-
-        <!-- Dashboard Panel -->
-        <section id="panel" style="display:none;">
-
-            <div class="top-actions">
-                <button onclick="logout()">
-                    Logout
-                </button>
-
-                <button onclick="loadDashboard()">
-                    Refresh
-                </button>
-
-                <button onclick="runScan()">
-                    Run Scan
-                </button>
-            </div>
-
-            <h2>System Metrics</h2>
-
-            <div id="metrics">
-                Loading metrics...
-            </div>
-
-            <h2>Operating Systems</h2>
-
-            <div id="osModules">
-                Loading OS modules...
-            </div>
-
-            <h2>Recent Permits</h2>
-
-            <div id="data">
-                Loading permits...
-            </div>
-
-        </section>
-
-    </div>
-
-    <!-- Absolute paths -->
-    <script type="module" src="/app.js"></script>
-
+  <script type="module" src="/app.js"></script>
 </body>
 </html>
