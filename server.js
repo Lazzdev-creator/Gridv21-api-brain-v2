@@ -5,6 +5,7 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import ws from 'ws'; // FIX for Node 20 WebSocket
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,15 +22,20 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Supabase - NO HARDCODED SECRETS
+// Supabase - FIXED for Node 20: inject ws transport
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
+  process.env.SUPABASE_KEY,
+  {
+    realtime: {
+      transport: ws 
+    }
+  }
 );
 
 // Middleware
 app.set('trust proxy', 1);
-app.use(helmet({ contentSecurityPolicy: false })); // Disable CSP for inline dev
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 app.use(morgan('dev'));
 app.use(cors());
@@ -209,7 +215,7 @@ app.post('/api/scrape-now', async (req, res) => {
 
 app.get('/api/test', async (req, res) => {
   const { data: os } = await supabase.from('os_modules').select('*');
-  res.json({ version: '5.5.10', engine: 'GRIDV21', os_active: os?.filter(o => o.status === 'active').length || 0 });
+  res.json({ version: '5.5.11', engine: 'GRIDV21', os_active: os?.filter(o => o.status === 'active').length || 0 });
 });
 
 // ===== FINAL ROUTING SECTION =====
@@ -234,5 +240,5 @@ cron.schedule('0 */6 *', async () => {
 });
 
 app.listen(PORT, () => {
-  console.log(`GRIDV21 Brain v5.5.10 running on ${PORT}`);
+  console.log(`GRIDV21 Brain v5.5.11 running on ${PORT}`);
 });
