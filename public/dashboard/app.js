@@ -1,106 +1,190 @@
 import { supabase } from './supabaseClient.js';
 
-const authBox = document.getElementById("authBox");
 const panel = document.getElementById("panel");
 
-async function getSession() {
-  const { data } = await supabase.auth.getSession();
-  return data.session;
-}
-
-async function getUserRole(userId) {
-  const { data } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .single();
-  return data?.role;
-}
+/* ===============================
+   GRIDV21 BOOT
+================================= */
 
 async function boot() {
-  const session = await getSession();
-  if (!session) {
-    showAuth();
-    return;
-  }
-  
-  const role = await getUserRole(session.user.id);
-  if (role !== "admin") {
-    showDenied();
-    return;
-  }
-  
-  loadDashboard();
+  if (panel) panel.style.display = "block";
+  await loadDashboard();
+
+  // Auto refresh every 10 seconds
+  setInterval(loadDashboard, 10000);
 }
 
-function showAuth() {
-  authBox.style.display = "block";
-  panel.style.display = "none";
-}
+/* ===============================
+   LOAD DASHBOARD
+================================= */
 
-function showDenied() {
-  document.body.innerHTML = "<h2>Access Denied - Admin only</h2>";
-}
-
-// FIXED: Now uses /api/dashboard instead of signals table
 async function loadDashboard() {
-  authBox.style.display = "none";
-  panel.style.display = "block";
-  
   try {
     const res = await fetch('/api/dashboard');
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
     const dashboard = await res.json();
-    
-    if (!dashboard.success) throw new Error('API failed');
-    
+
+    if (!dashboard.success) {
+      throw new Error('Dashboard API failed');
+    }
+
     // Metrics
-    document.getElementById('total_leads').textContent = dashboard.metrics.total_leads;
-    document.getElementById('est_revenue').textContent = `$${dashboard.metrics.est_revenue_month}`;
-    document.getElementById('os_active').textContent = dashboard.metrics.os_active;
-    document.getElementById('dms_sent').textContent = dashboard.metrics.dms_sent;
+    document.getElementById('total_leads').textContent =
+      dashboard.metrics.total_leads ?? 0;
 
-    // Permits
-    document.getElementById('data').innerHTML = dashboard.permits.map(p => `
+    document.getElementById('est_revenue').textContent =
+      '$' + Number(dashboard.metrics.est_revenue_month ?? 0).toLocaleString();
+
+    document.getElementById('os_active').textContent =
+      dashboard.metrics.os_active ?? 0;
+
+    document.getElementById('dms_sent').textContent =
+      dashboard.metrics.dms_sent ?? 0;
+
+    // Permit Feed
+    const permits = dashboard.permits || [];
+
+    document.getElementById('data').innerHTML =
+      permits.length
+        ? permits.map(p => `
+          <div class="card">
+            <strong>${p.city ?? 'Unknown City'}</strong><br>
+            ${p.permit_type ?? 'Unknown'}<br>
+            Status: ${p.status ?? 'Pending'}<br>
+            <small>${p.permit_id ?? ''}</small>
+          </div>
+        `).join('')
+        : `
+          <div class="card">
+            No permits available.
+          </div>
+        `;
+
+    // Operating Systems
+    const osModules = dashboard.osModules || [];
+
+    document.getElementById('os_grid').innerHTML =
+      osModules.length
+        ? osModules.map(os => `
+          <div class="card ${os.status}">
+            <strong>OS ${os.id}</strong><br>
+            ${os.name}<br>
+            Layer: ${os.layer}<br>
+            Agents: ${os.agents_count}<br>
+            KPIs: ${os.kpis_count}<br><br>
+
+            <button onclick="toggleOS(${os.id})">
+              ${os.status === 'active'
+                ? 'Deactivate'
+                : 'Activate'}
+            </button>
+          </div>
+        `).join('')
+        : `
+          <div class="card">
+            No OS modules found.
+          </div>
+        `;
+
+  } catch (err) {
+
+    console.error(err);
+
+    document.getElementById('data').innerHTML = `
       <div class="card">
-        <b>${p.city}</b><br>
-        ${p.permit_type}<br>
-        Status: ${p.status}<br>
-        <small>${p.permit_id}</small>
+        Failed to load dashboard.
       </div>
-    `).join('');
-
-    // OS Modules
-    document.getElementById('os_grid').innerHTML = dashboard.osModules.map(os => `
-      <div class="card ${os.status}">
-        <b>OS ${os.id}: ${os.name}</b><br>
-        Layer: ${os.layer}<br>
-        Agents: ${os.agents_count} | KPIs: ${os.kpis_count}
-      </div>
-    `).join('');
-    
-  } catch (e) {
-    console.error('Dashboard load error:', e);
-    document.getElementById('data').innerHTML = '<div class="card">Failed to load data</div>';
+    `;
   }
 }
 
-/* AUTH ACTIONS */
-window.login = async () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  await supabase.auth.signInWithPassword({ email, password });
-  location.reload();
+/* ===============================
+   TOGGLE OS
+================================= */
+
+window.toggleOS = async function (id) {
+
+  try {
+
+    await fetch(`/api/os-toggle/${id}`, {
+      method: 'POST'
+    });
+
+    loadDashboard();
+
+  } catch (err) {
+
+    console.error(err);
+
+  }
 };
 
-window.signup = async () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  await supabase.auth.signUp({ email, password });
+/* ===============================
+   FORCE SCRAPE
+================================= */
+
+window.forceScan = async function () {
+
+  try {
+
+    const res = await fetch('/api/scrape-now', {
+      method: 'POST'
+    });
+
+    const data = await res.json();
+
+    alert(`Scan complete.\nPermits Found: ${data.permits_found}`);
+
+    loadDashboard();
+
+  } catch (err) {
+
+    alert('Scan failed.');
+
+    console.error(err);
+
+  }
 };
 
-window.logout = async () => {
-  await supabase.auth.signOut();
-  location.reload();
+/* ===============================
+   ENGINE HEALTH
+================================= */
+
+window.checkEngine = async function () {
+
+  try {
+
+    const res = await fetch('/api/test');
+
+    const data = await res.json();
+
+    alert(
+      `GRIDV21 Brain\n\nVersion: ${data.version}\nStatus: ${data.status}`
+    );
+
+  } catch (err) {
+
+    alert('Unable to reach engine.');
+
+  }
 };
+
+/* ===============================
+   LOGOUT PLACEHOLDER
+================================= */
+
+window.logout = function () {
+
+  window.location.href = '/dashboard';
+
+};
+
+/* ===============================
+   START
+================================= */
 
 boot();
