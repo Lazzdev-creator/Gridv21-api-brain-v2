@@ -1,12 +1,10 @@
 {
   "name": "gridv21-brain",
-  "version": "6.0.3",
-  "description": "GRIDV21 Enterprise Brain - Permit Acquisition Intelligence System",
+  "version": "6.0.5",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
@@ -15,7 +13,7 @@
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.0",
     "express-session": "^1.18.0",
-    "node-cron": "^3.0.3",
+    "node-cron": "^4.2.1",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "stripe": "^15.10.0",
@@ -23,13 +21,5 @@
   },
   "engines": {
     "node": "20.x"
-  },
-  "keywords": [
-    "gridv21",
-    "enterprise",
-    "brain",
-    "permits"
-  ],
-  "author": "Lazz",
-  "license": "MIT"
+  }
 }
