@@ -287,7 +287,7 @@ app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'publ
 
 /* ====================== CRON ====================== */
 // FIX: node-cron@4.2.1 with correct 5-field syntax
-cron.schedule('*/30 *', () => {
+cron.schedule('*/30 ****', () => {
   console.log('⏰ Running scheduled scan...');
   scanAllCities();
 });
