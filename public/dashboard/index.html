@@ -3,33 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GRIDV21 Brain Dashboard</title>
+  <title>GRIDV21 Enterprise Brain v6.0.2</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div id="panel" style="padding:20px;">
-    <header style="display:flex; justify-content:space-between; align-items:center;">
-      <h1>GRIDV21 Brain v5.5.11</h1>
-      <div>
-        <button onclick="forceScan()">🔄 Run Scan</button>
-        <button onclick="checkEngine()">🧠 Health</button>
-      </div>
-    </header>
+  <header>
+    <h1>GRIDV21 Brain v6.0.2</h1>
+    <div class="btn-group">
+      <button onclick="forceScan()">🔄 Run Scan</button>
+      <button onclick="checkEngine()">🧠 AI Health</button>
+    </div>
+  </header>
 
+  <div class="container">
     <section class="metrics">
-      <div class="card"><b>Total Leads</b><div id="total_leads">0</div></div>
-      <div class="card"><b>Revenue MTD</b><div id="est_revenue">$0</div></div>
-      <div class="card"><b>OS Active</b><div id="os_active">0</div></div>
-      <div class="card"><b>DMS Sent</b><div id="dms_sent">0</div></div>
+      <div class="kpi-card"><b>Total Leads</b><div id="total_leads">0</div></div>
+      <div class="kpi-card"><b>Revenue MTD</b><div id="est_revenue">$0</div></div>
+      <div class="kpi-card"><b>OS Active</b><div id="os_active">0/12</div></div>
+      <div class="kpi-card"><b>DMS Sent</b><div id="dms_sent">0</div></div>
     </section>
 
-    <h2>Recent Permits</h2>
+    <h2 class="section-title">Permit Intelligence Feed</h2>
     <div id="data" class="grid"></div>
 
-    <h2>12 OS Modules</h2>
+    <h2 class="section-title">12 Operating Systems Control Center</h2>
     <div id="os_grid" class="grid"></div>
+
+    <!-- FIX 6: Activity Log -->
+    <h2 class="section-title">Activity Log</h2>
+    <div id="activity" class="grid"></div>
   </div>
 
-  <script type="module" src="/app.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
