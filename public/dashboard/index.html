@@ -7,19 +7,13 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div id="authBox" style="display:none; padding:40px;">
-    <h2>GRIDV21 Login</h2>
-    <input id="email" type="email" placeholder="Email"><br><br>
-    <input id="password" type="password" placeholder="Password"><br><br>
-    <button onclick="login()">Login</button>
-    <button onclick="signup()">Sign Up</button>
-    <a href="/auth/google"><button>Login with Google</button></a>
-  </div>
-
-  <div id="panel" style="display:none; padding:20px;">
-    <header>
-      <h1>GRIDV21 Brain v5.5.10</h1>
-      <button onclick="logout()">Logout</button>
+  <div id="panel" style="padding:20px;">
+    <header style="display:flex; justify-content:space-between; align-items:center;">
+      <h1>GRIDV21 Brain v5.5.11</h1>
+      <div>
+        <button onclick="forceScan()">🔄 Run Scan</button>
+        <button onclick="checkEngine()">🧠 Health</button>
+      </div>
     </header>
 
     <section class="metrics">
@@ -29,7 +23,7 @@
       <div class="card"><b>DMS Sent</b><div id="dms_sent">0</div></div>
     </section>
 
-    <h2>Recent Permits - Denver</h2>
+    <h2>Recent Permits</h2>
     <div id="data" class="grid"></div>
 
     <h2>12 OS Modules</h2>
