@@ -4,6 +4,7 @@ import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import WebSocket from "ws"; // FIX 1: Import ws
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -17,7 +18,10 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '6.0.3';
+const VERSION = '6.0.4';
+
+// FIX 1: MUST be before createClient
+global.WebSocket = WebSocket; 
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -43,7 +47,7 @@ const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
 const SUPABASE_KEY = process.env.SUPABASE_KEY?.trim();
 if (!SUPABASE_KEY) console.error('❌ SUPABASE_KEY missing in Render env');
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); // Now this will work
 
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -96,7 +100,7 @@ async function initDatabase() {
 initDatabase();
 
 /* ====================== PASSPORT ====================== */
-// FIX: Google routes ONLY defined once here
+// FIX: Google routes ONLY defined once
 if (process.env.GOOGLE_CLIENT_ID) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -278,7 +282,7 @@ app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   } catch(e) { res.json({ error: 'Stripe error: ' + e.message }); }
 });
 
-// REMOVED DUPLICATES HERE
+// NO DUPLICATE GOOGLE ROUTES HERE
 
 app.get('/', (req, res) => res.redirect('/dashboard.html'));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
