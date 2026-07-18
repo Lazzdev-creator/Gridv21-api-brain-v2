@@ -18,7 +18,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '6.0.5';
+const VERSION = '6.0.6';
 
 // CRITICAL: Must be before createClient
 global.WebSocket = WebSocket; 
@@ -119,7 +119,7 @@ if (process.env.GOOGLE_CLIENT_ID) {
 
   app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
   app.get('/auth/google/callback', passport.authenticate('google', { 
-    successRedirect: '/dashboard.html', 
+    successRedirect: '/dashboard/', 
     failureRedirect: '/' 
   }));
 } else {
@@ -202,7 +202,19 @@ async function scanAllCities() {
   } finally { scanRunning = false; }
 }
 
-/* ====================== ROUTES ====================== */
+/* ====================== ROUTES - FIXED ====================== */
+app.get("/", (req, res) => { 
+  res.redirect("/dashboard/"); 
+}); 
+
+app.get("/dashboard", (req, res) => { 
+  res.redirect("/dashboard/"); 
+}); 
+
+app.get("/dashboard/", (req, res) => { 
+  res.sendFile(path.join(__dirname, "public", "dashboard", "index.html")); 
+});
+
 app.get('/api/dashboard', async (req, res) => {
   try {
     const { data: permits, error: pErr } = await supabase.from('permits').select('*').order('created_at', { ascending: false }).limit(20);
@@ -274,16 +286,13 @@ app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
         },
         quantity: 1
       }],
-      success_url: `https://gridv21.onrender.com/api/lead/download/${lead_id}`,
-      cancel_url: 'https://gridv21.onrender.com/'
+      success_url: `https://gridv21-api-brain-v2-1.onrender.com/api/lead/download/${lead_id}`,
+      cancel_url: 'https://gridv21-api-brain-v2-1.onrender.com/'
     });
     await Brain.logRevenue(0, `checkout_${trade}`);
     res.json({ url: session.url });
   } catch(e) { res.json({ error: 'Stripe error: ' + e.message }); }
 });
-
-app.get('/', (req, res) => res.redirect('/dashboard.html'));
-app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 /* ====================== CRON ====================== */
 // Every 30 minutes
