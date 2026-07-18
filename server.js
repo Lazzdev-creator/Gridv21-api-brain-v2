@@ -4,7 +4,7 @@ import express from 'express';
 import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import WebSocket from "ws"; // FIX 1: Import ws
+import WebSocket from "ws"; // FIX: For Supabase on Node 20
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import axios from 'axios';
@@ -18,9 +18,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
-const VERSION = '6.0.4';
+const VERSION = '6.0.5';
 
-// FIX 1: MUST be before createClient
+// CRITICAL: Must be before createClient
 global.WebSocket = WebSocket; 
 
 app.use(express.json());
@@ -47,7 +47,7 @@ const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
 
 const SUPABASE_KEY = process.env.SUPABASE_KEY?.trim();
 if (!SUPABASE_KEY) console.error('❌ SUPABASE_KEY missing in Render env');
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY); // Now this will work
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let stripe = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -100,7 +100,6 @@ async function initDatabase() {
 initDatabase();
 
 /* ====================== PASSPORT ====================== */
-// FIX: Google routes ONLY defined once
 if (process.env.GOOGLE_CLIENT_ID) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -198,6 +197,7 @@ async function scanAllCities() {
       } catch (e) { console.error(`Scan error ${city.name}:`, e.message); }
       await new Promise(r => setTimeout(r, 600));
     }
+    console.log(`✅ Scan complete. Found ${total} new permits`);
     return total;
   } finally { scanRunning = false; }
 }
@@ -282,13 +282,15 @@ app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
   } catch(e) { res.json({ error: 'Stripe error: ' + e.message }); }
 });
 
-// NO DUPLICATE GOOGLE ROUTES HERE
-
 app.get('/', (req, res) => res.redirect('/dashboard.html'));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 /* ====================== CRON ====================== */
-cron.schedule('*/30 *', () => scanAllCities());
+// FIX: node-cron@4.2.1 with correct 5-field syntax
+cron.schedule('*/30 *', () => {
+  console.log('⏰ Running scheduled scan...');
+  scanAllCities();
+});
 
 /* ====================== START ====================== */
 const PORT = process.env.PORT || 3000;
