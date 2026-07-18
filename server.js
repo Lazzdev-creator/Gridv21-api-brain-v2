@@ -286,8 +286,8 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 /* ====================== CRON ====================== */
-// FIX: node-cron@4.2.1 with correct 5-field syntax
-cron.schedule('*/30 ****', () => {
+// Run every 30 minutes
+cron.schedule('*/30 *', () => {
   console.log('⏰ Running scheduled scan...');
   scanAllCities();
 });
