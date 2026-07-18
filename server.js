@@ -286,10 +286,14 @@ app.get('/', (req, res) => res.redirect('/dashboard.html'));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
 /* ====================== CRON ====================== */
-// Run every 30 minutes
-cron.schedule('*/30 *', () => {
-  console.log('⏰ Running scheduled scan...');
-  scanAllCities();
+// Every 30 minutes
+cron.schedule("*/30 * * * *", async () => {
+  try {
+    console.log("⏰ Running scheduled permit scan...");
+    await scanAllCities();
+  } catch (err) {
+    console.error("Cron error:", err);
+  }
 });
 
 /* ====================== START ====================== */
