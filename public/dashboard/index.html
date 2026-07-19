@@ -1,200 +1,150 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GRIDV21 BRAIN v6.2</title>
+  <title>GRIDV21 BRAIN v6.2.1</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { background: #0a0a0f; color: #e5e7eb; font-family: 'Inter', sans-serif; }
-    .glass { background: rgba(17, 24, 39, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(55, 65, 81, 0.3); }
-    .os-card { transition: all 0.2s; }
-    .os-card:hover { transform: translateY(-2px); border-color: #3b82f6; }
-    .live-feed { height: 400px; overflow-y: auto; scrollbar-width: thin; }
-    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .status-active { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    body { background: #05050a; color: #e5e7eb; }
+   .glass { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(59, 130, 246, 0.1); }
+   .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+   .kpi-card { transition: all 0.3s; }
+   .kpi-card:hover { border-color: #3b82f6; transform: translateY(-2px); }
   </style>
 </head>
 <body>
-  <!-- TOP NAV -->
-  <nav class="glass fixed top-0 w-full z-50 px-6 py-3 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 bg-blue-600 rounded"></div>
-      <h1 class="text-xl font-bold">GRIDV21 BRAIN <span class="text-xs text-gray-400">v6.2</span></h1>
+  <!-- TOP NAV + ACTION BAR -->
+  <nav class="glass fixed top-0 w-full z-50 px-6 py-2 flex justify-between items-center">
+    <div class="flex items-center gap-3"><div class="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded"></div><h1 class="text-lg font-bold">GRIDV21 BRAIN <span class="text-xs text-gray-400">v6.2.1</span></h1></div>
+    <div class="flex gap-4 text-sm">
+      <a class="text-blue-400">Dashboard</a><a>OS</a><a>Leads</a><a>AI</a><a>Settings</a>
     </div>
-    <div class="flex gap-6 text-sm">
-      <a href="#" class="text-blue-400">Dashboard</a>
-      <a href="#" class="hover:text-white">Brain</a>
-      <a href="#" class="hover:text-white">OS</a>
-      <a href="#" class="hover:text-white">Leads</a>
-      <a href="#" class="hover:text-white">Revenue</a>
-      <a href="#" class="hover:text-white">AI</a>
-      <a href="#" class="hover:text-white">Settings</a>
-    </div>
-    <div class="flex items-center gap-4">
-      <button class="text-gray-400 hover:text-white">🔔</button>
-      <button class="text-gray-400 hover:text-white">👤 User</button>
-      <button onclick="logout()" class="text-red-400 hover:text-red-300">Logout</button>
+    <div class="flex items-center gap-2">
+      <button onclick="runBrain()" class="bg-green-600 px-3 py-1 rounded text-xs">▶ Run Brain</button>
+      <button onclick="pauseBrain()" class="bg-yellow-600 px-3 py-1 rounded text-xs">⏸ Pause</button>
+      <button onclick="emergencyStop()" class="bg-red-600 px-3 py-1 rounded text-xs">🚨 E-Stop</button>
+      <button onclick="toggleTheme()" class="text-gray-400">🌙</button>
     </div>
   </nav>
 
-  <div class="flex pt-16">
+  <div class="flex pt-14">
     <!-- LEFT SIDEBAR -->
-    <aside class="w-64 glass h-screen fixed left-0 p-4 overflow-y-auto">
-      <div class="space-y-2 text-sm">
-        <a class="flex items-center gap-3 p-2 rounded bg-blue-600/20">🏠 Dashboard</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">🧠 Executive Intelligence OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">💰 Revenue Intelligence OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">🤝 Sales & CRM OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">📢 Marketing OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">⚙ Operations OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">💳 Finance OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">👥 Human Capital OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">📂 Project Management OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">📚 Knowledge OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">⚖ Legal & Compliance OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">🚚 Supply Chain OS</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">🎯 Acquisition Intelligence OS</a>
-        <hr class="border-gray-700 my-2">
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">🤖 AI Engine</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">📊 Analytics</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">📈 Forecast</a>
-        <a class="flex items-center gap-3 p-2 rounded hover:bg-gray-800">⚙ Settings</a>
-      </div>
+    <aside class="w-56 glass h-screen fixed left-0 p-3 overflow-y-auto text-xs">
+      <div id="sidebar-os" class="space-y-1"></div>
     </aside>
 
-    <!-- MAIN CONTENT -->
-    <main class="ml-64 flex-1 p-6">
-      <!-- KPI CARDS -->
-      <div class="grid grid-cols-6 gap-4 mb-6">
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">Total Leads</div><div id="kpi-leads" class="text-2xl font-bold">0</div></div>
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">Today's Permits</div><div id="kpi-today" class="text-2xl font-bold">0</div></div>
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">Monthly Revenue</div><div id="kpi-revenue" class="text-2xl font-bold">$0</div></div>
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">Active OS</div><div id="kpi-os" class="text-2xl font-bold">12</div></div>
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">AI Decisions</div><div id="kpi-ai" class="text-2xl font-bold">0</div></div>
-        <div class="glass p-4 rounded-lg"><div class="text-xs text-gray-400">System Health</div><div class="text-2xl font-bold text-green-400">100%</div></div>
-      </div>
+    <main class="ml-56 flex-1 p-4">
+      <!-- 12 KPI CARDS -->
+      <div id="kpi-grid" class="grid grid-cols-6 gap-3 mb-4"></div>
 
-      <div class="grid grid-cols-3 gap-6">
-        <!-- CENTER: LIVE ACTIVITY + CHARTS -->
-        <div class="col-span-2 space-y-6">
-          <!-- LIVE ACTIVITY MONITOR -->
+      <div class="grid grid-cols-4 gap-4">
+        <!-- CENTER: INTELLIGENCE PANEL WITH TABS -->
+        <div class="col-span-3 space-y-4">
           <div class="glass p-4 rounded-lg">
-            <h3 class="font-bold mb-3">Live Activity Monitor</h3>
-            <div id="live-feed" class="live-feed space-y-2 text-xs"></div>
+            <div class="flex gap-6 border-b border-gray-800 mb-3 text-xs">
+              <button class="tab-active pb-2" onclick="switchTab('activity')">Activity</button>
+              <button onclick="switchTab('ai')">AI Decisions</button>
+              <button onclick="switchTab('revenue')">Revenue</button>
+              <button onclick="switchTab('security')">Security</button>
+              <button onclick="switchTab('logs')">Scan Logs</button>
+            </div>
+            <div id="tab-content" class="h-80 overflow-y-auto text-xs"></div>
           </div>
 
-          <!-- CHARTS -->
-          <div class="grid grid-cols-2 gap-4">
-            <div class="glass p-4 rounded-lg"><canvas id="chart-permits"></canvas></div>
-            <div class="glass p-4 rounded-lg"><canvas id="chart-revenue"></canvas></div>
+          <!-- 6 CHARTS -->
+          <div class="grid grid-cols-3 gap-3">
+            <div class="glass p-3 rounded-lg"><canvas id="chart1"></canvas></div>
+            <div class="glass p-3 rounded-lg"><canvas id="chart2"></canvas></div>
+            <div class="glass p-3 rounded-lg"><canvas id="chart3"></canvas></div>
+            <div class="glass p-3 rounded-lg"><canvas id="chart4"></canvas></div>
+            <div class="glass p-3 rounded-lg"><canvas id="chart5"></canvas></div>
+            <div class="glass p-3 rounded-lg"><canvas id="chart6"></canvas></div>
           </div>
 
-          <!-- PERMIT TABLE -->
+          <!-- LEAD INTELLIGENCE TABLE -->
           <div class="glass p-4 rounded-lg">
-            <h3 class="font-bold mb-3">Permit Table</h3>
-            <table class="w-full text-xs">
-              <thead><tr class="text-gray-400"><th>Permit ID</th><th>City</th><th>Address</th><th>Type</th><th>Value</th><th>AI Score</th><th>Status</th></tr></thead>
-              <tbody id="permit-table"></tbody>
-            </table>
+            <div class="flex justify-between mb-3">
+              <input id="search" placeholder="Search permits..." class="bg-gray-900 p-2 rounded text-xs w-64">
+              <button onclick="exportCSV()" class="bg-blue-600 px-3 py-1 rounded text-xs">Export CSV</button>
+            </div>
+            <table class="w-full text-xs"><thead><tr class="text-gray-400"><th>Permit</th><th>City</th><th>Address</th><th>Value</th><th>AI Score</th><th>Revenue Pred</th><th>Actions</th></tr></thead><tbody id="permit-table"></tbody></table>
           </div>
         </div>
 
-        <!-- RIGHT: SYSTEM HEALTH + OS PANEL -->
-        <div class="space-y-6">
-          <!-- SYSTEM HEALTH -->
-          <div class="glass p-4 rounded-lg">
-            <h3 class="font-bold mb-3">System Health</h3>
-            <div class="space-y-2 text-xs">
-              <div>✓ Database <span class="text-green-400">Online</span></div>
-              <div>✓ API <span class="text-green-400">Online</span></div>
-              <div>✓ Stripe <span class="text-green-400">Connected</span></div>
-              <div>✓ AI Engine <span class="text-green-400">Running</span></div>
-              <div>✓ Scheduler <span class="text-green-400">Active</span></div>
-            </div>
-          </div>
-
-          <!-- OS CONTROL PANEL -->
-          <div class="glass p-4 rounded-lg">
-            <h3 class="font-bold mb-3">OS Control Panel</h3>
-            <div id="os-grid" class="space-y-3"></div>
-          </div>
-
-          <!-- AUTOMATION PANEL -->
-          <div class="glass p-4 rounded-lg">
-            <h3 class="font-bold mb-3">Automation</h3>
-            <div class="grid grid-cols-2 gap-2">
-              <button onclick="runScan()" class="bg-blue-600 hover:bg-blue-700 p-2 rounded text-xs">Run Full Scan</button>
-              <button onclick="syncAI()" class="bg-purple-600 hover:bg-purple-700 p-2 rounded text-xs">AI Sync</button>
-              <button class="bg-gray-700 hover:bg-gray-600 p-2 rounded text-xs">Backup DB</button>
-              <button class="bg-gray-700 hover:bg-gray-600 p-2 rounded text-xs">Export Reports</button>
+        <!-- RIGHT SIDEBAR -->
+        <div class="space-y-4">
+          <div class="glass p-3 rounded-lg"><h3 class="font-bold text-sm mb-2">System Health</h3><div id="system-health" class="space-y-1 text-xs"></div></div>
+          <div class="glass p-3 rounded-lg"><h3 class="font-bold text-sm mb-2">AI Command Center</h3><div id="ai-panel" class="space-y-1 text-xs"></div></div>
+          <div class="glass p-3 rounded-lg"><h3 class="font-bold text-sm mb-2">Automation</h3>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button onclick="runScan()" class="bg-blue-600 p-1 rounded">Full Scan</button>
+              <button class="bg-purple-600 p-1 rounded">AI Engine</button>
+              <button class="bg-gray-700 p-1 rounded">Backup DB</button>
+              <button class="bg-gray-700 p-1 rounded">Restart Brain</button>
             </div>
           </div>
         </div>
       </div>
 
       <!-- FOOTER -->
-      <footer class="text-center text-xs text-gray-500 mt-8">
-        GRIDV21 Brain Enterprise v6.2 | Database Connected | Render Online | AI Running
-      </footer>
+      <footer class="text-center text-xs text-gray-500 mt-6">v6.2.1 | Production | us-east-1 | Last Scan: <span id="last-scan">-</span></footer>
     </main>
   </div>
 
 <script>
 const API = '/api';
-let liveFeed = [];
+let charts = {};
 
-async function loadDashboard() {
-  const res = await fetch(`${API}/dashboard`);
-  const data = await res.json();
-  document.getElementById('kpi-leads').innerText = data.metrics.total_leads;
-  document.getElementById('kpi-revenue').innerText = '$' + (data.metrics.est_revenue_month/1000).toFixed(1) + 'K';
-  document.getElementById('kpi-os').innerText = data.metrics.os_active;
-  
-  // Permit Table
-  const tbody = document.getElementById('permit-table');
-  tbody.innerHTML = data.permits.map(p => `
-    <tr class="border-b border-gray-800">
-      <td>${p.permit_number}</td><td>${p.city}</td><td>${p.address}</td>
-      <td>${p.permit_type}</td><td>$${p.valuation?.toLocaleString() || 0}</td>
-      <td>${(p.ai_score || 0).toFixed(0)}%</td><td><span class="status-dot status-active"></span> ${p.status}</td>
-    </tr>
-  `).join('');
+async function loadAll() {
+  const [dash, status, os, ai, chartsData] = await Promise.all([
+    fetch(`${API}/dashboard`).then(r => r.json()),
+    fetch(`${API}/status`).then(r => r.json()),
+    fetch(`${API}/os`).then(r => r.json()),
+    fetch(`${API}/ai`).then(r => r.json()),
+    fetch(`${API}/charts`).then(r => r.json())
+  ]);
 
-  // OS Grid
-  const osGrid = document.getElementById('os-grid');
-  osGrid.innerHTML = data.osModules.map(os => `
-    <div class="os-card glass p-3 rounded">
-      <div class="flex justify-between"><span class="text-xs">${os.name}</span><span class="status-dot status-active"></span></div>
-      <div class="flex gap-2 mt-2">
-        <button class="text-xs bg-green-600 px-2 py-1 rounded">Run</button>
-        <button class="text-xs bg-gray-700 px-2 py-1 rounded">Config</button>
+  // 12 KPI Cards
+  document.getElementById('kpi-grid').innerHTML = `
+    ${['Total Leads','New Today','Monthly Revenue','Active OS','AI Decisions','System Health','CPU','Memory','API Calls','Scan Queue','AI Confidence','Active Users'].map((k,i) => `
+      <div class="glass kpi-card p-3 rounded-lg"><div class="text-xs text-gray-400">${k}</div><div class="text-xl font-bold">${Object.values(dash.metrics)[i] || '0'}</div></div>
+    `).join('')}
+  `;
+
+  // OS Control Cards
+  document.getElementById('sidebar-os').innerHTML = os.os.map(o => `
+    <div class="glass p-2 rounded flex items-center justify-between">
+      <span>${o.name}</span>
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full ${o.status==='active'?'bg-green-400':'bg-gray-500'}"></div>
+        <button class="text-xs">⚙</button>
       </div>
     </div>
   `).join('');
+
+  // System Health
+  document.getElementById('system-health').innerHTML = Object.entries(status.services).map(([k,v]) => `<div>✓ ${k}: <span class="text-green-400">${v}</span></div>`).join('');
+  
+  // AI Panel
+  document.getElementById('ai-panel').innerHTML = Object.entries(ai.ai).map(([k,v]) => `<div>${k}: <span class="text-blue-400">${v}</span></div>`).join('');
+
+  // Charts
+  renderCharts(chartsData.charts);
 }
 
-function addLiveLog(msg) {
-  const time = new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'});
-  liveFeed.unshift(`<div>[${time}] ${msg}</div>`);
-  if(liveFeed.length > 20) liveFeed.pop();
-  document.getElementById('live-feed').innerHTML = liveFeed.join('');
+function renderCharts(data) {
+  const ctx1 = document.getElementById('chart1');
+  new Chart(ctx1, {type: 'line', data: {labels: ['Jan','Feb','Mar','Apr','May','Jun'], datasets: [{label: 'Permits', data: data.permit_growth, borderColor: '#3b82f6'}]}, options: {plugins: {legend: {display: false}}}});
+  // repeat for chart2-6...
 }
 
-async function runScan() {
-  addLiveLog('Manual scan started...');
-  await fetch(`${API}/scrape-now`, {method: 'POST'});
-  addLiveLog('Scan complete');
-  loadDashboard();
-}
-
-function syncAI() { addLiveLog('AI Engine syncing...'); }
-function logout() { fetch('/api/logout', {method: 'POST'}).then(() => window.location = '/login.html'); }
-
-setInterval(loadDashboard, 5000); // auto refresh
-setInterval(() => addLiveLog('System heartbeat'), 10000);
-loadDashboard();
+async function runBrain() { await fetch(`${API}/scrape-now`, {method: 'POST'}); }
+async function pauseBrain() { await fetch(`${API}/brain/pause`, {method: 'POST'}); }
+async function emergencyStop() { await fetch(`${API}/brain/emergency-stop`, {method: 'POST'}); }
+function switchTab(tab) { document.getElementById('tab-content').innerHTML = `<div>Loading ${tab}...</div>`; }
+setInterval(loadAll, 5000);
+loadAll();
 </script>
 </body>
-          </html>
+                                                                    </html>
