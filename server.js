@@ -1,7 +1,8 @@
 /******************************************************************************
- * GRIDV21 BRAIN ENTERPRISE v6.1.10 - RENDER PRODUCTION MVP
- * OWNER: LAZARUS TAKUDZWA CHENANA
- ******************************************************************************/
+* GRIDV21 BRAIN ENTERPRISE v6.1.11 - RENDER PRODUCTION MVP
+* OWNER: LAZARUS TAKUDZWA CHENANA
+* FIX: Real Permit Field Parsing for Chicago + CSV
+******************************************************************************/
 import express from "express";
 import cors from "cors";
 import session from "express-session";
@@ -21,14 +22,12 @@ import compression from "compression";
 import morgan from "morgan";
 import Papa from "papaparse";
 import crypto from "crypto";
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config();
 global.WebSocket = WebSocket;
-
 const app = express();
-export const VERSION = "6.1.10";
+export const VERSION = "6.1.11"; // BUMPED
 const PORT = process.env.PORT || 3000;
 let supabase;
 
@@ -41,7 +40,9 @@ const logger = {
   error: async (reqId, msg) => {
     console.error(`[ERROR ${reqId} ${new Date().toISOString()}] ${msg}`);
     if (supabase) {
-      try { await supabase.from('audit_logs').insert({ level: 'error', message: msg, request_id: reqId, timestamp: new Date().toISOString() }); } catch {}
+      try {
+        await supabase.from('audit_logs').insert({ level: 'error', message: msg, request_id: reqId, timestamp: new Date().toISOString() });
+      } catch {}
     }
   }
 };
@@ -50,12 +51,15 @@ const logger = {
 ENV VALIDATION
 ============================================================ */
 const required = ["SUPABASE_URL", "SUPABASE_KEY", "SESSION_SECRET", "ADMIN_KEY", "FRONTEND_URL"];
-for(const v of required){ if(!process.env[v]){ throw new Error(`FATAL: ${v} missing from ENV`); } }
-
+for(const v of required){
+  if(!process.env[v]){
+    throw new Error(`FATAL: ${v} missing from ENV`);
+  }
+}
 morgan.token('id', req => req.id);
 
 /* ============================================================
-GLOBAL ERROR HANDLERS - FIX #8
+GLOBAL ERROR HANDLERS
 ============================================================ */
 process.on("unhandledRejection", (reason, promise) => {
   logger.error('system', `Unhandled Rejection: ${reason}`);
@@ -74,24 +78,19 @@ app.use((req, res, next) => {
   res.setHeader('X-Request-ID', req.id);
   next();
 });
-
-app.use(helmet({
-  contentSecurityPolicy: false,
-  hsts: process.env.NODE_ENV === 'production'? { maxAge: 31536000, includeSubDomains: true } : false
-}));
+app.use(helmet({ contentSecurityPolicy: false, hsts: process.env.NODE_ENV === 'production'? { maxAge: 31536000, includeSubDomains: true } : false }));
 app.use(compression());
 app.use(morgan(':id :method :url :status :res[content-length] - :response-time ms'));
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
-
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 200 });
 app.use("/api", apiLimiter);
 
 /* ============================================================
 SESSION STORE
 ============================================================ */
-app.set('trust proxy', 1); // CRITICAL: Must be before session
+app.set('trust proxy', 1);
 
 let sessionStore;
 let redisClient = null;
@@ -113,10 +112,10 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { 
-    secure: true, // Render is HTTPS so always true
+    secure: true,
     httpOnly: true, 
-    sameSite: 'none', // FIX: 'none' required with secure:true on Render
-    maxAge: 86400000 // 24 hours
+    sameSite: 'none',
+    maxAge: 86400000
   }
 }));
 app.use(passport.initialize());
@@ -152,9 +151,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   app.get('/auth/google/callback', passport.authenticate('google', { failureRedirect: '/login.html' }), (req, res) => res.redirect('/dashboard'));
   logger.info('system', "Google OAuth Enabled");
 }
-
 const stripe = process.env.STRIPE_SECRET_KEY? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
-export const SETTINGS = { OWNER: "LAZARUS TAKUDZWA CHENANA", WHATSAPP: "0672049913", AMAZON_ID: process.env.AMAZON_AFFILIATE_ID, ADMIN_KEY: process.env.ADMIN_KEY, STRIPE_ENABLED:!!stripe };
+
+export const SETTINGS = {
+  OWNER: "LAZARUS TAKUDZWA CHENANA",
+  WHATSAPP: "0672049913",
+  AMAZON_ID: process.env.AMAZON_AFFILIATE_ID,
+  ADMIN_KEY: process.env.ADMIN_KEY,
+  STRIPE_ENABLED:!!stripe
+};
 
 function requireAdmin(req, res, next) {
   if (req.session?.isAdmin || req.user?.role === 'admin') return next();
@@ -162,7 +167,7 @@ function requireAdmin(req, res, next) {
 }
 
 /* ============================================================
-BRAIN OS + AI - FIX #6: Marked placeholder
+BRAIN OS + AI
 ============================================================ */
 export const BRAIN_OS = [
   { id: 1, name: "Executive Intelligence OS", layer: "Strategy", agents_count: 3, kpis_count: 5 },
@@ -178,11 +183,11 @@ export const BRAIN_OS = [
   { id: 11, name: "Supply Chain OS", layer: "Supply", agents_count: 4, kpis_count: 5 },
   { id: 12, name: "Acquisition Intelligence OS", layer: "Lead Generation", agents_count: 6, kpis_count: 8 }
 ];
-export const OS_STATUS = {}; for (const os of BRAIN_OS) { OS_STATUS[os.id] = "active"; }
+export const OS_STATUS = {};
+for (const os of BRAIN_OS) { OS_STATUS[os.id] = "active"; }
 
 export const AI_ENGINE = {
   async enrichPermit(p) {
-    // FIX #6: PLACEHOLDER - Replace with OpenAI/Claude
     return {...p, ai_enriched: true, estimated_value: 25000, ai_confidence: 0.75, ai_note: "PLACEHOLDER MODEL" };
   },
   scoreLead(p) { return 50 + (p.permit_type?.includes('Commercial')? 20 : 0); },
@@ -193,13 +198,40 @@ export const CITIES = [
   { name: "Austin", url: "https://data.austintexas.gov/resource/3syk-w9eu.json", valid: true, type: "json" },
   { name: "Chicago", url: "https://data.cityofchicago.org/resource/ydr8-5enu.json", valid: true, type: "json" },
   { name: "Denver", url: "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv", valid: true, type: "csv" },
-  { name: "Phoenix", url: null, valid: false }, { name: "Seattle", url: null, valid: false }, { name: "Portland", url: null, valid: false },
-  { name: "Johannesburg", url: null, valid: false }, { name: "Pretoria", url: null, valid: false }, { name: "Cape Town", url: null, valid: false }, { name: "Durban", url: null, valid: false }
+  { name: "Phoenix", url: null, valid: false },
+  { name: "Seattle", url: null, valid: false },
+  { name: "Portland", url: null, valid: false },
+  { name: "Johannesburg", url: null, valid: false },
+  { name: "Pretoria", url: null, valid: false },
+  { name: "Cape Town", url: null, valid: false },
+  { name: "Durban", url: null, valid: false }
 ];
 
-export const SCAN_SETTINGS = { batchSize: 100, requestDelay: 750, requestTimeout: 15000, scanTimeout: 600000, cron: "*/30 * * * *", concurrency: 3 };
-export const REVENUE = { affiliateCommission: 0.03, minimumLeadPrice: 7500, currency: "usd" };
-export const ENGINE = { running: false, lastScan: null, lastScanDuration: 0, permitsFound: 0, errors: 0, uptime: Date.now(), queue: 0 };
+export const SCAN_SETTINGS = {
+  batchSize: 100,
+  requestDelay: 750,
+  requestTimeout: 15000,
+  scanTimeout: 600000,
+  cron: "*/30 * * * *",
+  concurrency: 3
+};
+
+export const REVENUE = {
+  affiliateCommission: 0.03,
+  minimumLeadPrice: 7500,
+  currency: "usd"
+};
+
+export const ENGINE = {
+  running: false,
+  lastScan: null,
+  lastScanDuration: 0,
+  permitsFound: 0,
+  errors: 0,
+  uptime: Date.now(),
+  queue: 0
+};
+
 export function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 /* ============================================================
@@ -208,17 +240,21 @@ SUPABASE UPSERT
 async function supabaseBatchUpsert(table, dataArray) {
   if (dataArray.length === 0) return 0;
   const { data, error } = await supabase.from(table).upsert(dataArray, { onConflict: 'permit_id', ignoreDuplicates: true }).select('permit_id');
-  if (error) { await logger.error('system', `Batch upsert failed ${table}: ${error.message}`); return 0; }
+  if (error) {
+    await logger.error('system', `Batch upsert failed ${table}: ${error.message}`);
+    return 0;
+  }
   return data?.length || 0;
 }
 
 /* ============================================================
-AXIOS WITH ABORT - FIX #2: Real cancellation
+AXIOS WITH ABORT
 ============================================================ */
 async function axiosWithAbort(url, reqId, signal, retries = 3) {
   for (let i = 0; i < retries; i++) {
-    try { return await axios.get(url, { timeout: SCAN_SETTINGS.requestTimeout, signal }); }
-    catch (err) {
+    try {
+      return await axios.get(url, { timeout: SCAN_SETTINGS.requestTimeout, signal });
+    } catch (err) {
       if (axios.isCancel(err)) throw err;
       const delay = 1000 * Math.pow(2, i);
       await logger.warn(reqId, `Retry ${i+1}/${retries} for ${url} in ${delay}ms`);
@@ -238,75 +274,114 @@ app.get('/api/health', async (req, res) => {
     let redisStatus = "disabled";
     if (redisClient) { await redisClient.ping(); redisStatus = "connected"; }
     res.json({ success: true, status: "healthy", version: VERSION, redis: redisStatus, stripe:!!stripe, oauth: oauthEnabled });
-  } catch (e) { res.status(503).json({ success: false, status: "unhealthy", error: e.message, version: VERSION }); }
+  } catch (e) {
+    res.status(503).json({ success: false, status: "unhealthy", error: e.message, version: VERSION });
+  }
 });
 
 /* ============================================================
-SCANNER - FIX #2 #3 #4 #5
+SCANNER - FIX v6.1.11: REAL FIELD PARSING
 ============================================================ */
 export async function scanAllCities() {
   if (ENGINE.running) return 0;
   ENGINE.running = true;
-  ENGINE.errors = 0; // FIX #4: Reset errors
-  ENGINE.permitsFound = 0; // FIX #3: Reset permits
+  ENGINE.errors = 0;
+  ENGINE.permitsFound = 0;
   const scanId = crypto.randomUUID();
   const startTime = Date.now();
   let newPermits = 0;
   let status = "success";
   ENGINE.lastScan = new Date().toISOString();
-
-  const abortController = new AbortController(); // FIX #2
+  const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), SCAN_SETTINGS.scanTimeout);
-
+  
   try {
     const validCities = CITIES.filter(c => c.valid);
     for (const city of validCities) {
       try {
         logger.info(scanId, `Scanning ${city.name}`);
-        const response = await axiosWithAbort(city.url, scanId, abortController.signal); // FIX #2
+        const response = await axiosWithAbort(city.url, scanId, abortController.signal);
         let permits = [];
-
+        
         if (city.type === 'csv') {
           const parsed = Papa.parse(response.data, { header: true, skipEmptyLines: true });
+          // FIX: Parse real CSV fields
           permits = parsed.data.map(p => ({
-            permit_number: p.permit_number || p['Permit #'],
-            permit_type: p.permit_type_description || p['Work Class'] || p.permit_type,
-            applicant: p.applicant_name || p['Applicant Name'],
-            issued_date: p.issued_date || p['Issue Date']
+            permit_number: p['Permit #'] || p.permit_number || 'N/A',
+            permit_type: p['Permit Type'] || p['Work Class'] || p.permit_type || 'PERMIT',
+            address: p['Street Address'] || p.address || `${city.name}`,
+            applicant: p['Applicant Name'] || p.applicant_name || 'Unknown',
+            issued_date: p['Issue Date'] || p.issued_date || null,
+            description: p['Work Description'] || p.description || '',
+            valuation: parseFloat(p['Estimated Cost'] || 0) || 0,
+            contractor: p['Contractor Name'] || p.contractor || null,
+            source_url: null
           })).filter(p => p.permit_number);
         } else {
-          permits = response.data || [];
+          // FIX: Parse real JSON fields for Chicago/Austin
+          permits = (response.data || []).map(p => ({
+            permit_number: p['Permit #'] || p.permit_number || 'N/A',
+            permit_type: p['Permit Type'] || p.permit_type || 'PERMIT',
+            address: p['Street Address'] || p.address || `${city.name}`,
+            applicant: p['Applicant Name'] || p.applicant || 'Unknown',
+            issued_date: p['Issue Date'] || p.issue_date || null,
+            description: p['Work Description'] || p.description || '',
+            valuation: parseFloat(p['Estimated Cost'] || 0) || 0,
+            contractor: p['Contractor Name'] || p.contractor || null,
+            source_url: `https://data.cityofchicago.org/resource/ydr8-5enu/${p[':id']}`
+          }));
         }
-
+        
         const { data: existingPermits } = await supabase.from("permits").select("permit_id").eq("city", city.name);
         const existingIds = new Set(existingPermits?.map(p => p.permit_id) || []);
-
         let batch = [];
+        
         for (const permit of permits) {
           const permitID = `${city.name.toLowerCase()}-${permit.permit_number || crypto.randomUUID()}`;
           if (existingIds.has(permitID)) continue;
-          let record = { permit_id: permitID, city: city.name, permit_type: permit.permit_type || "Unknown", status: "new", raw_data: permit };
+          
+          let record = { 
+            permit_id: permitID, 
+            city: city.name, 
+            permit_number: permit.permit_number, // NEW
+            permit_type: permit.permit_type,
+            address: permit.address, // NEW
+            applicant: permit.applicant, // NEW
+            issued_date: permit.issued_date, // NEW
+            description: permit.description, // NEW
+            valuation: permit.valuation, // NEW
+            contractor: permit.contractor, // NEW
+            source_url: permit.source_url, // NEW
+            status: "new", 
+            raw_data: permit 
+          };
+          
           record = await AI_ENGINE.enrichPermit(record);
           record.ai_score = AI_ENGINE.scoreLead(record);
           record.predicted_revenue = AI_ENGINE.predictRevenue(record);
           batch.push(record);
-
+          
           if (batch.length >= SCAN_SETTINGS.batchSize) {
             const inserted = await supabaseBatchUpsert('permits', batch);
             newPermits += inserted;
-            ENGINE.permitsFound = newPermits; // FIX #3
+            ENGINE.permitsFound = newPermits;
             batch = [];
           }
         }
         if (batch.length > 0) {
           const inserted = await supabaseBatchUpsert('permits', batch);
           newPermits += inserted;
-          ENGINE.permitsFound = newPermits; // FIX #3
+          ENGINE.permitsFound = newPermits;
         }
-
       } catch (err) {
-        if (axios.isCancel(err)) { logger.warn(scanId, "Scan cancelled due to timeout"); status = "timeout"; break; }
-        ENGINE.errors++; status = "failed"; await logger.error(scanId, `${city.name}: ${err.message}`);
+        if (axios.isCancel(err)) {
+          logger.warn(scanId, "Scan cancelled due to timeout");
+          status = "timeout";
+          break;
+        }
+        ENGINE.errors++;
+        status = "failed";
+        await logger.error(scanId, `${city.name}: ${err.message}`);
       }
       await sleep(SCAN_SETTINGS.requestDelay);
     }
@@ -314,7 +389,6 @@ export async function scanAllCities() {
   } finally {
     clearTimeout(timeout);
     ENGINE.running = false;
-    // FIX #5: completed_at added
     await supabase.from('scan_logs').insert({
       started_at: ENGINE.lastScan,
       completed_at: new Date().toISOString(),
@@ -329,7 +403,7 @@ export async function scanAllCities() {
 }
 
 /* ============================================================
-API ROUTES - FIX #7: Graceful RPC fallback
+API ROUTES
 ============================================================ */
 app.get('/api/status', requireAdmin, (req, res) => {
   const payload = { success: true,...ENGINE, uptime: Date.now() - ENGINE.uptime, version: VERSION, stripe_enabled:!!stripe };
@@ -343,35 +417,43 @@ app.get('/api/dashboard', requireAdmin, async (req, res) => {
     const limit = 50;
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-
     let totalRevenue = 0;
     try {
-      const { data: revenueData } = await supabase.rpc('get_monthly_revenue'); // FIX #7
+      const { data: revenueData } = await supabase.rpc('get_monthly_revenue');
       totalRevenue = revenueData?.[0]?.total || 0;
     } catch (e) {
       logger.warn('system', "RPC get_monthly_revenue not found. Using 0");
     }
-
     const [{ count: permitCount }, { data: permits }, { data: osModules }, { data: scanLogs }] = await Promise.all([
       supabase.from("permits").select("*", { count: "exact", head: true }),
       supabase.from('permits').select('*').order('created_at', { ascending: false }).range(from, to),
       supabase.from('os_modules').select('*').order('id'),
       supabase.from('scan_logs').select('*').order('started_at', { ascending: false }).limit(10)
     ]);
-
     res.json({
       success: true,
-      metrics: { total_leads: permitCount || 0, dms_sent: scanLogs?.length || 0, os_active: Object.values(OS_STATUS).filter(s => s === "active").length, est_revenue_month: totalRevenue, ai_avg_confidence: 0.75 },
+      metrics: {
+        total_leads: permitCount || 0,
+        dms_sent: scanLogs?.length || 0,
+        os_active: Object.values(OS_STATUS).filter(s => s === "active").length,
+        est_revenue_month: totalRevenue,
+        ai_avg_confidence: 0.75
+      },
       permits: permits || [],
       osModules: osModules || [],
       scanLogs: scanLogs || [],
       system: process.env.NODE_ENV!== 'production'? { memory: process.memoryUsage(), uptime: process.uptime() } : {},
       stripe_enabled:!!stripe
     });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 });
 
-app.post('/api/scrape-now', requireAdmin, async (req, res) => { const saved = await scanAllCities(); res.json({ success: true, permits_found: saved }); });
+app.post('/api/scrape-now', requireAdmin, async (req, res) => {
+  const saved = await scanAllCities();
+  res.json({ success: true, permits_found: saved });
+});
 
 app.post('/api/lead/checkout', requireAdmin, async (req, res) => {
   if (!stripe) return res.status(400).json({ success: false, message: "Stripe not configured" });
@@ -384,34 +466,31 @@ app.post('/api/lead/checkout', requireAdmin, async (req, res) => {
       cancel_url: `${process.env.FRONTEND_URL}/dashboard?canceled=true`
     });
     res.json({ success: true, url: session.url });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 });
 
-app.post('/api/login', (req, res) => { if (req.body.key === SETTINGS.ADMIN_KEY) { req.session.isAdmin = true; return res.json({ success: true, redirect: "/dashboard" }); } res.status(401).json({ success: false }); });
+app.post('/api/login', (req, res) => {
+  if (req.body.key === SETTINGS.ADMIN_KEY) {
+    req.session.isAdmin = true;
+    return res.json({ success: true, redirect: "/dashboard" });
+  }
+  res.status(401).json({ success: false });
+});
 
-cron.schedule(SCAN_SETTINGS.cron, async () => { logger.info('cron', "⏰ Running scheduled scan"); await scanAllCities(); });
+cron.schedule(SCAN_SETTINGS.cron, async () => {
+  logger.info('cron', "⏰ Running scheduled scan");
+  await scanAllCities();
+});
 
-app.get('/dashboard', requireAdmin, (req, res) => { res.sendFile(path.join(__dirname, 'public/dashboard/index.html')); });
+app.get('/dashboard', requireAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard/index.html'));
+});
+
 app.get('/', (req, res) => res.redirect('/login.html'));
 
 app.use(async (err, req, res, next) => {
   await logger.error(req.id, err.stack);
   res.status(500).json({ success: false, message: "Internal Server Error" });
-});
-
-/* ============================================================
-STARTUP - FIX #1: Non-blocking scan
-============================================================ */
-const server = app.listen(PORT, '0.0.0.0', () => {
-  logger.info('system', `🚀 GRIDV21 BRAIN v${VERSION} LIVE`);
-  setImmediate(() => { // FIX #1
-    logger.info('system', "Running initial scan on boot...");
-    scanAllCities();
-  });
-});
-
-process.on("SIGTERM", async () => {
-  logger.info('system', "SIGTERM received, shutting down gracefully");
-  if (redisClient) await redisClient.quit();
-  server.close(() => process.exit(0));
-});
+  
