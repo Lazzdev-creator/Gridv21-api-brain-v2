@@ -1,313 +1,32 @@
-console.log('GridV21 starting... Node:', process.version);
-
 import express from 'express';
-import session from 'express-session';
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import WebSocket from "ws"; // FIX: For Supabase on Node 20
-import { createClient } from '@supabase/supabase-js';
-import Stripe from 'stripe';
-import axios from 'axios';
-import cron from 'node-cron';
-import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
+import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
+import cron from 'node-cron';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const app = express();
-const VERSION = '6.0.6';
-
-// CRITICAL: Must be before createClient
-global.WebSocket = WebSocket; 
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'gridv21-final',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(express.static(path.join(__dirname, 'public')));
-
-const dmLimiter = rateLimit({ windowMs: 30*60*1000, max: 50, message: 'Rate limited' });
-
-const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
-const AMAZON_AFFILIATE_ID = 'grid08-20';
-const YOUTUBE_HANDLE = '@lazarustakudzwachenana1936';
-const LINKEDIN_PROFILE = 'https://za.linkedin.com/in/lazarus-chenana-5b511215b';
-const WHATSAPP_NUMBER = '+27672049913';
-const OWNER_EMAIL = 'ltchenana.thirteen@gmail.com';
-const ADMIN_KEY = 'T578ij74de34vgh9km65vcds32sa9kb5';
-
-const SUPABASE_KEY = process.env.SUPABASE_KEY?.trim();
-if (!SUPABASE_KEY) console.error('❌ SUPABASE_KEY missing in Render env');
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let stripe = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-} else {
-  console.warn('⚠️ STRIPE_SECRET_KEY missing. Checkout will fail.');
-}
-
-/* ====================== 12 OS MODULES ====================== */
-const BRAIN_OS = [
-  { id: 1, name: 'Executive Intelligence OS', layer: 'Strategy', agents_count: 3, kpis_count: 5 },
-  { id: 2, name: 'Revenue Intelligence OS', layer: 'Finance', agents_count: 4, kpis_count: 6 },
-  { id: 3, name: 'Sales & CRM OS', layer: 'Sales', agents_count: 5, kpis_count: 4 },
-  { id: 4, name: 'Marketing OS', layer: 'Growth', agents_count: 6, kpis_count: 7 },
-  { id: 5, name: 'Operations OS', layer: 'Ops', agents_count: 4, kpis_count: 5 },
-  { id: 6, name: 'Finance OS', layer: 'Finance', agents_count: 3, kpis_count: 6 },
-  { id: 7, name: 'Human Capital OS', layer: 'HR', agents_count: 4, kpis_count: 4 },
-  { id: 8, name: 'Project Management OS', layer: 'PMO', agents_count: 5, kpis_count: 5 },
-  { id: 9, name: 'Knowledge OS', layer: 'Data', agents_count: 3, kpis_count: 3 },
-  { id: 10, name: 'Legal & Compliance OS', layer: 'Legal', agents_count: 2, kpis_count: 4 },
-  { id: 11, name: 'Supply Chain OS', layer: 'Supply', agents_count: 4, kpis_count: 5 },
-  { id: 12, name: 'Acquisition Intelligence OS', layer: 'Leads', agents_count: 6, kpis_count: 8 }
-];
-let OS_STATUS = Object.fromEntries(BRAIN_OS.map(os => [os.id, 'active']));
-
-/* ====================== DB INIT ====================== */
-async function initDatabase() {
-  try {
-    console.log('🔄 Initializing Supabase...');
-    const { data: existing, error } = await supabase.from('os_modules').select('id').limit(1);
-    if (error) {
-      console.error('DB Error - os_modules table missing:', error.message);
-      return;
-    }
-    if (!existing || existing.length === 0) {
-      const seed = BRAIN_OS.map(os => ({
-        id: os.id, name: os.name, layer: os.layer,
-        agents_count: os.agents_count, kpis_count: os.kpis_count,
-        status: 'active', last_run: new Date().toISOString()
-      }));
-      const { error: insertError } = await supabase.from('os_modules').insert(seed);
-      if (insertError) console.error('Seed error:', insertError.message);
-      else console.log('✅ OS modules seeded');
-    }
-    console.log('✅ Supabase ready');
-  } catch (e) {
-    console.error('Supabase init error:', e.message);
-  }
-}
-initDatabase();
-
-/* ====================== PASSPORT ====================== */
-if (process.env.GOOGLE_CLIENT_ID) {
-  passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: '/auth/google/callback'
-  }, async (token, tokenSecret, profile, done) => {
-    try {
-      const { data, error } = await supabase.from('companies').upsert({
-        email: profile.emails[0].value,
-        name: profile.displayName,
-        avatar: profile.photos[0]?.value
-      }, { onConflict: 'email' }).select().single();
-      if (error) throw error;
-      return done(null, data);
-    } catch(e) { return done(e, null); }
-  }));
-
-  app.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-  app.get('/auth/google/callback', passport.authenticate('google', { 
-    successRedirect: '/dashboard/', 
-    failureRedirect: '/' 
-  }));
-} else {
-  app.get('/auth/google', (req, res) => {
-    res.status(503).json({ success: false, message: "Google Login is not configured." });
-  });
-}
-
-passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser(async (id, done) => {
-  try {
-    const { data } = await supabase.from('companies').select().eq('id', id).single();
-    done(null, data);
-  } catch(e) { done(e, null); }
-});
-
-/* ====================== BRAIN CLASS ====================== */
-class Brain {
-  static async getMonthlyProjection() {
-    try {
-      const since = new Date(Date.now() - 24*60*60*1000).toISOString();
-      const { data, error } = await supabase.from('revenue_log').select('amount').gte('created_at', since);
-      if (error) { console.error('DB revenue_log error:', error.message); return 0; }
-      const daily = data?.reduce((s, r) => s + parseFloat(r.amount), 0) || 0;
-      return daily * 30;
-    } catch(e) { console.error('Projection error:', e); return 0; }
-  }
-  static async logRevenue(amount, source) {
-    try {
-      if (amount >= 0) {
-        const { error } = await supabase.from('revenue_log').insert({ amount, source, created_at: new Date() });
-        if (error) console.error('Log revenue error:', error.message);
-      }
-    } catch(e) { console.error('Log revenue error:', e); }
-  }
-}
-
-/* ====================== PERMIT SCANNER ====================== */
-const CITIES = [
-  { name: 'Austin', url: 'https://data.austintexas.gov/resource/3syk-w9eu.json' },
-  { name: 'Denver', url: 'https://data.denvergov.org/resource/r5jd-p7g9.json' },
-  { name: 'Chicago', url: 'https://data.cityofchicago.org/resource/6ij4-pg3t.json' }
-];
-
-async function savePermit(city, p) {
-  try {
-    const permit_id = `${city.name.toLowerCase()}-${p.permit_number || p.id || Date.now()}`;
-    const { data: existing } = await supabase.from('permits').select('permit_id').eq('permit_id', permit_id).maybeSingle();
-    if (existing) return { inserted: false };
-    const permitData = {
-      permit_id, city: city.name,
-      permit_type: p.permit_type_description || p.permit_type || p.type || 'Unknown',
-      status: 'new', issued_date: p.issued_date || null, raw_data: p
-    };
-    const { error } = await supabase.from('permits').insert(permitData);
-    if (error) { console.error('Insert permit error:', error.message); return null; }
-    return { inserted: true, permit_id };
-  } catch (e) { console.error('Save permit error:', e.message); return null; }
-}
-
-let scanRunning = false;
-async function scanAllCities() {
-  if (scanRunning) return 0;
-  scanRunning = true;
-  let total = 0;
-  try {
-    for (const city of CITIES) {
-      try {
-        const res = await axios.get(`${city.url}?$limit=20`, { timeout: 15000 });
-        const permits = res.data || [];
-        for (const p of permits) {
-          const result = await savePermit(city, p);
-          if (result?.inserted) total++;
-        }
-      } catch (e) { console.error(`Scan error ${city.name}:`, e.message); }
-      await new Promise(r => setTimeout(r, 600));
-    }
-    console.log(`✅ Scan complete. Found ${total} new permits`);
-    return total;
-  } finally { scanRunning = false; }
-}
-
-/* ====================== ROUTES - FIXED ====================== */
-app.get("/", (req, res) => { 
-  res.redirect("/dashboard/"); 
-}); 
-
-app.get("/dashboard", (req, res) => { 
-  res.redirect("/dashboard/"); 
-}); 
-
-app.get("/dashboard/", (req, res) => { 
-  res.sendFile(path.join(__dirname, "public", "dashboard", "index.html")); 
-});
-
-app.get('/api/dashboard', async (req, res) => {
-  try {
-    const { data: permits, error: pErr } = await supabase.from('permits').select('*').order('created_at', { ascending: false }).limit(20);
-    if (pErr) console.error('DB permits error:', pErr.message);
-    
-    const { data: osModules, error: oErr } = await supabase.from('os_modules').select('*').order('id');
-    if (oErr) console.error('DB os_modules error:', oErr.message);
-    
-    const { data: revenue, error: rErr } = await supabase.from('revenue_log').select('amount').limit(100);
-    if (rErr) console.error('DB revenue_log error:', rErr.message);
-
-    const metrics = {
-      total_leads: permits?.length || 0,
-      dms_sent: revenue?.length || 0,
-      est_revenue_month: (revenue || []).reduce((sum, r) => sum + Number(r.amount || 0), 0),
-      os_active: (osModules || BRAIN_OS).filter(o => (o.status || OS_STATUS[o.id]) === 'active').length
-    };
-
-    res.json({
-      success: true,
-      metrics,
-      permits: permits || [],
-      osModules: osModules || BRAIN_OS.map(o => ({...o, status: OS_STATUS[o.id] }))
-    });
-  } catch (e) {
-    console.error('Dashboard fatal error:', e.message);
-    res.json({
-      success: false,
-      message: e.message,
-      metrics: { total_leads: 0, dms_sent: 0, est_revenue_month: 0, os_active: 12 },
-      permits: [],
-      osModules: BRAIN_OS.map(o => ({...o, status: 'active'}))
-    });
-  }
-});
-
-app.get('/api/test', (req, res) => {
-  const active = Object.values(OS_STATUS).filter(s => s === 'active').length;
-  res.json({ version: VERSION, os_active: active, status: 'online', engine: 'GRIDV21' });
-});
-
-app.post('/api/os-toggle/:id', async (req, res) => {
-  const id = Number(req.params.id);
-  const newStatus = OS_STATUS[id] === 'active'? 'inactive' : 'active';
-  OS_STATUS[id] = newStatus;
-  const { error } = await supabase.from('os_modules').update({ status: newStatus }).eq('id', id);
-  if (error) console.error('Toggle OS error:', error.message);
-  res.json({ id, status: newStatus });
-});
-
-app.post('/api/scrape-now', async (req, res) => {
-  const saved = await scanAllCities();
-  res.json({ status: 'success', permits_found: saved });
-});
-
-app.post('/api/lead/checkout', dmLimiter, async (req, res) => {
-  if (!stripe) return res.json({ error: "Add STRIPE_SECRET_KEY to Render env first" });
-  const { lead_id, trade, region, value } = req.body;
-  const price = Math.max(75, value * 0.01);
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: OWNER_EMAIL,
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: `${trade.toUpperCase()} Permit ${region}` },
-          unit_amount: price * 100
-        },
-        quantity: 1
-      }],
-      success_url: `https://gridv21-api-brain-v2-1.onrender.com/api/lead/download/${lead_id}`,
-      cancel_url: 'https://gridv21-api-brain-v2-1.onrender.com/'
-    });
-    await Brain.logRevenue(0, `checkout_${trade}`);
-    res.json({ url: session.url });
-  } catch(e) { res.json({ error: 'Stripe error: ' + e.message }); }
-});
-
-/* ====================== CRON ====================== */
-// Every 30 minutes
-cron.schedule("*/30 * * * *", async () => {
-  try {
-    console.log("⏰ Running scheduled permit scan...");
-    await scanAllCities();
-  } catch (err) {
-    console.error("Cron error:", err);
-  }
-});
-
-/* ====================== START ====================== */
 const PORT = process.env.PORT || 3000;
-/* ====================== GRIDV21 API ROUTES v6.0.6 ====================== */
+const VERSION = "6.0.6";
+
+/* ====================== MIDDLEWARE ====================== */
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public/dashboard')));
+
+/* ====================== SUPABASE ====================== */
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+/* ====================== GRIDV21 12 OS CONFIG ====================== */
+const VERSION = "6.0.6";
+const CITIES = ['Johannesburg', 'Pretoria', 'Cape Town', 'Durban', 'Daveyton']; // Add your cities
 
 const BRAIN_OS = [
   { id: 1, name: 'OS1 Prospecting', layer: 'Acquisition', agents_count: 8, kpis_count: 12 },
@@ -328,15 +47,110 @@ let OS_STATUS = {};
 BRAIN_OS.forEach(os => OS_STATUS[os.id] = 'active');
 
 
-app.get('/api/test', (req, res) => { 
-  const active = Object.values(OS_STATUS).filter(s => s === 'active').length;
-  res.json({ success: true, version: "6.0.6", os_active: active }); 
+/* ====================== CORE FUNCTION: SCRAPER ====================== */
+async function scrapeCity(city) {
+  try {
+    // EXAMPLE: Replace with your real city permit portal URL
+    const url = `https://example-permits.gov/${city}/new`; 
+    const { data: html } = await axios.get(url, { timeout: 15000 });
+    const $ = cheerio.load(html);
+    const permits = [];
+
+    $('.permit-row').each((i, el) => { // CHANGE SELECTOR TO MATCH SITE
+      const permit_id = $(el).find('.permit-id').text().trim();
+      const permit_type = $(el).find('.type').text().trim();
+      const issued_date = $(el).find('.date').text().trim();
+      
+      if (permit_id) {
+        permits.push({
+          permit_id: `${city}-${permit_id}`,
+          city,
+          permit_type,
+          status: 'new',
+          issued_date: new Date(issued_date),
+          raw_data: { source: url }
+        });
+      }
+    });
+    return permits;
+  } catch (e) {
+    console.error(`Scrape error for ${city}:`, e.message);
+    return [];
+  }
+}
+
+
+/* ====================== CORE FUNCTION: AI ENRICHMENT OS2 ====================== */
+async function enrichPermit(permit) {
+  // OS2: Call OpenAI/Claude to find contractor email, phone, project value
+  // For now we mock it. Replace with real AI call
+  return {
+   ...permit,
+    contractor_name: "Mock Contractor",
+    contractor_email: "contact@mock.com",
+    est_project_value: Math.floor(Math.random() * 500000) + 50000
+  };
+}
+
+
+/* ====================== CORE FUNCTION: DM OUTREACH OS3 ====================== */
+async function sendDM(permit) {
+  // OS3: Send email/IG DM/LinkedIn DM
+  // For now we log it and save to revenue_log as "DM Sent"
+  console.log(`DM SENT to ${permit.contractor_email} for ${permit.permit_id}`);
+  await supabase.from('revenue_log').insert({
+    amount: 0, // $0 until they reply
+    source: `DM: ${permit.permit_id}`
+  });
+  return true;
+}
+
+
+/* ====================== CORE FUNCTION: MASTER SCAN ====================== */
+async function scanAllCities() {
+  if (OS_STATUS[1]!== 'active') return 0; // OS1 must be active
+  console.log("🧠 GRIDV21 SCAN STARTED");
+  let totalSaved = 0;
+
+  for (const city of CITIES) {
+    const permits = await scrapeCity(city);
+    for (const p of permits) {
+      // OS2 Enrichment
+      const enriched = OS_STATUS[2] === 'active'? await enrichPermit(p) : p;
+      // Save to DB
+      const { error } = await supabase.from('permits').upsert(enriched, { onConflict: 'permit_id' });
+      if (!error) {
+        totalSaved++;
+        // OS3 Outreach
+        if (OS_STATUS[3] === 'active') await sendDM(enriched);
+      }
+    }
+  }
+  console.log(`✅ SCAN COMPLETE: ${totalSaved} new permits`);
+  return totalSaved;
+}
+
+/* ====================== CRON ====================== */
+// Every 30 minutes
+cron.schedule("*/30 * * * *", async () => {
+  try {
+    console.log("⏰ Running scheduled permit scan...");
+    await scanAllCities();
+  } catch (err) {
+    console.error("Cron error:", err);
+  }
 });
 
 
+/* ====================== GRIDV21 API ROUTES ====================== */
+app.get('/api/test', (req, res) => { 
+  const active = Object.values(OS_STATUS).filter(s => s === 'active').length;
+  res.json({ success: true, version: VERSION, os_active: active }); 
+});
+
 app.get('/api/dashboard', async (req, res) => {
   try {
-    const { data: permits } = await supabase.from('permits').select('*').order('created_at', { ascending: false }).limit(50);
+    const { data: permits } = await supabase.from('permits').select('*').order('created_at', { ascending: false }).limit(100);
     const { data: osModules } = await supabase.from('os_modules').select('*').order('id');
     const { data: revenue } = await supabase.from('revenue_log').select('amount').limit(1000);
 
@@ -355,44 +169,44 @@ app.get('/api/dashboard', async (req, res) => {
     });
   } catch (e) {
     console.error('Dashboard fatal error', e);
-    res.json({
-      success: false,
-      message: e.message,
-      metrics: { total_leads: 0, dms_sent: 0, est_revenue_month: 0, os_active: 0 },
-      permits: [],
-      osModules: BRAIN_OS.map(o => ({...o, status: OS_STATUS[o.id] || 'inactive'}))
-    });
+    res.status(500).json({ success: false, message: e.message });
   }
 });
-
 
 app.post('/api/os-toggle/:id', async (req, res) => {
   try {
     const id = Number(req.params.id);
     const newStatus = OS_STATUS[id] === 'active'? 'inactive' : 'active';
     OS_STATUS[id] = newStatus;
-    
-    const { error } = await supabase.from('os_modules').update({ status: newStatus }).eq('id', id);
-    if (error) console.error('Toggle OS error', error);
-    
-    res.json({ success: true, id, status: newStatus }); // FIXED FORMAT
+    await supabase.from('os_modules').update({ status: newStatus }).eq('id', id);
+    res.json({ success: true, id, status: newStatus });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }
 });
 
-
 app.post('/api/scrape-now', async (req, res) => { 
   try { 
     console.log("Manual scan started"); 
-    const saved = await scanAllCities(); // this must exist in your code
+    const saved = await scanAllCities(); 
     const { count } = await supabase.from("permits").select("*", { count: "exact", head: true }); 
-    res.json({ success: true, permits_found: saved || 0, total_permits: count || 0 }); // FIXED FORMAT
+    res.json({ success: true, permits_found: saved || 0, total_permits: count || 0 });
   } catch (err) { 
     console.error(err); 
     res.status(500).json({ success: false, message: err.message }); 
   } 
 });
+
+
+/* ====================== FRONTEND ROUTE ====================== */
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public/dashboard/index.html'));
+});
+app.get('/', (req, res) => res.redirect('/dashboard'));
+
+
+/* ====================== START SERVER ====================== */
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 GRIDV21 v${VERSION} LIVE on port ${PORT}`);
+  console.log(`🚀 GRIDV21 BRAIN v${VERSION} LIVE on port ${PORT}`);
+  console.log(`12 OS Loaded. Auto-scan every 30min.`);
 });
