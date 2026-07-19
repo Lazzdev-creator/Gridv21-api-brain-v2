@@ -91,6 +91,8 @@ app.use("/api", apiLimiter);
 /* ============================================================
 SESSION STORE
 ============================================================ */
+app.set('trust proxy', 1); // CRITICAL: Must be before session
+
 let sessionStore;
 let redisClient = null;
 if (process.env.REDIS_URL) {
@@ -102,7 +104,7 @@ if (process.env.REDIS_URL) {
   sessionStore = new RedisStore({ client: redisClient });
   logger.info('system', "Redis Session Store Enabled");
 } else {
-  logger.warn('system', "Redis not configured. Using MemoryStore - sessions will not persist");
+  logger.warn('system', "Redis not configured. Using MemoryStore");
 }
 
 app.use(session({
@@ -110,7 +112,12 @@ app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === "production", httpOnly: true, sameSite: "lax", maxAge: 86400000 }
+  cookie: { 
+    secure: true, // Render is HTTPS so always true
+    httpOnly: true, 
+    sameSite: 'none', // FIX: 'none' required with secure:true on Render
+    maxAge: 86400000 // 24 hours
+  }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
