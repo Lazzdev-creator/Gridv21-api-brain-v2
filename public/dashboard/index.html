@@ -1,58 +1,152 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GRIDV21 Brain v6.0.6</title>
-  <link rel="stylesheet" href="./styles.css"> <!-- FIXED PATH -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GRIDV21 Brain Dashboard</title>
+
+<link rel="stylesheet" href="/dashboard/styles.css">
+
 </head>
+
 <body>
-  <div class="container">
-    <header>
-      <h1>GRIDV21 BRAIN</h1>
-      <p class="version">v6.0.6 | 12 OS Operating System</p>
-    </header>
 
-    <div class="metrics-grid">
-      <div class="metric-card">
-        <h3>Total Leads</h3>
-        <p id="total-leads">0</p>
-      </div>
-      <div class="metric-card">
-        <h3>OS Active</h3>
-        <p id="os-active">0/12</p>
-      </div>
-      <div class="metric-card">
-        <h3>Est Revenue/Month</h3>
-        <p id="est-revenue">$0</p>
-      </div>
-      <div class="metric-card">
-        <h3>DMs Sent</h3>
-        <p id="dms-sent">0</p>
-      </div>
-    </div>
+<header>
 
-    <div class="controls">
-      <button id="run-scan-btn" class="btn-primary">🔄 Run Scan</button>
-      <button id="refresh-btn" class="btn-secondary">↻ Refresh</button>
-    </div>
+<h1>GRIDV21 BRAIN v6.1.10</h1>
 
-    <div class="section">
-      <h2>12 OS Modules</h2>
-      <div id="os-grid" class="os-grid"></div>
-    </div>
+<div>
 
-    <div class="section">
-      <h2>Latest Permits</h2>
-      <div id="permits-table"></div>
-    </div>
+<span id="health" class="status">Checking...</span>
 
-    <div id="toast"></div>
-  </div>
+<button id="scanBtn">
+Run Scan
+</button>
 
-  <script src="./app.js"></script> <!-- FIXED PATH -->
+</div>
+
+</header>
+
+<div class="container">
+
+<div class="grid">
+
+<div class="card">
+<h2>Total Leads</h2>
+<div id="totalLeads" class="metric">0</div>
+</div>
+
+<div class="card">
+<h2>Monthly Revenue</h2>
+<div id="revenue" class="metric">$0</div>
+</div>
+
+<div class="card">
+<h2>Brain OS Active</h2>
+<div id="osActive" class="metric">0</div>
+</div>
+
+<div class="card">
+<h2>AI Confidence</h2>
+<div id="confidence" class="metric">0%</div>
+</div>
+
+</div>
+
+<div class="section">
+
+<h2>Latest Permits</h2>
+
+<table>
+
+<thead>
+
+<tr>
+<th>City</th>
+<th>Permit</th>
+<th>Status</th>
+<th>AI Score</th>
+</tr>
+
+</thead>
+
+<tbody id="permitsTable">
+
+<tr>
+
+<td colspan="4" class="loading">
+
+Loading...
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+<div class="section">
+
+<h2>Operating Systems</h2>
+
+<div id="osGrid" class="os-grid">
+
+<div class="loading">
+
+Loading...
+
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h2>Recent Scan Logs</h2>
+
+<table>
+
+<thead>
+
+<tr>
+
+<th>Started</th>
+
+<th>Status</th>
+
+<th>Permits</th>
+
+<th>Errors</th>
+
+</tr>
+
+</thead>
+
+<tbody id="scanTable">
+
+<tr>
+
+<td colspan="4" class="loading">
+
+Loading...
+
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script src="/dashboard/app.js"></script>
+
 </body>
-</html>
+  </html>
