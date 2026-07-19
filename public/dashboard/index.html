@@ -1,45 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
-<head><style>
-body { font-family: system-ui; background:#0b0c10; color:#fff; margin:0; padding:20px; }
-header { display:flex; justify-content:space-between; margin-bottom:20px; }
-.kpi-card, .card { background:#1f2833; padding:12px; border-radius:12px; border:1px solid #45a29e; margin-bottom:12px; }
-button { background:#45a29e; border:none; padding:10px 16px; border-radius:8px; color:#fff; }
-.metrics { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
-      </style>
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GRIDV21 Enterprise Brain v6.0.2</title>
-  <link rel="stylesheet" href="/styles.css">
+  <title>GRIDV21 Brain v6.0.6</title>
+  <link rel="stylesheet" href="./styles.css"> <!-- FIXED PATH -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
 </head>
 <body>
-  <header>
-    <h1>GRIDV21 Brain v6.0.2</h1>
-    <div class="btn-group">
-      <button onclick="forceScan()">🔄 Run Scan</button>
-      <button onclick="checkEngine()">🧠 AI Health</button>
-    </div>
-  </header>
-
   <div class="container">
-    <section class="metrics">
-      <div class="kpi-card"><b>Total Leads</b><div id="total_leads">0</div></div>
-      <div class="kpi-card"><b>Revenue MTD</b><div id="est_revenue">$0</div></div>
-      <div class="kpi-card"><b>OS Active</b><div id="os_active">0/12</div></div>
-      <div class="kpi-card"><b>DMS Sent</b><div id="dms_sent">0</div></div>
-    </section>
+    <header>
+      <h1>GRIDV21 BRAIN</h1>
+      <p class="version">v6.0.6 | 12 OS Operating System</p>
+    </header>
 
-    <h2 class="section-title">Permit Intelligence Feed</h2>
-    <div id="data" class="grid"></div>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <h3>Total Leads</h3>
+        <p id="total-leads">0</p>
+      </div>
+      <div class="metric-card">
+        <h3>OS Active</h3>
+        <p id="os-active">0/12</p>
+      </div>
+      <div class="metric-card">
+        <h3>Est Revenue/Month</h3>
+        <p id="est-revenue">$0</p>
+      </div>
+      <div class="metric-card">
+        <h3>DMs Sent</h3>
+        <p id="dms-sent">0</p>
+      </div>
+    </div>
 
-    <h2 class="section-title">12 Operating Systems Control Center</h2>
-    <div id="os_grid" class="grid"></div>
+    <div class="controls">
+      <button id="run-scan-btn" class="btn-primary">🔄 Run Scan</button>
+      <button id="refresh-btn" class="btn-secondary">↻ Refresh</button>
+    </div>
 
-    <!-- FIX 6: Activity Log -->
-    <h2 class="section-title">Activity Log</h2>
-    <div id="activity" class="grid"></div>
+    <div class="section">
+      <h2>12 OS Modules</h2>
+      <div id="os-grid" class="os-grid"></div>
+    </div>
+
+    <div class="section">
+      <h2>Latest Permits</h2>
+      <div id="permits-table"></div>
+    </div>
+
+    <div id="toast"></div>
   </div>
 
-  <script src="/app.js"></script>
+  <script src="./app.js"></script> <!-- FIXED PATH -->
 </body>
 </html>
