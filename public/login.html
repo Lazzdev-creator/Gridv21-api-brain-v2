@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GRIDV21 Brain Login</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,Helvetica,sans-serif;
+}
+
+body{
+background:#0b1020;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+color:white;
+}
+
+.card{
+width:360px;
+background:#151d35;
+padding:35px;
+border-radius:16px;
+box-shadow:0 0 30px rgba(0,0,0,.35);
+}
+
+h1{
+text-align:center;
+margin-bottom:10px;
+font-size:30px;
+}
+
+p{
+text-align:center;
+color:#b8c2d8;
+margin-bottom:25px;
+}
+
+input{
+width:100%;
+padding:14px;
+border:none;
+border-radius:10px;
+margin-bottom:20px;
+background:#222d4b;
+color:white;
+font-size:16px;
+}
+
+button{
+width:100%;
+padding:14px;
+border:none;
+border-radius:10px;
+background:#00b4ff;
+color:white;
+font-size:16px;
+font-weight:bold;
+cursor:pointer;
+}
+
+button:hover{
+background:#0095d6;
+}
+
+#error{
+margin-top:18px;
+text-align:center;
+color:#ff6b6b;
+font-size:15px;
+}
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>GRIDV21</h1>
+
+<p>Brain Enterprise v6.1.10</p>
+
+<input
+id="key"
+type="password"
+placeholder="Enter Admin Key">
+
+<button onclick="login()">
+Login
+</button>
+
+<div id="error"></div>
+
+</div>
+
+<script>
+
+async function login(){
+
+const key=document.getElementById("key").value;
+
+const res=await fetch("/api/login",{
+
+method:"POST",
+
+headers:{
+"Content-Type":"application/json"
+},
+
+credentials:"include",
+
+body:JSON.stringify({
+key:key
+})
+
+});
+
+const data=await res.json();
+
+if(data.success){
+
+window.location="/dashboard";
+
+}else{
+
+document.getElementById("error").innerText="Invalid Admin Key";
+
+}
+
+}
+
+document.getElementById("key").addEventListener("keypress",e=>{
+
+if(e.key==="Enter") login();
+
+});
+
+</script>
+
+</body>
+</html>
