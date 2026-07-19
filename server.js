@@ -307,6 +307,92 @@ cron.schedule("*/30 * * * *", async () => {
 
 /* ====================== START ====================== */
 const PORT = process.env.PORT || 3000;
+/* ====================== GRIDV21 API ROUTES v6.0.6 ====================== */
+
+const BRAIN_OS = [
+  { id: 1, name: 'OS1 Prospecting', layer: 'Acquisition', agents_count: 8, kpis_count: 12 },
+  { id: 2, name: 'OS2 Enrichment', layer: 'Data', agents_count: 6, kpis_count: 9 },
+  { id: 3, name: 'OS3 Outreach', layer: 'Engagement', agents_count: 12, kpis_count: 15 },
+  { id: 4, name: 'OS4 Qualification', layer: 'Sales', agents_count: 5, kpis_count: 8 },
+  { id: 5, name: 'OS5 Closing', layer: 'Revenue', agents_count: 4, kpis_count: 6 },
+  { id: 6, name: 'OS6 Delivery', layer: 'Ops', agents_count: 7, kpis_count: 10 },
+  { id: 7, name: 'OS7 Retention', layer: 'CS', agents_count: 5, kpis_count: 7 },
+  { id: 8, name: 'OS8 Finance', layer: 'Money', agents_count: 3, kpis_count: 5 },
+  { id: 9, name: 'OS9 Analytics', layer: 'BI', agents_count: 6, kpis_count: 11 },
+  { id: 10, name: 'OS10 Compliance', layer: 'Legal', agents_count: 2, kpis_count: 4 },
+  { id: 11, name: 'OS11 HR', layer: 'Team', agents_count: 3, kpis_count: 5 },
+  { id: 12, name: 'OS12 CEO Brain', layer: 'Strategy', agents_count: 1, kpis_count: 20 }
+];
+
+let OS_STATUS = {};
+BRAIN_OS.forEach(os => OS_STATUS[os.id] = 'active');
+
+
+app.get('/api/test', (req, res) => { 
+  const active = Object.values(OS_STATUS).filter(s => s === 'active').length;
+  res.json({ success: true, version: "6.0.6", os_active: active }); 
+});
+
+
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const { data: permits } = await supabase.from('permits').select('*').order('created_at', { ascending: false }).limit(50);
+    const { data: osModules } = await supabase.from('os_modules').select('*').order('id');
+    const { data: revenue } = await supabase.from('revenue_log').select('amount').limit(1000);
+
+    const metrics = {
+      total_leads: permits?.length || 0,
+      dms_sent: revenue?.length || 0,
+      est_revenue_month: (revenue || []).reduce((sum, r) => sum + Number(r.amount || 0), 0),
+      os_active: (osModules || BRAIN_OS).filter(o => o.status === 'active').length
+    };
+
+    res.json({ 
+      success: true, 
+      metrics, 
+      permits: permits || [], 
+      osModules: osModules || BRAIN_OS.map(o => ({...o, status: OS_STATUS[o.id]}))
+    });
+  } catch (e) {
+    console.error('Dashboard fatal error', e);
+    res.json({
+      success: false,
+      message: e.message,
+      metrics: { total_leads: 0, dms_sent: 0, est_revenue_month: 0, os_active: 0 },
+      permits: [],
+      osModules: BRAIN_OS.map(o => ({...o, status: OS_STATUS[o.id] || 'inactive'}))
+    });
+  }
+});
+
+
+app.post('/api/os-toggle/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const newStatus = OS_STATUS[id] === 'active'? 'inactive' : 'active';
+    OS_STATUS[id] = newStatus;
+    
+    const { error } = await supabase.from('os_modules').update({ status: newStatus }).eq('id', id);
+    if (error) console.error('Toggle OS error', error);
+    
+    res.json({ success: true, id, status: newStatus }); // FIXED FORMAT
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+app.post('/api/scrape-now', async (req, res) => { 
+  try { 
+    console.log("Manual scan started"); 
+    const saved = await scanAllCities(); // this must exist in your code
+    const { count } = await supabase.from("permits").select("*", { count: "exact", head: true }); 
+    res.json({ success: true, permits_found: saved || 0, total_permits: count || 0 }); // FIXED FORMAT
+  } catch (err) { 
+    console.error(err); 
+    res.status(500).json({ success: false, message: err.message }); 
+  } 
+});
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 GRIDV21 v${VERSION} LIVE on port ${PORT}`);
 });
