@@ -224,7 +224,7 @@ export const SCAN_SETTINGS = {
     750,
 
   requestTimeout:
-    15000,
+    30000,
 
   scanTimeout:
     600000,
