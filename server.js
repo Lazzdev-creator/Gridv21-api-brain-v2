@@ -1345,91 +1345,6 @@ async function supabaseBatchInsert(
 
 }
 
-/* ==========================================================================
-   DEDUPLICATED PERMIT INSERT
-========================================================================== */
-
-async function insertNewPermits(
-  rows
-) {
-
-  if (
-    !rows.length
-  ) {
-
-    return {
-
-      inserted:
-        0,
-
-      skipped:
-        0
-
-    };
-
-  }
-
-  const ids =
-    [
-      ...new Set(
-
-        rows
-
-          .map(
-            row =>
-              row.permit_id
-          )
-
-          .filter(Boolean)
-
-      )
-    ];
-
-  const existing =
-    new Set();
-
-  for (
-    let i = 0;
-    i < ids.length;
-    i += 500
-  ) {
-
-    const chunk =
-      ids.slice(
-        i,
-        i + 500
-      );
-
-    const {
-      data,
-      error
-    } =
-      await supabase
-        .from("permits")
-        .select(
-          "permit_id"
-        )
-        .in(
-          "permit_id",
-          chunk
-        );
-
-    if (
-      error
-    ) {
-
-      throw error;
-
-    }
-
-    for (
-      const row of
-        data || []
-    ) {
-
-      existing.add(
-        row.permit_id
-      );
 
     }
 
@@ -1454,3 +1369,396 @@ async function insertNewPermits(
 
       seen.has(
         row.permit_i
+      
+         /* ==========================================================================
+   DEDUPLICATED PERMIT INSERT  (FIXED)
+========================================================================== */
+
+async function insertNewPermits(rows) {
+
+  if (!rows.length) {
+    return {
+      inserted: 0,
+      skipped: 0
+    };
+  }
+
+  // Collect unique permit_ids from the new batch
+  const ids = [
+    ...new Set(
+      rows
+        .map(row => row.permit_id)
+        .filter(Boolean)
+    )
+  ];
+
+  // Fetch already-existing permit_ids from Supabase (in chunks of 500)
+  const existing = new Set();
+
+  for (let i = 0; i < ids.length; i += 500) {
+    const chunk = ids.slice(i, i + 500);
+
+    const { data, error } = await supabase
+      .from("permits")
+      .select("permit_id")
+      .in("permit_id", chunk);
+
+    if (error) {
+      throw error;
+    }
+
+    for (const row of data || []) {
+      existing.add(row.permit_id);
+    }
+  }
+
+  // Filter out duplicates
+  const unique = [];
+  const seen = new Set(existing);
+
+  for (const row of rows) {
+    if (!row.permit_id || seen.has(row.permit_id)) {
+      continue;
+    }
+
+    seen.add(row.permit_id);
+    unique.push(row);
+  }
+
+  if (!unique.length) {
+    return {
+      inserted: 0,
+      skipped: rows.length
+    };
+  }
+
+  // Insert only the new ones
+  const { inserted, errors } = await supabaseBatchInsert("permits", unique);
+
+  return {
+    inserted,
+    skipped: rows.length - inserted,
+    errors
+  };
+}
+
+/* ==========================================================================
+   PARSE CITY DATA
+========================================================================== */
+
+function parseCityData(city, rawText) {
+
+  if (city.type === "csv") {
+
+    const parsed = Papa.parse(rawText, {
+      header: true,
+      skipEmptyLines: true,
+      dynamicTyping: false
+    });
+
+    return safeArray(parsed.data);
+
+  }
+
+  // JSON
+  try {
+    const data = JSON.parse(rawText);
+    return safeArray(data);
+  } catch {
+    return [];
+  }
+
+}
+
+/* ==========================================================================
+   SCAN SINGLE CITY
+========================================================================== */
+
+async function scanCity(city, reqId, signal) {
+
+  logger.info(reqId, `Scanning ${city.name}...`);
+
+  const rawText = await axiosWithAbort(
+    city.url,
+    reqId,
+    signal
+  );
+
+  const records = parseCityData(city, rawText);
+
+  logger.info(
+    reqId,
+    `${city.name}: received ${records.length} raw records`
+  );
+
+  const mapped = [];
+
+  for (const raw of records) {
+    if (signal?.aborted) {
+      throw new Error("Scan aborted");
+    }
+
+    try {
+      const permit = mapPermitData(city.name, raw);
+      if (permit.permit_id) {
+        mapped.push(permit);
+      }
+    } catch (err) {
+      logger.warn(reqId, `Map error ${city.name}: ${err.message}`);
+    }
+  }
+
+  const result = await insertNewPermits(mapped);
+
+  logger.info(
+    reqId,
+    `${city.name}: inserted ${result.inserted}, skipped ${result.skipped}`
+  );
+
+  return result;
+}
+
+/* ==========================================================================
+   FULL SCAN ENGINE
+========================================================================== */
+
+let currentAbortController = null;
+
+async function runFullScan(reqId = "SYSTEM") {
+
+  if (ENGINE.scanning) {
+    logger.warn(reqId, "Scan already running – skipped");
+    return { status: "already_running" };
+  }
+
+  if (ENGINE.emergencyStopped) {
+    logger.warn(reqId, "Engine is emergency-stopped");
+    return { status: "emergency_stopped" };
+  }
+
+  if (!ENGINE.running) {
+    logger.warn(reqId, "Engine is paused");
+    return { status: "paused" };
+  }
+
+  ENGINE.scanning = true;
+  ENGINE.lastError = null;
+  const start = Date.now();
+
+  currentAbortController = new AbortController();
+  const signal = currentAbortController.signal;
+
+  let totalInserted = 0;
+  let totalSkipped = 0;
+  let totalErrors = 0;
+
+  try {
+
+    logger.info(reqId, "=== FULL SCAN STARTED ===");
+
+    for (const city of CITIES) {
+
+      if (signal.aborted || ENGINE.emergencyStopped) {
+        break;
+      }
+
+      try {
+        const result = await scanCity(city, reqId, signal);
+        totalInserted += result.inserted || 0;
+        totalSkipped += result.skipped || 0;
+      } catch (err) {
+        totalErrors++;
+        ENGINE.errors++;
+        ENGINE.lastError = err.message;
+        await logger.error(reqId, `City ${city.name} failed: ${err.message}`);
+      }
+
+      // polite delay between cities
+      await sleep(SCAN_SETTINGS.requestDelay);
+    }
+
+    ENGINE.lastScan = new Date().toISOString();
+    ENGINE.lastScanDuration = Date.now() - start;
+    ENGINE.permitsFound += totalInserted;
+
+    logger.info(
+      reqId,
+      `=== SCAN COMPLETE === inserted=${totalInserted} skipped=${totalSkipped} errors=${totalErrors} duration=${ENGINE.lastScanDuration}ms`
+    );
+
+    return {
+      status: "completed",
+      inserted: totalInserted,
+      skipped: totalSkipped,
+      errors: totalErrors,
+      duration: ENGINE.lastScanDuration
+    };
+
+  } catch (err) {
+
+    ENGINE.lastError = err.message;
+    ENGINE.errors++;
+    await logger.error(reqId, `Full scan crashed: ${err.message}`);
+
+    return {
+      status: "error",
+      message: err.message
+    };
+
+  } finally {
+
+    ENGINE.scanning = false;
+    currentAbortController = null;
+
+  }
+
+}
+
+/* ==========================================================================
+   AUTH HELPERS
+========================================================================== */
+
+function requireAdmin(req, res, next) {
+
+  const key =
+    req.headers["x-admin-key"] ||
+    req.query.admin_key ||
+    req.body?.admin_key;
+
+  if (key !== process.env.ADMIN_KEY) {
+    return res.status(401).json({
+      error: "Unauthorized – invalid admin key"
+    });
+  }
+
+  next();
+
+}
+
+function requireAuth(req, res, next) {
+
+  if (req.isAuthenticated && req.isAuthenticated()) {
+    return next();
+  }
+
+  // also allow admin key as fallback
+  const key =
+    req.headers["x-admin-key"] ||
+    req.query.admin_key;
+
+  if (key === process.env.ADMIN_KEY) {
+    return next();
+  }
+
+  return res.status(401).json({
+    error: "Unauthorized"
+  });
+
+}
+
+/* ==========================================================================
+   ROUTES – HEALTH & STATUS
+========================================================================== */
+
+app.get("/health", (req, res) => {
+  res.json({
+    status: "ok",
+    version: VERSION,
+    uptime: Date.now() - ENGINE.uptime,
+    engine: {
+      running: ENGINE.running,
+      scanning: ENGINE.scanning,
+      emergencyStopped: ENGINE.emergencyStopped,
+      lastScan: ENGINE.lastScan,
+      permitsFound: ENGINE.permitsFound,
+      errors: ENGINE.errors
+    }
+  });
+});
+
+app.get("/api/status", requireAuth, (req, res) => {
+  res.json({
+    version: VERSION,
+    engine: ENGINE,
+    scanSettings: SCAN_SETTINGS,
+    cities: CITIES.map(c => c.name),
+    redis: !!redisClient,
+    stripe: !!stripe
+  });
+});
+
+/* ==========================================================================
+   ROUTES – AUTH (Google OAuth)
+========================================================================== */
+
+app.get(
+  "/auth/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"]
+  })
+);
+
+app.get(
+  "/auth/google/callback",
+  passport.authenticate("google", {
+    failureRedirect: `${process.env.FRONTEND_URL}/login?error=auth_failed`
+  }),
+  (req, res) => {
+    res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+  }
+);
+
+app.get("/auth/logout", (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+    req.session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ status: "logged_out" });
+    });
+  });
+});
+
+app.get("/auth/me", (req, res) => {
+  if (req.user) {
+    return res.json({ user: req.user });
+  }
+  res.status(401).json({ user: null });
+});
+
+/* ==========================================================================
+   ROUTES – SCAN CONTROLS
+========================================================================== */
+
+app.post("/api/scan/start", requireAdmin, async (req, res) => {
+  const result = await runFullScan(req.id);
+  res.json(result);
+});
+
+app.post("/api/scan/stop", requireAdmin, (req, res) => {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  ENGINE.scanning = false;
+  res.json({ status: "stop_requested" });
+});
+
+app.post("/api/engine/pause", requireAdmin, (req, res) => {
+  ENGINE.running = false;
+  res.json({ status: "paused", engine: ENGINE });
+});
+
+app.post("/api/engine/resume", requireAdmin, (req, res) => {
+  ENGINE.running = true;
+  ENGINE.emergencyStopped = false;
+  res.json({ status: "resumed", engine: ENGINE });
+});
+
+app.post("/api/engine/emergency-stop", requireAdmin, (req, res) => {
+  ENGINE.emergencyStopped = true;
+  ENGINE.running = false;
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  ENGINE.scanning = false;
+  res.json({ status: "emergency_stopped", engine: ENGINE });
+});
