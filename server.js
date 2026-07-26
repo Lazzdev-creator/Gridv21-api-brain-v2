@@ -1762,3 +1762,179 @@ app.post("/api/engine/emergency-stop", requireAdmin, (req, res) => {
   ENGINE.scanning = false;
   res.json({ status: "emergency_stopped", engine: ENGINE });
 });
+/* ==========================================================================
+   ROUTES – DASHBOARD DATA
+========================================================================== */
+
+app.get("/api/permits", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 500);
+    const offset = Number(req.query.offset) || 0;
+    const city = req.query.city || null;
+    const minScore = Number(req.query.min_score) || 0;
+
+    let query = supabase
+      .from("permits")
+      .select("*", { count: "exact" })
+      .order("issued_date", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (city) {
+      query = query.eq("city", city);
+    }
+
+    if (minScore > 0) {
+      query = query.gte("ai_score", minScore);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    res.json({
+      data: data || [],
+      total: count || 0,
+      limit,
+      offset
+    });
+  } catch (err) {
+    await logger.error(req.id, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/stats", requireAuth, async (req, res) => {
+  try {
+    const { count: totalPermits } = await supabase
+      .from("permits")
+      .select("*", { count: "exact", head: true });
+
+    const { data: topCities } = await supabase
+      .from("permits")
+      .select("city")
+      .limit(1000);
+
+    const cityCounts = {};
+    for (const row of topCities || []) {
+      cityCounts[row.city] = (cityCounts[row.city] || 0) + 1;
+    }
+
+    res.json({
+      totalPermits: totalPermits || 0,
+      engine: ENGINE,
+      cityBreakdown: cityCounts,
+      version: VERSION
+    });
+  } catch (err) {
+    await logger.error(req.id, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ==========================================================================
+   ROUTES – CSV EXPORT
+========================================================================== */
+
+app.get("/api/export/csv", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("permits")
+      .select("*")
+      .order("issued_date", { ascending: false })
+      .limit(5000);
+
+    if (error) throw error;
+
+    const csv = Papa.unparse(data || []);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="gridv21-permits-${new Date().toISOString().slice(0, 10)}.csv"`
+    );
+    res.send(csv);
+  } catch (err) {
+    await logger.error(req.id, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/* ==========================================================================
+   ROUTES – OS / ADMIN CONTROLS
+========================================================================== */
+
+app.get("/api/os/info", requireAdmin, (req, res) => {
+  res.json({
+    version: VERSION,
+    node: process.version,
+    platform: process.platform,
+    memory: process.memoryUsage(),
+    uptime: process.uptime(),
+    engine: ENGINE,
+    env: {
+      production: IS_PRODUCTION,
+      redis: !!redisClient,
+      stripe: !!stripe
+    }
+  });
+});
+
+app.post("/api/os/restart-engine", requireAdmin, (req, res) => {
+  ENGINE.running = true;
+  ENGINE.emergencyStopped = false;
+  ENGINE.scanning = false;
+  ENGINE.lastError = null;
+  res.json({ status: "engine_restarted", engine: ENGINE });
+});
+
+/* ==========================================================================
+   CRON – AUTO SCAN
+========================================================================== */
+
+if (SCAN_SETTINGS.cron) {
+  cron.schedule(SCAN_SETTINGS.cron, async () => {
+    if (ENGINE.running && !ENGINE.scanning && !ENGINE.emergencyStopped) {
+      console.log("[CRON] Triggering scheduled scan...");
+      await runFullScan("CRON");
+    }
+  });
+  console.log(`[CRON] Scheduled: ${SCAN_SETTINGS.cron}`);
+}
+
+/* ==========================================================================
+   ERROR HANDLING
+========================================================================== */
+
+app.use((err, req, res, next) => {
+  console.error(`[UNHANDLED ${req.id}]`, err);
+  res.status(500).json({
+    error: "Internal Server Error",
+    requestId: req.id
+  });
+});
+
+app.use((req, res) => {
+  res.status(404).json({
+    error: "Not Found",
+    path: req.path
+  });
+});
+
+/* ==========================================================================
+   START SERVER
+========================================================================== */
+
+app.listen(PORT, () => {
+  console.log(`
+=======================================================
+  GRIDV21 BRAIN ENTERPRISE v${VERSION}
+  Owner: Lazarus Takudzwa Chenana
+  Port: ${PORT}
+  Environment: ${IS_PRODUCTION ? "PRODUCTION" : "DEVELOPMENT"}
+  Redis: ${redisClient ? "ENABLED" : "DISABLED"}
+  Stripe: ${stripe ? "ENABLED" : "DISABLED"}
+=======================================================
+  `);
+});
+
+export default app;
