@@ -908,183 +908,83 @@ function addressFromRaw(
 /* ==========================================================================
    PERMIT MAPPING
 ========================================================================== */
+function mapPermitData(cityName, raw) {
 
-function mapPermitData(
-  cityName,
-  raw
-) {
+  const permitId = normalizeText(
+    pick(raw, [
+      "permit_id", "permit_num", "permit_number", "permitnum",
+      "id", "permit", "record_id", "permitnumber", "PERMIT_NUMBER"
+    ])
+  );
 
-  const permitId =
-    normalizeText(
+  const permitType = normalizeText(
+    pick(raw, [
+      "permit_type_definition", "permit_type_desc", "permit_type",
+      "permit_type_name", "type", "work_type", "permittype",
+      "PERMIT_TYPE", "worktype", "description", "permit_class"
+    ])
+  );
 
-      pick(
-        raw,
-        [
-          "permit_id",
-          "permit_num",
-          "permit_number",
-          "permitnum",
-          "id",
-          "permit",
-          "record_id"
-        ]
-      )
+  const status = normalizeText(
+    pick(raw, [
+      "status_current", "status", "permit_status",
+      "current_status", "STATUS", "permitstatus"
+    ])
+  );
 
-    );
+  const issuedDate = dateValue(
+    pick(raw, [
+      "issued_date", "issue_date", "Issue Date", "issued",
+      "application_date", "ISSUED_DATE", "issue_dt", "date_issued"
+    ])
+  );
 
-  const permitType =
-    normalizeText(
+  const valuation = numberValue(
+    pick(raw, [
+      "estimated_value", "estimated_cost", "total_job_valuation",
+      "reported_cost", "valuation", "job_value", "declared_valuation",
+      "ESTIMATED_COST", "job_cost", "value", "total_valuation"
+    ])
+  );
 
-      pick(
-        raw,
-        [
-          "permit_type_definition",
-          "permit_type_desc",
-          "permit_type",
-          "permit_type_name",
-          "type",
-          "work_type"
-        ]
-      )
+  const address = addressFromRaw(cityName, raw) || normalizeText(
+    pick(raw, ["address", "site_address", "property_address", "street_address", "location"])
+  );
 
-    );
+  // Better fallback ID
+  const stableSource = JSON.stringify({
+    cityName, permitId, permitType, status, issuedDate, valuation, address
+  });
 
-  const status =
-    normalizeText(
-
-      pick(
-        raw,
-        [
-          "status_current",
-          "status",
-          "permit_status",
-          "current_status"
-        ]
-      )
-
-    );
-
-  const issuedDate =
-    dateValue(
-
-      pick(
-        raw,
-        [
-          "issued_date",
-          "issue_date",
-          "Issue Date",
-          "issued",
-          "application_date"
-        ]
-      )
-
-    );
-
-  const valuation =
-    numberValue(
-
-      pick(
-        raw,
-        [
-          "estimated_value",
-          "estimated_cost",
-          "total_job_valuation",
-          "reported_cost",
-          "valuation",
-          "job_value",
-          "declared_valuation"
-        ]
-      )
-
-    );
-
-  const address =
-    addressFromRaw(
-      cityName,
-      raw
-    );
-
-  const stableSource =
-    JSON.stringify({
-
-      cityName,
-      permitId,
-      permitType,
-      status,
-      issuedDate,
-      valuation,
-      address
-
-    });
-
-  const generatedId =
-    `${cityName.toLowerCase()}-${crypto
-      .createHash("sha1")
-      .update(stableSource)
-      .digest("hex")
-      .slice(0, 20)}`;
+  const generatedId = `${cityName.toLowerCase()}-${crypto
+    .createHash("sha1")
+    .update(stableSource)
+    .digest("hex")
+    .slice(0, 20)}`;
 
   const base = {
-
-    city:
-      cityName,
-
-    permit_type:
-      permitType,
-
-    status,
-
-    issued_date:
-      issuedDate,
-
-    permit_id:
-      permitId ||
-      generatedId,
-
-    ai_confidence:
-      0,
-
-    ai_enriched:
-      false,
-
-    estimated_value:
-      valuation ||
-      25000,
-
-    ai_score:
-      0
-
+    city: cityName,
+    permit_type: permitType || "Unknown",
+    status: status || null,
+    issued_date: issuedDate,
+    permit_id: permitId || generatedId,
+    address: address || null,
+    estimated_value: valuation || 0,
+    ai_score: 0,
+    ai_confidence: 0,
+    ai_enriched: false
   };
 
-  const score =
-    scoreLead(
-      base
-    );
+  // Only score if we have some real data
+  if (base.permit_type !== "Unknown" || base.estimated_value > 0) {
+    const score = scoreLead(base);
+    base.ai_score = score;
+    base.ai_confidence = Number((0.65 + Math.min(score, 100) / 400).toFixed(2));
+    base.ai_enriched = true;
+  }
 
-  return {
-
-    ...base,
-
-    ai_score:
-      score,
-
-    ai_confidence:
-      Number(
-        (
-          0.70 +
-          Math.min(
-            score,
-            100
-          ) / 333
-        ).toFixed(2)
-      ),
-
-    ai_enriched:
-      true
-
-  };
-
-}
+  return base;
+     }
 
 /* ==========================================================================
    AI ENGINE
