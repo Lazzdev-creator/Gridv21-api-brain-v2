@@ -248,122 +248,272 @@
 
     </main>
   </div>
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const ADMIN_KEY = urlParams.get('key') || '';
 
-  <script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const ADMIN_KEY = urlParams.get('key') || '';
+  if (!ADMIN_KEY) {
+    document.getElementById('auth-badge').textContent = 'No Key';
+    document.getElementById('auth-badge').className = 'text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30';
+  }
 
-    if (!ADMIN_KEY) {
-      document.getElementById('auth-badge').textContent = 'No Key';
-      document.getElementById('auth-badge').className = 'text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30';
+  function showSection(name) {
+    document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+    document.getElementById('section-' + name).classList.remove('hidden');
+    document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    // Auto-load data when opening a section
+    if (name === 'leads') loadLeads();
+    if (name === 'activities') loadActivity();
+    if (name === 'brain') loadBrainSuggestion();
+    if (name === 'revenue') loadRevenue();
+    if (name === 'affiliates') loadAffiliates();
+  }
+
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('hidden-mobile');
+  }
+
+  function formatUptime(ms) {
+    const s = Math.floor(ms / 1000);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    return `${h}h ${m}m ${s % 60}s`;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return 'Never';
+    return new Date(iso).toLocaleString();
+  }
+
+  function formatMoney(val) {
+    return '$' + Number(val || 0).toLocaleString();
+  }
+
+  function addLog(msg, type = 'info') {
+    const container = document.getElementById('log-container');
+    const colors = {
+      info: 'text-slate-300',
+      success: 'text-emerald-400',
+      warn: 'text-amber-400',
+      error: 'text-rose-400'
+    };
+    const line = document.createElement('div');
+    line.className = colors[type] || colors.info;
+    line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    container.appendChild(line);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function clearLogs() {
+    document.getElementById('log-container').innerHTML = '<div class="text-slate-500">Logs cleared</div>';
+  }
+
+  // ========== ENGINE STATUS ==========
+  async function refreshStatus() {
+    try {
+      const res = await fetch('/health');
+      const data = await res.json();
+      const eng = data.engine || {};
+
+      let status = 'Idle', color = 'bg-emerald-500';
+      if (eng.emergencyStopped) { status = 'EMERGENCY STOPPED'; color = 'bg-rose-500'; }
+      else if (eng.scanning) { status = 'Scanning...'; color = 'bg-amber-400 animate-pulse'; }
+      else if (!eng.running) { status = 'Paused'; color = 'bg-slate-400'; }
+
+      document.getElementById('status-dot').className = `status-dot ${color}`;
+      document.getElementById('status-text').textContent = status;
+      document.getElementById('val-running').textContent = eng.running ? 'Yes' : 'No';
+      document.getElementById('val-scanning').textContent = eng.scanning ? 'Yes' : 'No';
+      document.getElementById('val-permits').textContent = eng.permitsFound ?? 0;
+      document.getElementById('val-errors').textContent = eng.errors ?? 0;
+      document.getElementById('val-lastscan').textContent = formatDate(eng.lastScan);
+      document.getElementById('val-duration').textContent = eng.lastScanDuration ? (eng.lastScanDuration / 1000).toFixed(1) + 's' : '—';
+      document.getElementById('val-uptime').textContent = formatUptime(data.uptime || 0);
+      document.getElementById('val-emergency').textContent = eng.emergencyStopped ? 'YES' : 'No';
+    } catch (err) {
+      addLog('Health error: ' + err.message, 'error');
     }
+  }
 
-    function showSection(name) {
-      document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
-      document.getElementById('section-' + name).classList.remove('hidden');
-      document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
-      event.currentTarget.classList.add('active');
-      if (name === 'leads') loadLeads();
+  // ========== ACTIONS ==========
+  async function action(endpoint) {
+    if (!ADMIN_KEY) return alert('Admin key missing');
+    const resultEl = document.getElementById('action-result');
+    if (resultEl) {
+      resultEl.classList.remove('hidden');
+      resultEl.textContent = 'Sending...';
+      resultEl.className = 'mt-4 text-sm text-amber-400';
     }
+    addLog(`Command → ${endpoint}`, 'info');
 
-    function toggleSidebar() {
-      document.getElementById('sidebar').classList.toggle('hidden-mobile');
-    }
-
-    function formatUptime(ms) {
-      const s = Math.floor(ms / 1000);
-      const h = Math.floor(s / 3600);
-      const m = Math.floor((s % 3600) / 60);
-      return `${h}h ${m}m ${s % 60}s`;
-    }
-
-    function formatDate(iso) {
-      if (!iso) return 'Never';
-      return new Date(iso).toLocaleString();
-    }
-
-    function addLog(msg, type = 'info') {
-      const container = document.getElementById('log-container');
-      const colors = { info: 'text-slate-300', success: 'text-emerald-400', warn: 'text-amber-400', error: 'text-rose-400' };
-      const line = document.createElement('div');
-      line.className = colors[type] || colors.info;
-      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      container.appendChild(line);
-      container.scrollTop = container.scrollHeight;
-    }
-
-    function clearLogs() {
-      document.getElementById('log-container').innerHTML = '<div class="text-slate-500">Logs cleared</div>';
-    }
-
-    async function refreshStatus() {
-      try {
-        const res = await fetch('/health');
-        const data = await res.json();
-        const eng = data.engine || {};
-
-        let status = 'Idle', color = 'bg-emerald-500';
-        if (eng.emergencyStopped) { status = 'EMERGENCY STOPPED'; color = 'bg-rose-500'; }
-        else if (eng.scanning) { status = 'Scanning...'; color = 'bg-amber-400 animate-pulse'; }
-        else if (!eng.running) { status = 'Paused'; color = 'bg-slate-400'; }
-
-        document.getElementById('status-dot').className = `status-dot ${color}`;
-        document.getElementById('status-text').textContent = status;
-        document.getElementById('val-running').textContent = eng.running ? 'Yes' : 'No';
-        document.getElementById('val-scanning').textContent = eng.scanning ? 'Yes' : 'No';
-        document.getElementById('val-permits').textContent = eng.permitsFound ?? 0;
-        document.getElementById('val-errors').textContent = eng.errors ?? 0;
-        document.getElementById('val-lastscan').textContent = formatDate(eng.lastScan);
-        document.getElementById('val-duration').textContent = eng.lastScanDuration ? (eng.lastScanDuration / 1000).toFixed(1) + 's' : '—';
-        document.getElementById('val-uptime').textContent = formatUptime(data.uptime || 0);
-        document.getElementById('val-emergency').textContent = eng.emergencyStopped ? 'YES' : 'No';
-      } catch (err) {
-        addLog('Health error: ' + err.message, 'error');
-      }
-    }
-
-    async function action(endpoint) {
-      if (!ADMIN_KEY) return alert('Admin key missing');
-      const resultEl = document.getElementById('action-result');
+    try {
+      const res = await fetch(`/api/${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
       if (resultEl) {
-        resultEl.classList.remove('hidden');
-        resultEl.textContent = 'Sending...';
-        resultEl.className = 'mt-4 text-sm text-amber-400';
+        resultEl.textContent = 'Success: ' + JSON.stringify(data);
+        resultEl.className = 'mt-4 text-sm text-emerald-400';
       }
-      addLog(`Command → ${endpoint}`, 'info');
-
-      try {
-        const res = await fetch(`/api/${endpoint}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY }
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed');
-        if (resultEl) {
-          resultEl.textContent = 'Success: ' + JSON.stringify(data);
-          resultEl.className = 'mt-4 text-sm text-emerald-400';
-        }
-        addLog(`Success: ${endpoint}`, 'success');
-        setTimeout(refreshStatus, 700);
-      } catch (err) {
-        if (resultEl) {
-          resultEl.textContent = 'Error: ' + err.message;
-          resultEl.className = 'mt-4 text-sm text-rose-400';
-        }
-        addLog(`Error: ${err.message}`, 'error');
+      addLog(`Success: ${endpoint}`, 'success');
+      setTimeout(refreshStatus, 700);
+    } catch (err) {
+      if (resultEl) {
+        resultEl.textContent = 'Error: ' + err.message;
+        resultEl.className = 'mt-4 text-sm text-rose-400';
       }
+      addLog(`Error: ${err.message}`, 'error');
     }
+  }
 
-    async function loadLeads() {
-      const container = document.getElementById('leads-container');
-      container.innerHTML = '<div class="text-slate-400 text-sm">Loading leads...</div>';
+  // ========== ACTIVITY LOGS ==========
+  async function loadActivity() {
+    const container = document.getElementById('log-container');
+    container.innerHTML = '<div class="text-slate-500">Loading activity...</div>';
 
-      try {
-        const res = await fetch('/api/permits?limit=20', {
-          headers: { 'x-admin-key': ADMIN_KEY }
-        });
-        const json = await res.json();
-        const leads = json.data || [];
+    try {
+      const res = await fetch('/api/activity?limit=100', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const json = await res.json();
+      const logs = json.data || [];
 
-        if (!leads.length) {
-          co
+      if (!logs.length) {
+        container.innerHTML = '<div class="text-slate-500">No activity yet</div>';
+        return;
+      }
+
+      container.innerHTML = logs.map(log => {
+        const color = {
+          info: 'text-slate-300',
+          success: 'text-emerald-400',
+          warn: 'text-amber-400',
+          error: 'text-rose-400'
+        }[log.level] || 'text-slate-300';
+
+        return `<div class="${color}">[${formatDate(log.created_at)}] ${log.action || ''} – ${log.message}</div>`;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = `<div class="text-rose-400">Failed to load activity: ${err.message}</div>`;
+    }
+  }
+
+  // ========== LEADS ==========
+  async function loadLeads() {
+    const container = document.getElementById('leads-container');
+    container.innerHTML = '<div class="text-slate-400 text-sm">Loading leads...</div>';
+
+    try {
+      const res = await fetch('/api/leads?limit=25', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const json = await res.json();
+      const leads = json.data || [];
+
+      if (!leads.length) {
+        container.innerHTML = '<div class="text-slate-500 text-sm">No permits found yet. Run a scan first.</div>';
+        return;
+      }
+
+      container.innerHTML = leads.map(lead => {
+        const value = formatMoney(lead.estimated_value);
+        const score = lead.ai_score || 0;
+        const type = lead.permit_type || 'Unknown';
+        const city = lead.city || '';
+        const advice = lead.advice || 'No advice';
+        const buyers = (lead.possible_buyers || []).join(', ');
+        const commission = formatMoney(lead.estimated_commission);
+
+        return `
+          <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div>
+                <p class="font-medium">${type}</p>
+                <p class="text-xs text-slate-400 mt-0.5">${city} • ${lead.issued_date || 'No date'}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-lg font-bold text-emerald-400">${value}</p>
+                <p class="text-xs text-slate-400">AI Score: ${score} • Est. Comm: ${commission}</p>
+              </div>
+            </div>
+            <p class="text-sm text-slate-300 mb-2">${advice}</p>
+            <p class="text-xs text-slate-400 mb-4">Possible buyers: ${buyers}</p>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn text-xs bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">Prepare Acquisition</button>
+              <button class="btn text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg">View Buyers</button>
+              <button class="btn text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg">Export</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = `<div class="text-rose-400 text-sm">Failed to load leads: ${err.message}</div>`;
+    }
+  }
+
+  // ========== BRAIN OS ==========
+  async function loadBrainSuggestion() {
+    const el = document.getElementById('brain-suggestion');
+    el.textContent = 'Analyzing...';
+
+    try {
+      const res = await fetch('/api/brain/suggestion', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const data = await res.json();
+      el.textContent = data.suggestion || 'No suggestion available';
+    } catch (err) {
+      el.textContent = 'Failed to load suggestion: ' + err.message;
+    }
+  }
+
+  function authorizeAction() {
+    addLog('Brain recommendation AUTHORIZED by admin', 'success');
+    document.getElementById('brain-suggestion').textContent = 'Action authorized.';
+  }
+
+  function dismissSuggestion() {
+    document.getElementById('brain-suggestion').textContent = 'Suggestion dismissed. Waiting for new signals...';
+  }
+
+  // ========== REVENUE ==========
+  async function loadRevenue() {
+    try {
+      const res = await fetch('/api/revenue', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const json = await res.json();
+      // You can expand this later to render a full table
+      console.log('Revenue data:', json);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // ========== AFFILIATES ==========
+  async function loadAffiliates() {
+    try {
+      const res = await fetch('/api/affiliates', {
+        headers: { 'x-admin-key': ADMIN_KEY }
+      });
+      const json = await res.json();
+      console.log('Affiliates:', json);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  function refreshAll() {
+    refreshStatus();
+    addLog('Manual refresh triggered', 'info');
+  }
+
+  // Init
+  refreshStatus();
+  setInterval(refreshStatus, 10000);
+  </script>
+  
