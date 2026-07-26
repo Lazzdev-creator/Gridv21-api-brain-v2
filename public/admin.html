@@ -1,93 +1,439 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-
-<meta name="viewport"
-content="width=device-width,initial-scale=1">
-
-<title>GRIDV21 ADMIN</title>
-
-<link rel="stylesheet"
-href="styles.css">
-
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRIDV21 Brain • Admin Control</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background: #0b1120; }
+    .card { background: #1e293b; border: 1px solid #334155; }
+    .btn { transition: all 0.15s ease; }
+    .btn:active { transform: scale(0.97); }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .nav-item.active { background: #4f46e5; color: white; }
+    .log-line { font-family: ui-monospace, monospace; font-size: 12px; }
+    #sidebar { transition: transform 0.25s ease; }
+    @media (max-width: 768px) {
+      #sidebar.hidden-mobile { transform: translateX(-100%); }
+    }
+  </style>
 </head>
+<body class="text-slate-200 min-h-screen flex">
 
-<body>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-700 flex flex-col">
+    <div class="p-5 border-b border-slate-700">
+      <div class="flex items-center gap-3">
+        <img src="/logo.png" alt="GRIDV21" class="w-10 h-10 object-contain" onerror="this.style.display='none'">
+        <div>
+          <h1 class="font-bold text-lg leading-tight">GRIDV21</h1>
+          <p class="text-[10px] text-slate-400 tracking-wider">BRAIN ADMIN</p>
+        </div>
+      </div>
+    </div>
 
-<h2>ADMIN CONTROL</h2>
+    <nav class="flex-1 p-3 space-y-1">
+      <button onclick="showSection('dashboard')" class="nav-item active w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800">
+        Dashboard
+      </button>
+      <button onclick="showSection('logs')" class="nav-item w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800">
+        Live Logs
+      </button>
+      <button onclick="showSection('tenants')" class="nav-item w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800">
+        Tenants Monitor
+      </button>
+      <button onclick="showSection('os')" class="nav-item w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800">
+        OS Controls
+      </button>
+      <button onclick="showSection('activity')" class="nav-item w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-800">
+        Live Activity
+      </button>
+    </nav>
 
-<div class="card">
+    <div class="p-4 border-t border-slate-700 text-xs text-slate-500">
+      v6.3.4 • Lazarus Chenana
+    </div>
+  </aside>
 
-<h3>Tenants Monitor</h3>
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col min-h-screen">
 
-<div id="tenants"></div>
+    <!-- Top bar -->
+    <header class="border-b border-slate-700 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+      <div class="px-4 py-3 flex items-center justify-between">
+        <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-lg hover:bg-slate-800">
+          ☰
+        </button>
+        <div class="flex items-center gap-3 ml-auto">
+          <span id="auth-badge" class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            Authenticated
+          </span>
+          <button onclick="refreshAll()" class="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-slate-800">
+            Refresh All
+          </button>
+        </div>
+      </div>
+    </header>
 
-</div>
+    <main class="flex-1 p-4 md:p-6 overflow-y-auto">
 
-<div class="card">
+      <!-- ==================== DASHBOARD ==================== -->
+      <section id="section-dashboard" class="space-y-6">
+        <div class="card rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Engine Status</h2>
+            <div class="flex items-center gap-2">
+              <div id="status-dot" class="status-dot bg-slate-500"></div>
+              <span id="status-text" class="text-sm font-medium text-slate-400">Loading...</span>
+            </div>
+          </div>
 
-<h3>Affiliate Tracking</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Running</p>
+              <p id="val-running" class="text-xl font-bold">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Scanning</p>
+              <p id="val-scanning" class="text-xl font-bold">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Permits Found</p>
+              <p id="val-permits" class="text-xl font-bold text-brand-400">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Errors</p>
+              <p id="val-errors" class="text-xl font-bold text-rose-400">—</p>
+            </div>
+          </div>
 
-<div id="affiliates"></div>
+          <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div class="flex justify-between bg-slate-800/40 rounded-lg px-4 py-2.5">
+              <span class="text-slate-400">Last Scan</span>
+              <span id="val-lastscan" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between bg-slate-800/40 rounded-lg px-4 py-2.5">
+              <span class="text-slate-400">Last Duration</span>
+              <span id="val-duration" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between bg-slate-800/40 rounded-lg px-4 py-2.5">
+              <span class="text-slate-400">Uptime</span>
+              <span id="val-uptime" class="font-medium">—</span>
+            </div>
+            <div class="flex justify-between bg-slate-800/40 rounded-lg px-4 py-2.5">
+              <span class="text-slate-400">Emergency Stop</span>
+              <span id="val-emergency" class="font-medium">—</span>
+            </div>
+          </div>
+        </div>
 
-</div>
+        <div class="card rounded-2xl p-6">
+          <h2 class="text-lg font-semibold mb-5">Scan & Engine Controls</h2>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <button onclick="action('scan/start')" class="btn bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 px-4 rounded-xl">Start Scan</button>
+            <button onclick="action('scan/stop')" class="btn bg-amber-600 hover:bg-amber-500 text-white font-medium py-3 px-4 rounded-xl">Stop Scan</button>
+            <button onclick="action('engine/pause')" class="btn bg-slate-600 hover:bg-slate-500 text-white font-medium py-3 px-4 rounded-xl">Pause Engine</button>
+            <button onclick="action('engine/resume')" class="btn bg-brand-600 hover:bg-brand-500 text-white font-medium py-3 px-4 rounded-xl">Resume Engine</button>
+            <button onclick="action('engine/emergency-stop')" class="btn bg-rose-700 hover:bg-rose-600 text-white font-medium py-3 px-4 rounded-xl">Emergency Stop</button>
+          </div>
+          <p id="action-result" class="mt-4 text-sm text-slate-400 hidden"></p>
+        </div>
+      </section>
 
-<script>
+      <!-- ==================== LIVE LOGS ==================== -->
+      <section id="section-logs" class="hidden space-y-4">
+        <div class="card rounded-2xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold">Live Logs</h2>
+            <button onclick="clearLogs()" class="text-xs text-slate-400 hover:text-white">Clear</button>
+          </div>
+          <div id="log-container" class="bg-black/40 rounded-xl p-4 h-96 overflow-y-auto space-y-1 log-line">
+            <div class="text-slate-500">Waiting for activity...</div>
+          </div>
+        </div>
+      </section>
 
-async function loadTenants(){
+      <!-- ==================== TENANTS ==================== -->
+      <section id="section-tenants" class="hidden space-y-4">
+        <div class="card rounded-2xl p-6">
+          <h2 class="text-lg font-semibold mb-4">Tenants Monitor</h2>
+          <p class="text-sm text-slate-400 mb-6">Active tenants and usage overview (placeholder – connect to your tenants table).</p>
+          
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400">Total Tenants</p>
+              <p class="text-2xl font-bold mt-1">0</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400">Active Now</p>
+              <p class="text-2xl font-bold mt-1 text-emerald-400">0</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400">API Calls (24h)</p>
+              <p class="text-2xl font-bold mt-1">0</p>
+            </div>
+          </div>
 
-const r=await fetch('/api/tenants');
-const d=await r.json();
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead class="text-slate-400 border-b border-slate-700">
+                <tr>
+                  <th class="text-left py-3 px-2">Tenant</th>
+                  <th class="text-left py-3 px-2">Status</th>
+                  <th class="text-left py-3 px-2">Last Active</th>
+                  <th class="text-left py-3 px-2">Usage</th>
+                </tr>
+              </thead>
+              <tbody id="tenants-body" class="divide-y divide-slate-700">
+                <tr>
+                  <td colspan="4" class="py-8 text-center text-slate-500">No tenant data yet</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-document.getElementById('tenants').innerHTML=
+      <!-- ==================== OS CONTROLS ==================== -->
+      <section id="section-os" class="hidden space-y-4">
+        <div class="card rounded-2xl p-6">
+          <h2 class="text-lg font-semibold mb-5">OS / System Controls</h2>
 
-d.map(t=>`
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Node Version</p>
+              <p id="os-node" class="font-medium">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Platform</p>
+              <p id="os-platform" class="font-medium">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Memory (RSS)</p>
+              <p id="os-memory" class="font-medium">—</p>
+            </div>
+            <div class="bg-slate-800/60 rounded-xl p-4">
+              <p class="text-xs text-slate-400 mb-1">Process Uptime</p>
+              <p id="os-uptime" class="font-medium">—</p>
+            </div>
+          </div>
 
-<div>
+          <div class="flex flex-wrap gap-3">
+            <button onclick="action('os/restart-engine')" class="btn bg-brand-600 hover:bg-brand-500 text-white font-medium py-2.5 px-5 rounded-xl">
+              Restart Engine
+            </button>
+            <a href="/api/export/csv" target="_blank" class="btn bg-slate-600 hover:bg-slate-500 text-white font-medium py-2.5 px-5 rounded-xl">
+              Export CSV
+            </a>
+          </div>
+        </div>
+      </section>
 
-ID:${t.id}<br>
+      <!-- ==================== LIVE ACTIVITY ==================== -->
+      <section id="section-activity" class="hidden space-y-4">
+        <div class="card rounded-2xl p-6">
+          <h2 class="text-lg font-semibold mb-4">Live Activity Feed</h2>
+          <div id="activity-feed" class="space-y-3 max-h-96 overflow-y-auto">
+            <div class="text-slate-500 text-sm">No recent activity</div>
+          </div>
+        </div>
+      </section>
 
-Status:${t.status}<br>
+    </main>
+  </div>
 
-Plan:${t.subscription}<br>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const ADMIN_KEY = urlParams.get('key') || '';
 
-Last Seen:${t.updated_at}
+    if (!ADMIN_KEY) {
+      document.getElementById('auth-badge').textContent = 'No Key';
+      document.getElementById('auth-badge').className = 'text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30';
+    }
 
-</div><hr>
+    // Navigation
+    function showSection(name) {
+      document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+      document.getElementById('section-' + name).classList.remove('hidden');
 
-`).join('');
+      document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
 
-}
+      if (name === 'os') loadOsInfo();
+    }
 
-async function loadAffiliates(){
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('hidden-mobile');
+    }
 
-const r=await fetch('/api/affiliates');
-const d=await r.json();
+    function formatUptime(ms) {
+      const s = Math.floor(ms / 1000);
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return `${h}h ${m}m ${s % 60}s`;
+    }
 
-document.getElementById('affiliates').innerHTML=
+    function formatDate(iso) {
+      if (!iso) return 'Never';
+      return new Date(iso).toLocaleString();
+    }
 
-d.map(a=>`
+    function addLog(msg, type = 'info') {
+      const container = document.getElementById('log-container');
+      const colors = {
+        info: 'text-slate-300',
+        success: 'text-emerald-400',
+        warn: 'text-amber-400',
+        error: 'text-rose-400'
+      };
+      const line = document.createElement('div');
+      line.className = colors[type] || colors.info;
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      container.appendChild(line);
+      container.scrollTop = container.scrollHeight;
+    }
 
-<div>
+    function clearLogs() {
+      document.getElementById('log-container').innerHTML = '<div class="text-slate-500">Logs cleared</div>';
+    }
 
-${a.product}<br>
+    function addActivity(text) {
+      const feed = document.getElementById('activity-feed');
+      if (feed.querySelector('.text-slate-500')) feed.innerHTML = '';
+      const item = document.createElement('div');
+      item.className = 'flex items-start gap-3 text-sm bg-slate-800/50 rounded-lg px-4 py-3';
+      item.innerHTML = `
+        <div class="w-2 h-2 mt-1.5 rounded-full bg-brand-500"></div>
+        <div>
+          <p>${text}</p>
+          <p class="text-xs text-slate-500 mt-1">${new Date().toLocaleString()}</p>
+        </div>
+      `;
+      feed.prepend(item);
+    }
 
-Clicks:${a.clicks}<br>
+    async function refreshStatus() {
+      try {
+        const res = await fetch('/health');
+        const data = await res.json();
+        const eng = data.engine || {};
 
-Conversions:${a.conversions}<br>
+        let status = 'Idle';
+        let color = 'bg-emerald-500';
 
-Revenue:$${a.revenue}
+        if (eng.emergencyStopped) {
+          status = 'EMERGENCY STOPPED';
+          color = 'bg-rose-500';
+        } else if (eng.scanning) {
+          status = 'Scanning...';
+          color = 'bg-amber-400 animate-pulse';
+        } else if (!eng.running) {
+          status = 'Paused';
+          color = 'bg-slate-400';
+        }
 
-</div><hr>
+        document.getElementById('status-dot').className = `status-dot ${color}`;
+        document.getElementById('status-text').textContent = status;
 
-`).join('');
+        document.getElementById('val-running').textContent = eng.running ? 'Yes' : 'No';
+        document.getElementById('val-scanning').textContent = eng.scanning ? 'Yes' : 'No';
+        document.getElementById('val-permits').textContent = eng.permitsFound ?? 0;
+        document.getElementById('val-errors').textContent = eng.errors ?? 0;
+        document.getElementById('val-lastscan').textContent = formatDate(eng.lastScan);
+        document.getElementById('val-duration').textContent = eng.lastScanDuration ? (eng.lastScanDuration / 1000).toFixed(1) + 's' : '—';
+        document.getElementById('val-uptime').textContent = formatUptime(data.uptime || 0);
+        document.getElementById('val-emergency').textContent = eng.emergencyStopped ? 'YES' : 'No';
+      } catch (err) {
+        addLog('Failed to load health: ' + err.message, 'error');
+      }
+    }
 
-}
+    async function loadOsInfo() {
+      if (!ADMIN_KEY) return;
+      try {
+        const res = await fetch('/api/os/info', {
+          headers: { 'x-admin-key': ADMIN_KEY }
+        });
+        const data = await res.json();
+        document.getElementById('os-node').textContent = data.node || '—';
+        document.getElementById('os-platform').textContent = data.platform || '—';
+        document.getElementById('os-memory').textContent = data.memory ? Math.round(data.memory.rss / 1024 / 1024) + ' MB' : '—';
+        document.getElementById('os-uptime').textContent = data.uptime ? Math.round(data.uptime) + 's' : '—';
+      } catch (err) {
+        addLog('OS info error: ' + err.message, 'error');
+      }
+    }
 
-loadTenants();
-loadAffiliates();
+    async function action(endpoint) {
+      if (!ADMIN_KEY) {
+        alert('Admin key missing from URL');
+        return;
+      }
 
-</script>
+      const resultEl = document.getElementById('action-result');
+      if (resultEl) {
+        resultEl.classList.remove('hidden');
+        resultEl.textContent = 'Sending command...';
+        resultEl.className = 'mt-4 text-sm text-amber-400';
+      }
 
+      addLog(`Command: ${endpoint}`, 'info');
+      addActivity(`Executed: /api/${endpoint}`);
+
+      try {
+        const res = await fetch(`/api/${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': ADMIN_KEY
+          }
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+
+        if (resultEl) {
+          resultEl.textContent = `Success: ${JSON.stringify(data)}`;
+          resultEl.className = 'mt-4 text-sm text-emerald-400';
+        }
+        addLog(`Success: ${endpoint}`, 'success');
+        setTimeout(refreshStatus, 700);
+      } catch (err) {
+        if (resultEl) {
+          resultEl.textContent = `Error: ${err.message}`;
+          resultEl.className = 'mt-4 text-sm text-rose-400';
+        }
+        addLog(`Error on ${endpoint}: ${err.message}`, 'error');
+      }
+    }
+
+    function refreshAll() {
+      refreshStatus();
+      loadOsInfo();
+      addLog('Manual refresh triggered', 'info');
+    }
+
+    // Init
+    refreshStatus();
+    setInterval(refreshStatus, 8000);
+  </script>
 </body>
-</html>
+  </html>
