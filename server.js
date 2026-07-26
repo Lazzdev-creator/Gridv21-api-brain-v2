@@ -54,6 +54,19 @@ const app = express();
 
 export const VERSION = "6.3.4";
 
+// Safe global fallback so logActivity never crashes any route or scan engine
+globalThis.logActivity = globalThis.logActivity || async function(type, action, message, details = {}) {
+  try {
+    if (typeof logger !== "undefined" && typeof logger[type] === "function") {
+      await logger[type]("SYSTEM", `[${action}] ${message}`);
+    } else {
+      console.log(`[LOG ${type.toUpperCase()}] ${action}: ${message}`, details || "");
+    }
+  } catch (e) {
+    console.error("logActivity error:", e.message);
+  }
+};
+
 const PORT = Number(process.env.PORT || 3000);
 
 const IS_PRODUCTION =
