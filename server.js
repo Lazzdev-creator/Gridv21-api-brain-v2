@@ -1928,6 +1928,126 @@ app.get("/api/leads", requireAuth, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+/* ==========================================================================
+   ROUTES – BRAIN OS
+========================================================================== */
+
+app.get("/api/brain/suggestion", requireAdmin, async (req, res) => {
+  try {
+    // Simple intelligence for now
+    const { data: recent } = await supabase
+      .from("permits")
+      .select("ai_score, estimated_value, permit_type, city")
+      .order("issued_date", { ascending: false })
+      .limit(20);
+
+    const highValue = (recent || []).filter(p => (p.ai_score || 0) >= 70 || (p.estimated_value || 0) >= 300000);
+
+    let suggestion = "System is stable. Continue regular scanning.";
+    let action = null;
+
+    if (highValue.length >= 3) {
+      suggestion = `Brain detected ${highValue.length} high-value leads. Recommend preparing acquisition packages and outreach.`;
+      action = "prepare_acquisitions";
+    } else if ((recent || []).length === 0) {
+      suggestion = "No recent permits found. Recommend triggering a full scan now.";
+      action = "start_scan";
+    }
+
+    res.json({
+      suggestion,
+      recommended_action: action,
+      high_value_count: highValue.length,
+      analyzed: (recent || []).length
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+/* ==========================================================================
+   ROUTES – REVENUE
+========================================================================== */
+
+app.get("/api/revenue", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("revenue")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    const total = (data || []).reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+    res.json({
+      data: data || [],
+      total_pipeline: total
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/revenue", requireAdmin, async (req, res) => {
+  try {
+    const { source, amount, permit_id, notes, status } = req.body;
+
+    const { data, error } = await supabase
+      .from("revenue")
+      .insert({
+        source,
+        amount,
+        permit_id,
+        notes,
+        status: status || "pending"
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    await logActivity("success", "revenue_created", `Revenue entry created: ${amount}`, { id: data.id });
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+/* ==========================================================================
+   ROUTES – AFFILIATES
+========================================================================== */
+
+app.get("/api/affiliates", requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("affiliates")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    res.json({ data: data || [] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/affiliates", requireAdmin, async (req, res) => {
+  try {
+    const { name, email, type, code } = req.body;
+
+    const { data, error } = await supabase
+      .from("affiliates")
+      .insert({ name, email, type, code })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /* ==========================================================================
    ERROR HANDLING
