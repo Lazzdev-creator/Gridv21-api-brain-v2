@@ -229,45 +229,41 @@ export const SCAN_SETTINGS = {
 ========================================================================== */
 
 export const CITIES = [
-
+  // United States
   {
-    name:
-      "Austin",
-
-    url:
-      "https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=1000",
-
-    type:
-      "json"
-
+    name: "Austin",
+    url: "https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=1000",
+    type: "json"
+  },
+  {
+    name: "Chicago",
+    url: "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1000&$order=Issue%20Date%20DESC",
+    type: "json"
+  },
+  {
+    name: "Denver",
+    url: "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv",
+    type: "csv"
+  },
+  {
+    name: "New York",
+    url: "https://data.cityofnewyork.us/resource/ipu4-2q9e.json?$limit=1000",
+    type: "json"
+  },
+  {
+    name: "Los Angeles",
+    url: "https://data.lacity.org/resource/pi9x-tg5x.json?$limit=1000",
+    type: "json"
   },
 
+  // South Africa (limited public sources)
   {
-    name:
-      "Chicago",
-
-    url:
-      "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1000&$order=Issue%20Date%20DESC",
-
-    type:
-      "json"
-
-  },
-
-  {
-    name:
-      "Denver",
-
-    url:
-      "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv",
-
-    type:
-      "csv"
-
+    name: "Cape Town",
+    url: "https://web1.capetown.gov.za/web1/OpenDataPortal/DownloadFile?fileName=Building%20Plans%20Approved.csv",
+    type: "csv",
+    note: "May require headers or may be unstable"
   }
-
 ];
-
 /* ==========================================================================
    LOGGER
 ========================================================================== */
