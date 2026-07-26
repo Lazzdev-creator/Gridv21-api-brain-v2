@@ -1396,6 +1396,21 @@ let currentAbortController = null;
 
 async function runFullScan(reqId = "SYSTEM") {
 
+  // Helper to safely execute logActivity without throwing a ReferenceError
+  const safeLogActivity = async (type, action, message) => {
+    try {
+      if (typeof logActivity === "function") {
+        await logActivity(type, action, message);
+      } else if (logger && typeof logger[type] === "function") {
+        await logger[type](reqId, `[${action}] ${message}`);
+      } else {
+        console.log(`[${type.toUpperCase()}] [${action}] ${message}`);
+      }
+    } catch (e) {
+      console.error(`Failed to execute logActivity: ${e.message}`);
+    }
+  };
+
   if (ENGINE.scanning) {
     logger.warn(reqId, "Scan already running – skipped");
     return { status: "already_running" };
@@ -1425,7 +1440,7 @@ async function runFullScan(reqId = "SYSTEM") {
   try {
 
     logger.info(reqId, "=== FULL SCAN STARTED ===");
-    await logActivity("info", "scan_started", "Full scan started");
+    await safeLogActivity("info", "scan_started", "Full scan started");
 
     for (const city of CITIES) {
 
@@ -1439,8 +1454,8 @@ async function runFullScan(reqId = "SYSTEM") {
         totalSkipped += result.skipped || 0;
 
         // Log each city result
-        await logActivity(
-          "success",
+        await safeLogActivity(
+          "info",
           "scan_city",
           `Scanned ${city.name}: inserted ${result.inserted}, skipped ${result.skipped}`
         );
@@ -1451,7 +1466,7 @@ async function runFullScan(reqId = "SYSTEM") {
         ENGINE.lastError = err.message;
         await logger.error(reqId, `City ${city.name} failed: ${err.message}`);
 
-        await logActivity(
+        await safeLogActivity(
           "error",
           "scan_city_error",
           `Failed scanning ${city.name}: ${err.message}`
@@ -1472,7 +1487,7 @@ async function runFullScan(reqId = "SYSTEM") {
     );
 
     // Log full scan completion
-    await logActivity(
+    await safeLogActivity(
       "info",
       "scan_complete",
       `Full scan finished. Inserted: ${totalInserted}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`
@@ -1492,7 +1507,7 @@ async function runFullScan(reqId = "SYSTEM") {
     ENGINE.errors++;
     await logger.error(reqId, `Full scan crashed: ${err.message}`);
 
-    await logActivity(
+    await safeLogActivity(
       "error",
       "scan_crashed",
       `Full scan crashed: ${err.message}`
@@ -1510,7 +1525,7 @@ async function runFullScan(reqId = "SYSTEM") {
 
   }
 
-  }
+       }
 
 /* ==========================================================================
    AUTH HELPERS
