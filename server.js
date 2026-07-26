@@ -1344,33 +1344,6 @@ async function supabaseBatchInsert(
   };
 
 }
-
-
-    }
-
-  }
-
-  const unique =
-    [];
-
-  const seen =
-    new Set(
-      existing
-    );
-
-  for (
-    const row of
-      rows
-  ) {
-
-    if (
-
-      !row.permit_id ||
-
-      seen.has(
-        row.permit_i
-};
-  }
       
  /* ==========================================================================
    DEDUPLICATED PERMIT INSERT  (FIXED)
