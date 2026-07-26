@@ -1,8 +1,8 @@
 /******************************************************************************
- * GRIDV21 BRAIN ENTERPRISE v6.3.4 - ENTERPRISE OS
+ * GRIDV21 BRAIN ENTERPRISE v6.3.4
  * OWNER: LAZARUS TAKUDZWA CHENANA
  *
- * FULL BACKEND BUILD
+ * COMPLETE PRODUCTION BACKEND
  * - Express 5
  * - Supabase
  * - Optional Redis sessions
@@ -60,7 +60,7 @@ const IS_PRODUCTION =
   process.env.NODE_ENV === "production";
 
 /* ==========================================================================
-   REQUIRED ENVIRONMENT VARIABLES
+   ENVIRONMENT VALIDATION
 ========================================================================== */
 
 const REQUIRED_ENV = [
@@ -72,44 +72,201 @@ const REQUIRED_ENV = [
 ];
 
 for (const key of REQUIRED_ENV) {
+
   if (!process.env[key]) {
-    throw new Error(`FATAL: ${key} missing from ENV`);
+
+    throw new Error(
+      `FATAL: ${key} missing from ENV`
+    );
+
   }
+
 }
 
 /* ==========================================================================
    SUPABASE
 ========================================================================== */
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false
+const supabase =
+  createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+      }
     }
-  }
-);
+  );
 
 /* ==========================================================================
    OPTIONAL STRIPE
 ========================================================================== */
 
-const stripe = process.env.STRIPE_SECRET_KEY
-  ? new Stripe(process.env.STRIPE_SECRET_KEY)
-  : null;
+const stripe =
+  process.env.STRIPE_SECRET_KEY
+    ? new Stripe(
+        process.env.STRIPE_SECRET_KEY
+      )
+    : null;
 
 /* ==========================================================================
-   REDIS / SCAN STATE
+   REDIS
 ========================================================================== */
 
 let redisClient = null;
 
-let currentScanAbortController = null;
+let sessionStore = undefined;
 
-let scanPromise = null;
+if (process.env.REDIS_URL) {
+
+  try {
+
+    redisClient =
+      createRedisClient({
+        url: process.env.REDIS_URL
+      });
+
+    redisClient.on(
+      "error",
+      error => {
+
+        console.warn(
+          `[REDIS] ${error.message}`
+        );
+
+      }
+    );
+
+    await redisClient.connect();
+
+    sessionStore =
+      new RedisStore({
+        client: redisClient
+      });
+
+    console.log(
+      "[REDIS] Redis session store enabled"
+    );
+
+  } catch (error) {
+
+    console.warn(
+      `[REDIS] Redis unavailable. Using memory sessions: ${error.message}`
+    );
+
+    redisClient = null;
+    sessionStore = undefined;
+
+  }
+
+}
+
+/* ==========================================================================
+   ENGINE STATE
+========================================================================== */
+
+export const ENGINE = {
+
+  running:
+    true,
+
+  scanning:
+    false,
+
+  lastScan:
+    null,
+
+  lastScanDuration:
+    0,
+
+  permitsFound:
+    0,
+
+  errors:
+    0,
+
+  uptime:
+    Date.now(),
+
+  lastError:
+    null,
+
+  emergencyStopped:
+    false
+
+};
+
+/* ==========================================================================
+   SCAN CONFIG
+========================================================================== */
+
+export const SCAN_SETTINGS = {
+
+  batchSize:
+    100,
+
+  requestDelay:
+    750,
+
+  requestTimeout:
+    15000,
+
+  scanTimeout:
+    600000,
+
+  cron:
+    "*/30 * * * *",
+
+  concurrency:
+    3
+
+};
+
+/* ==========================================================================
+   CITY SOURCES
+========================================================================== */
+
+export const CITIES = [
+
+  {
+    name:
+      "Austin",
+
+    url:
+      "https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=1000",
+
+    type:
+      "json"
+
+  },
+
+  {
+    name:
+      "Chicago",
+
+    url:
+      "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1000&$order=Issue%20Date%20DESC",
+
+    type:
+      "json"
+
+  },
+
+  {
+    name:
+      "Denver",
+
+    url:
+      "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv",
+
+    type:
+      "csv"
+
+  }
+
+];
 
 /* ==========================================================================
    LOGGER
@@ -118,15 +275,19 @@ let scanPromise = null;
 const logger = {
 
   info(reqId, msg) {
+
     console.log(
       `[INFO ${reqId} ${new Date().toISOString()}] ${msg}`
     );
+
   },
 
   warn(reqId, msg) {
+
     console.warn(
       `[WARN ${reqId} ${new Date().toISOString()}] ${msg}`
     );
+
   },
 
   async error(reqId, msg) {
@@ -140,168 +301,277 @@ const logger = {
       await supabase
         .from("audit_logs")
         .insert({
-          level: "error",
-          message: String(msg).slice(0, 5000),
-          request_id: reqId
+
+          level:
+            "error",
+
+          message:
+            String(msg).slice(0, 5000),
+
+          request_id:
+            reqId
+
         });
 
     } catch (_) {}
+
   }
 
 };
 
 /* ==========================================================================
-   MORGAN
+   MORGAN REQUEST ID
 ========================================================================== */
 
 morgan.token(
   "id",
-  req => req.id || "no-id"
+  req =>
+    req.id || "no-id"
 );
 
 /* ==========================================================================
-   CITY SOURCES
+   MIDDLEWARE
 ========================================================================== */
 
-export const CITIES = [
+app.set(
+  "trust proxy",
+  1
+);
 
-  {
-    name: "Austin",
-    url:
-      "https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=1000",
-    type: "json"
-  },
+app.use(
+  (req, res, next) => {
 
-  {
-    name: "Chicago",
-    url:
-      "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1000&$order=Issue%20Date%20DESC",
-    type: "json"
-  },
+    req.id =
+      crypto.randomUUID();
 
-  {
-    name: "Denver",
-    url:
-      "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv",
-    type: "csv"
-  }
-
-];
-
-/* ==========================================================================
-   SCANNER CONFIG
-========================================================================== */
-
-export const SCAN_SETTINGS = {
-
-  batchSize: 100,
-
-  requestDelay: 750,
-
-  requestTimeout: 15000,
-
-  scanTimeout: 600000,
-
-  cron: "*/30 * * * *",
-
-  concurrency: 3
-
-};
-
-/* ==========================================================================
-   ENGINE STATE
-========================================================================== */
-
-export const ENGINE = {
-
-  running: true,
-
-  scanning: false,
-
-  lastScan: null,
-
-  lastScanDuration: 0,
-
-  permitsFound: 0,
-
-  errors: 0,
-
-  uptime: Date.now(),
-
-  lastError: null,
-
-  emergencyStopped: false
-
-};
-
-/* ==========================================================================
-   AI ENGINE
-========================================================================== */
-
-export const AI_ENGINE = {
-
-  async enrichPermit(permit) {
-
-    const estimatedValue =
-      Number(permit.estimated_value || 25000);
-
-    const score =
-      scoreLead(permit);
-
-    return {
-
-      ...permit,
-
-      ai_enriched: true,
-
-      estimated_value:
-        estimatedValue,
-
-      ai_confidence:
-        Number(
-          (
-            0.70 +
-            Math.min(score, 100) / 333
-          ).toFixed(2)
-        ),
-
-      ai_score:
-        score,
-
-      ai_note:
-        "GRIDV21 heuristic AI engine"
-
-    };
-
-  },
-
-  scoreLead,
-
-  predictRevenue(permit) {
-
-    return Number(
-      (
-        Number(permit.estimated_value || 25000) *
-        0.03
-      ).toFixed(2)
+    res.setHeader(
+      "X-Request-ID",
+      req.id
     );
 
-  }
+    next();
 
-};
+  }
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy:
+      false
+  })
+);
+
+app.use(
+  compression()
+);
+
+app.use(
+  morgan(
+    ":id :method :url :status :response-time ms"
+  )
+);
+
+app.use(
+  cors({
+
+    origin:
+      process.env.FRONTEND_URL,
+
+    credentials:
+      true
+
+  })
+);
+
+app.use(
+  express.json({
+    limit:
+      "20mb"
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended:
+      true
+  })
+);
+
+app.use(
+  express.static(
+    path.join(
+      __dirname,
+      "public"
+    )
+  )
+);
+
+app.use(
+  "/api",
+  rateLimit({
+
+    windowMs:
+      15 * 60 * 1000,
+
+    max:
+      500,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false
+
+  })
+);
+
+/* ==========================================================================
+   SESSION
+========================================================================== */
+
+app.use(
+  session({
+
+    store:
+      sessionStore,
+
+    secret:
+      process.env.SESSION_SECRET,
+
+    resave:
+      false,
+
+    saveUninitialized:
+      false,
+
+    cookie: {
+
+      httpOnly:
+        true,
+
+      secure:
+        IS_PRODUCTION,
+
+      sameSite:
+        "lax",
+
+      maxAge:
+        24 * 60 * 60 * 1000
+
+    }
+
+  })
+);
+
+/* ==========================================================================
+   PASSPORT
+========================================================================== */
+
+app.use(
+  passport.initialize()
+);
+
+app.use(
+  passport.session()
+);
+
+passport.serializeUser(
+  (user, done) =>
+    done(
+      null,
+      user
+    )
+);
+
+passport.deserializeUser(
+  (user, done) =>
+    done(
+      null,
+      user
+    )
+);
+
+if (
+  process.env.GOOGLE_CLIENT_ID &&
+  process.env.GOOGLE_CLIENT_SECRET
+) {
+
+  passport.use(
+
+    new GoogleStrategy(
+
+      {
+
+        clientID:
+          process.env.GOOGLE_CLIENT_ID,
+
+        clientSecret:
+          process.env.GOOGLE_CLIENT_SECRET,
+
+        callbackURL:
+          process.env.GOOGLE_CALLBACK_URL ||
+          `${process.env.FRONTEND_URL}/auth/google/callback`
+
+      },
+
+      async (
+        accessToken,
+        refreshToken,
+        profile,
+        done
+      ) => {
+
+        done(
+
+          null,
+
+          {
+
+            id:
+              profile.id,
+
+            displayName:
+              profile.displayName,
+
+            email:
+              profile.emails?.[0]?.value ||
+              null
+
+          }
+
+        );
+
+      }
+
+    )
+
+  );
+
+}
 
 /* ==========================================================================
    HELPER FUNCTIONS
 ========================================================================== */
 
-function pick(obj, keys) {
+function pick(
+  obj,
+  keys
+) {
 
-  for (const key of keys) {
+  for (
+    const key of keys
+  ) {
 
     if (
+
       obj?.[key] !== undefined &&
+
       obj?.[key] !== null &&
-      String(obj[key]).trim() !== ""
+
+      String(
+        obj[key]
+      ).trim() !== ""
+
     ) {
 
       return obj[key];
@@ -314,7 +584,9 @@ function pick(obj, keys) {
 
 }
 
-function numberValue(value) {
+function numberValue(
+  value
+) {
 
   if (
     value === null ||
@@ -328,20 +600,38 @@ function numberValue(value) {
 
   const number =
     Number(
+
       String(value)
-        .replace(/[$,]/g, "")
-        .replace(/[^0-9.-]/g, "")
+
+        .replace(
+          /[$,]/g,
+          ""
+        )
+
+        .replace(
+          /[^0-9.-]/g,
+          ""
+        )
+
     );
 
-  return Number.isFinite(number)
+  return Number.isFinite(
+    number
+  )
     ? number
     : null;
 
 }
 
-function dateValue(value) {
+function dateValue(
+  value
+) {
 
-  if (!value) return null;
+  if (!value) {
+
+    return null;
+
+  }
 
   const date =
     new Date(value);
@@ -362,7 +652,9 @@ function dateValue(value) {
 
 }
 
-function normalizeText(value) {
+function normalizeText(
+  value
+) {
 
   if (
     value === null ||
@@ -380,133 +672,136 @@ function normalizeText(value) {
 
 }
 
-function sleep(ms) {
+function sleep(
+  ms
+) {
 
   return new Promise(
-    resolve => setTimeout(resolve, ms)
+    resolve =>
+      setTimeout(
+        resolve,
+        ms
+      )
   );
 
 }
 
-/* ==========================================================================
-   ADDRESS NORMALIZATION
-========================================================================== */
+function safeNumber(
+  value,
+  fallback = 0
+) {
 
-function addressFromRaw(city, raw) {
+  const number =
+    Number(value);
 
-  if (city === "Austin") {
+  return Number.isFinite(
+    number
+  )
+    ? number
+    : fallback;
 
-    return [
+}
 
-      pick(raw, [
-        "original_address1",
-        "address",
-        "street_number"
-      ]),
+function safeArray(
+  value
+) {
 
-      pick(raw, [
-        "original_address2",
-        "street_name"
-      ])
-
-    ]
-      .filter(Boolean)
-      .join(" ") || null;
-
-  }
-
-  if (city === "Chicago") {
-
-    return [
-
-      pick(raw, [
-        "street_number"
-      ]),
-
-      pick(raw, [
-        "street_direction"
-      ]),
-
-      pick(raw, [
-        "street_name"
-      ]),
-
-      pick(raw, [
-        "street_type"
-      ])
-
-    ]
-      .filter(Boolean)
-      .join(" ") || null;
-
-  }
-
-  return normalizeText(
-    pick(raw, [
-      "address",
-      "site_address",
-      "address_line1",
-      "property_address"
-    ])
-  );
+  return Array.isArray(
+    value
+  )
+    ? value
+    : [];
 
 }
 
 /* ==========================================================================
-   AI SCORE
+   AI SCORING
 ========================================================================== */
 
-function scoreLead(permit) {
+function scoreLead(
+  permit
+) {
 
-  let score = 50;
+  let score =
+    50;
 
   const type =
     String(
-      permit.permit_type || ""
+      permit.permit_type ||
+      ""
     ).toLowerCase();
 
   const value =
     Number(
-      permit.estimated_value || 0
+      permit.estimated_value ||
+      0
     );
 
   if (
-    type.includes("commercial")
+    type.includes(
+      "commercial"
+    )
   ) {
 
-    score += 25;
+    score +=
+      25;
 
   }
 
   if (
-    type.includes("building") ||
-    type.includes("construction")
+
+    type.includes(
+      "building"
+    ) ||
+
+    type.includes(
+      "construction"
+    )
+
   ) {
 
-    score += 10;
+    score +=
+      10;
 
   }
 
   if (
-    type.includes("remodel") ||
-    type.includes("renovation")
+
+    type.includes(
+      "remodel"
+    ) ||
+
+    type.includes(
+      "renovation"
+    )
+
   ) {
 
-    score += 8;
+    score +=
+      8;
 
   }
 
-  if (value >= 1000000) {
+  if (
+    value >= 1000000
+  ) {
 
-    score += 20;
+    score +=
+      20;
 
-  } else if (value >= 500000) {
+  } else if (
+    value >= 500000
+  ) {
 
-    score += 15;
+    score +=
+      15;
 
-  } else if (value >= 100000) {
+  } else if (
+    value >= 100000
+  ) {
 
-    score += 10;
+    score +=
+      10;
 
   }
 
@@ -518,7 +813,104 @@ function scoreLead(permit) {
 }
 
 /* ==========================================================================
-   PERMIT NORMALIZATION
+   ADDRESS NORMALIZATION
+========================================================================== */
+
+function addressFromRaw(
+  city,
+  raw
+) {
+
+  if (
+    city === "Austin"
+  ) {
+
+    return [
+
+      pick(
+        raw,
+        [
+          "original_address1",
+          "address",
+          "street_number"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "original_address2",
+          "street_name"
+        ]
+      )
+
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+      null;
+
+  }
+
+  if (
+    city === "Chicago"
+  ) {
+
+    return [
+
+      pick(
+        raw,
+        [
+          "street_number"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "street_direction"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "street_name"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "street_type"
+        ]
+      )
+
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+      null;
+
+  }
+
+  return normalizeText(
+
+    pick(
+      raw,
+      [
+        "address",
+        "site_address",
+        "address_line1",
+        "property_address",
+        "address_line_1"
+      ]
+    )
+
+  );
+
+}
+
+/* ==========================================================================
+   PERMIT MAPPING
 ========================================================================== */
 
 function mapPermitData(
@@ -528,71 +920,86 @@ function mapPermitData(
 
   const permitId =
     normalizeText(
-      pick(raw, [
 
-        "permit_id",
-        "permit_num",
-        "permit_number",
-        "permitnum",
-        "id",
-        "permit",
-        "record_id"
+      pick(
+        raw,
+        [
+          "permit_id",
+          "permit_num",
+          "permit_number",
+          "permitnum",
+          "id",
+          "permit",
+          "record_id"
+        ]
+      )
 
-      ])
     );
 
   const permitType =
     normalizeText(
-      pick(raw, [
 
-        "permit_type_definition",
-        "permit_type_desc",
-        "permit_type",
-        "permit_type_name",
-        "type",
-        "work_type"
+      pick(
+        raw,
+        [
+          "permit_type_definition",
+          "permit_type_desc",
+          "permit_type",
+          "permit_type_name",
+          "type",
+          "work_type"
+        ]
+      )
 
-      ])
     );
 
   const status =
     normalizeText(
-      pick(raw, [
 
-        "status_current",
-        "status",
-        "permit_status",
-        "current_status"
+      pick(
+        raw,
+        [
+          "status_current",
+          "status",
+          "permit_status",
+          "current_status"
+        ]
+      )
 
-      ])
     );
 
   const issuedDate =
     dateValue(
-      pick(raw, [
 
-        "issued_date",
-        "issue_date",
-        "Issue Date",
-        "issued",
-        "application_date"
+      pick(
+        raw,
+        [
+          "issued_date",
+          "issue_date",
+          "Issue Date",
+          "issued",
+          "application_date"
+        ]
+      )
 
-      ])
     );
 
   const valuation =
     numberValue(
-      pick(raw, [
 
-        "estimated_value",
-        "estimated_cost",
-        "total_job_valuation",
-        "reported_cost",
-        "valuation",
-        "job_value",
-        "declared_valuation"
+      pick(
+        raw,
+        [
+          "estimated_value",
+          "estimated_cost",
+          "total_job_valuation",
+          "reported_cost",
+          "valuation",
+          "job_value",
+          "declared_valuation"
+        ]
+      )
 
-      ])
     );
 
   const address =
@@ -605,17 +1012,11 @@ function mapPermitData(
     JSON.stringify({
 
       cityName,
-
       permitId,
-
       permitType,
-
       status,
-
       issuedDate,
-
       valuation,
-
       address
 
     });
@@ -655,18 +1056,14 @@ function mapPermitData(
       25000,
 
     ai_score:
-      0,
-
-    _address:
-      address,
-
-    _raw:
-      raw
+      0
 
   };
 
   const score =
-    scoreLead(base);
+    scoreLead(
+      base
+    );
 
   return {
 
@@ -679,7 +1076,10 @@ function mapPermitData(
       Number(
         (
           0.70 +
-          Math.min(score, 100) / 333
+          Math.min(
+            score,
+            100
+          ) / 333
         ).toFixed(2)
       ),
 
@@ -689,6 +1089,81 @@ function mapPermitData(
   };
 
 }
+
+/* ==========================================================================
+   AI ENGINE
+========================================================================== */
+
+export const AI_ENGINE = {
+
+  async enrichPermit(
+    permit
+  ) {
+
+    const estimatedValue =
+      Number(
+        permit.estimated_value ||
+        25000
+      );
+
+    const score =
+      scoreLead(
+        permit
+      );
+
+    return {
+
+      ...permit,
+
+      ai_enriched:
+        true,
+
+      estimated_value:
+        estimatedValue,
+
+      ai_confidence:
+        Number(
+          (
+            0.70 +
+            Math.min(
+              score,
+              100
+            ) / 333
+          ).toFixed(2)
+        ),
+
+      ai_score:
+        score,
+
+      ai_note:
+        "GRIDV21 heuristic AI engine"
+
+    };
+
+  },
+
+  scoreLead,
+
+  predictRevenue(
+    permit
+  ) {
+
+    return Number(
+
+      (
+
+        Number(
+          permit.estimated_value ||
+          25000
+        ) * 0.03
+
+      ).toFixed(2)
+
+    );
+
+  }
+
+};
 
 /* ==========================================================================
    HTTP FETCH
@@ -727,7 +1202,10 @@ async function axiosWithAbort(
             headers: {
 
               "User-Agent":
-                `GRIDV21-BRAIN/${VERSION}`
+                `GRIDV21-BRAIN/${VERSION}`,
+
+              Accept:
+                "application/json,text/csv,*/*"
 
             },
 
@@ -740,13 +1218,18 @@ async function axiosWithAbort(
         );
 
       logger.info(
+
         reqId,
+
         `Fetched ${url} (${response.status})`
+
       );
 
       return response.data;
 
-    } catch (error) {
+    } catch (
+      error
+    ) {
 
       lastError =
         error;
@@ -762,8 +1245,11 @@ async function axiosWithAbort(
       }
 
       logger.warn(
+
         reqId,
+
         `Fetch attempt ${attempt}/${retries} failed: ${error.message}`
+
       );
 
       if (
@@ -793,29 +1279,37 @@ async function supabaseBatchInsert(
   rows
 ) {
 
-  if (!rows.length) {
+  if (
+    !rows.length
+  ) {
 
     return {
-      inserted: 0,
-      errors: 0
+
+      inserted:
+        0,
+
+      errors:
+        0
+
     };
 
   }
 
-  let inserted = 0;
-
-  let errors = 0;
+  let inserted =
+    0;
 
   for (
     let i = 0;
     i < rows.length;
-    i += SCAN_SETTINGS.batchSize
+    i +=
+      SCAN_SETTINGS.batchSize
   ) {
 
     const batch =
       rows.slice(
         i,
-        i + SCAN_SETTINGS.batchSize
+        i +
+          SCAN_SETTINGS.batchSize
       );
 
     const {
@@ -823,12 +1317,13 @@ async function supabaseBatchInsert(
     } =
       await supabase
         .from(table)
-        .insert(batch);
+        .insert(
+          batch
+        );
 
-    if (error) {
-
-      errors +=
-        batch.length;
+    if (
+      error
+    ) {
 
       throw error;
 
@@ -840,8 +1335,12 @@ async function supabaseBatchInsert(
   }
 
   return {
+
     inserted,
-    errors
+
+    errors:
+      0
+
   };
 
 }
@@ -854,11 +1353,18 @@ async function insertNewPermits(
   rows
 ) {
 
-  if (!rows.length) {
+  if (
+    !rows.length
+  ) {
 
     return {
-      inserted: 0,
-      skipped: 0
+
+      inserted:
+        0,
+
+      skipped:
+        0
+
     };
 
   }
@@ -866,11 +1372,16 @@ async function insertNewPermits(
   const ids =
     [
       ...new Set(
+
         rows
+
           .map(
-            row => row.permit_id
+            row =>
+              row.permit_id
           )
+
           .filter(Boolean)
+
       )
     ];
 
@@ -895,20 +1406,25 @@ async function insertNewPermits(
     } =
       await supabase
         .from("permits")
-        .select("permit_id")
+        .select(
+          "permit_id"
+        )
         .in(
           "permit_id",
           chunk
         );
 
-    if (error) {
+    if (
+      error
+    ) {
 
       throw error;
 
     }
 
     for (
-      const row of data || []
+      const row of
+        data || []
     ) {
 
       existing.add(
@@ -923,383 +1439,18 @@ async function insertNewPermits(
     [];
 
   const seen =
-    new Set(existing);
+    new Set(
+      existing
+    );
 
   for (
-    const row of rows
+    const row of
+      rows
   ) {
 
     if (
+
       !row.permit_id ||
-      seen.has(row.permit_id)
-    ) {
 
-      continue;
-
-    }
-
-    seen.add(
-      row.permit_id
-    );
-
-    unique.push(
-      row
-    );
-
-  }
-
-  if (!unique.length) {
-
-    return {
-
-      inserted: 0,
-
-      skipped:
-        rows.length
-
-    };
-
-  }
-
-  const result =
-    await supabaseBatchInsert(
-      "permits",
-      unique
-    );
-
-  return {
-
-    inserted:
-      result.inserted,
-
-    skipped:
-      rows.length -
-      result.inserted
-
-  };
-
-}
-
-/* ==========================================================================
-   OPTIONAL SCAN LOG
-========================================================================== */
-
-async function writeScanLog(
-  payload
-) {
-
-  try {
-
-    const {
-      error
-    } =
-      await supabase
-        .from("scan_logs")
-        .insert(payload);
-
-    if (
-      error &&
-      !/relation .*scan_logs.* does not exist/i.test(
-        error.message || ""
-      )
-    ) {
-
-      logger.warn(
-        "scan-log",
-        error.message
-      );
-
-    }
-
-  } catch (error) {
-
-    logger.warn(
-      "scan-log",
-      error.message
-    );
-
-  }
-
-}
-
-/* ==========================================================================
-   CITY SCANNER
-========================================================================== */
-
-async function scanCity(
-  city,
-  reqId,
-  signal
-) {
-
-  const rawText =
-    await axiosWithAbort(
-      city.url,
-      reqId,
-      signal
-    );
-
-  let records;
-
-  if (
-    city.type === "csv"
-  ) {
-
-    const parsed =
-      Papa.parse(
-        rawText,
-        {
-
-          header: true,
-
-          skipEmptyLines:
-            true,
-
-          dynamicTyping:
-            false
-
-        }
-      );
-
-    if (
-      parsed.errors?.length
-    ) {
-
-      logger.warn(
-        reqId,
-        `${city.name}: ${parsed.errors.length} CSV parse warnings`
-      );
-
-    }
-
-    records =
-      parsed.data || [];
-
-  } else {
-
-    records =
-      typeof rawText === "string"
-        ? JSON.parse(rawText)
-        : rawText;
-
-  }
-
-  if (
-    !Array.isArray(records)
-  ) {
-
-    records =
-      records?.data ||
-      [];
-
-  }
-
-  const mapped =
-    records
-      .map(
-        row =>
-          mapPermitData(
-            city.name,
-            row
-          )
-      )
-      .filter(Boolean);
-
-  return {
-
-    city:
-      city.name,
-
-    fetched:
-      records.length,
-
-    mapped
-
-  };
-
-}
-
-/* ==========================================================================
-   FULL SCAN
-========================================================================== */
-
-export async function scanAllCities(
-  reqId = crypto.randomUUID()
-) {
-
-  if (
-    ENGINE.scanning
-  ) {
-
-    return {
-
-      ok: false,
-
-      status:
-        "already_scanning",
-
-      message:
-        "A scan is already running."
-
-    };
-
-  }
-
-  if (
-    !ENGINE.running
-  ) {
-
-    return {
-
-      ok: false,
-
-      status:
-        "paused",
-
-      message:
-        "Brain is paused."
-
-    };
-
-  }
-
-  ENGINE.scanning =
-    true;
-
-  ENGINE.lastError =
-    null;
-
-  ENGINE.permitsFound =
-    0;
-
-  ENGINE.errors =
-    0;
-
-  const started =
-    Date.now();
-
-  const scanStartedAt =
-    new Date().toISOString();
-
-  currentScanAbortController =
-    new AbortController();
-
-  const timeout =
-    setTimeout(
-      () =>
-        currentScanAbortController?.abort(),
-      SCAN_SETTINGS.scanTimeout
-    );
-
-  const result = {
-
-    ok: true,
-
-    status:
-      "completed",
-
-    started_at:
-      scanStartedAt,
-
-    cities: [],
-
-    fetched: 0,
-
-    inserted: 0,
-
-    skipped: 0,
-
-    errors: 0
-
-  };
-
-  try {
-
-    for (
-      const city of CITIES
-    ) {
-
-      if (
-        !ENGINE.running ||
-        currentScanAbortController
-          .signal
-          .aborted
-      ) {
-
-        result.status =
-          "aborted";
-
-        break;
-
-      }
-
-      try {
-
-        const cityResult =
-          await scanCity(
-            city,
-            reqId,
-            currentScanAbortController.signal
-          );
-
-        const rows =
-          cityResult.mapped
-            .map(
-              ({
-                _address,
-                _raw,
-                ...dbRow
-              }) =>
-                dbRow
-            );
-
-        const saved =
-          await insertNewPermits(
-            rows
-          );
-
-        result.fetched +=
-          cityResult.fetched;
-
-        result.inserted +=
-          saved.inserted;
-
-        result.skipped +=
-          saved.skipped;
-
-        result.cities.push({
-
-          name:
-            city.name,
-
-          fetched:
-            cityResult.fetched,
-
-          inserted:
-            saved.inserted,
-
-          skipped:
-            saved.skipped
-
-        });
-
-        ENGINE.permitsFound +=
-          saved.inserted;
-
-      } catch (error) {
-
-        result.errors +=
-          1;
-
-        ENGINE.errors +=
-          1;
-
-        ENGINE.lastError =
-          `${city.name}: ${error.message}`;
-
-        result.cities.push({
-
-          name:
-            city.name,
-
- 
+      seen.has(
+        row.permit_i
