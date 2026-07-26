@@ -1425,6 +1425,7 @@ async function runFullScan(reqId = "SYSTEM") {
   try {
 
     logger.info(reqId, "=== FULL SCAN STARTED ===");
+    await logActivity("info", "scan_started", "Full scan started");
 
     for (const city of CITIES) {
 
@@ -1436,11 +1437,25 @@ async function runFullScan(reqId = "SYSTEM") {
         const result = await scanCity(city, reqId, signal);
         totalInserted += result.inserted || 0;
         totalSkipped += result.skipped || 0;
+
+        // Log each city result
+        await logActivity(
+          "success",
+          "scan_city",
+          `Scanned ${city.name}: inserted ${result.inserted}, skipped ${result.skipped}`
+        );
+
       } catch (err) {
         totalErrors++;
         ENGINE.errors++;
         ENGINE.lastError = err.message;
         await logger.error(reqId, `City ${city.name} failed: ${err.message}`);
+
+        await logActivity(
+          "error",
+          "scan_city_error",
+          `Failed scanning ${city.name}: ${err.message}`
+        );
       }
 
       // polite delay between cities
@@ -1454,6 +1469,13 @@ async function runFullScan(reqId = "SYSTEM") {
     logger.info(
       reqId,
       `=== SCAN COMPLETE === inserted=${totalInserted} skipped=${totalSkipped} errors=${totalErrors} duration=${ENGINE.lastScanDuration}ms`
+    );
+
+    // Log full scan completion
+    await logActivity(
+      "info",
+      "scan_complete",
+      `Full scan finished. Inserted: ${totalInserted}, Skipped: ${totalSkipped}, Errors: ${totalErrors}`
     );
 
     return {
@@ -1470,6 +1492,12 @@ async function runFullScan(reqId = "SYSTEM") {
     ENGINE.errors++;
     await logger.error(reqId, `Full scan crashed: ${err.message}`);
 
+    await logActivity(
+      "error",
+      "scan_crashed",
+      `Full scan crashed: ${err.message}`
+    );
+
     return {
       status: "error",
       message: err.message
@@ -1482,7 +1510,7 @@ async function runFullScan(reqId = "SYSTEM") {
 
   }
 
-}
+  }
 
 /* ==========================================================================
    AUTH HELPERS
