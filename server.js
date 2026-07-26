@@ -1874,6 +1874,60 @@ if (SCAN_SETTINGS.cron) {
   });
   console.log(`[CRON] Scheduled: ${SCAN_SETTINGS.cron}`);
 }
+/* ==========================================================================
+   ROUTES – ENHANCED LEADS (with advice)
+========================================================================== */
+
+app.get("/api/leads", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const minScore = Number(req.query.min_score) || 0;
+
+    let query = supabase
+      .from("permits")
+      .select("*")
+      .order("issued_date", { ascending: false })
+      .limit(limit);
+
+    if (minScore > 0) {
+      query = query.gte("ai_score", minScore);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const enriched = (data || []).map(lead => {
+      const score = lead.ai_score || 0;
+      const value = Number(lead.estimated_value || 0);
+      const type = (lead.permit_type || "").toLowerCase();
+
+      let advice = "Monitor – low priority";
+      let buyers = ["General contractors", "Local realtors"];
+
+      if (score >= 80 || value >= 500000) {
+        advice = "High priority – push to developers & large GCs immediately";
+        buyers = ["Commercial developers", "General contractors", "Investment groups"];
+      } else if (score >= 60 || value >= 150000) {
+        advice = "Good opportunity – target specialty trades & mid-size contractors";
+        buyers = ["Remodel contractors", "Specialty trades", "Property managers"];
+      } else if (type.includes("commercial")) {
+        advice = "Commercial lead – focus on commercial brokers & developers";
+        buyers = ["Commercial brokers", "Developers", "Facility managers"];
+      }
+
+      return {
+        ...lead,
+        advice,
+        possible_buyers: buyers,
+        estimated_commission: Number((value * 0.03).toFixed(2))
+      };
+    });
+
+    res.json({ data: enriched });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 /* ==========================================================================
    ERROR HANDLING
