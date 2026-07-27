@@ -1427,3 +1427,896 @@ export async function scanAllCities(
     scanPromise = null;
   }
     }
+/* -------------------------------------------------------------------------- */
+/* AUTH / ADMIN HELPERS                                                       */
+/* -------------------------------------------------------------------------- */
+
+function requireAdmin(req, res, next) {
+  const supplied =
+    req.headers["x-admin-key"] ||
+    req.query.admin_key ||
+    req.body?.admin_key;
+
+  if (
+    !supplied ||
+    supplied !== process.env.ADMIN_KEY
+  ) {
+    return res.status(401).json({
+      ok: false,
+      error: "Unauthorized"
+    });
+  }
+
+  next();
+}
+
+function requireBrainAccess(req, res, next) {
+  if (
+    req.isAuthenticated?.() ||
+    req.headers["x-admin-key"] ===
+      process.env.ADMIN_KEY ||
+    req.query.admin_key ===
+      process.env.ADMIN_KEY
+  ) {
+    return next();
+  }
+
+  return res.status(401).json({
+    ok: false,
+    error: "Authentication required"
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* HEALTH                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get("/api/health", async (req, res) => {
+  let database = "unknown";
+
+  try {
+    const { error } = await supabase
+      .from("os_modules")
+      .select("id")
+      .limit(1);
+
+    database = error
+      ? "error"
+      : "connected";
+  } catch (_) {
+    database = "error";
+  }
+
+  res.json({
+    ok: true,
+    version: VERSION,
+    service: "GRIDV21 BRAIN",
+    database,
+    engine: {
+      running: ENGINE.running,
+      scanning: ENGINE.scanning,
+      emergency_stopped:
+        ENGINE.emergencyStopped,
+      last_scan:
+        ENGINE.lastScan,
+      permits_found:
+        ENGINE.permitsFound,
+      errors: ENGINE.errors,
+      uptime_seconds: Math.floor(
+        (Date.now() -
+          ENGINE.uptime) /
+          1000
+      )
+    },
+    os_count:
+      OS_MODULES.length,
+    timestamp:
+      new Date().toISOString()
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* TEST                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get("/api/test", (req, res) => {
+  res.json({
+    ok: true,
+    message:
+      "GRIDV21 BRAIN API operational",
+    version: VERSION,
+    request_id: req.id
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* CONFIG                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    ok: true,
+    version: VERSION,
+    frontend_url:
+      process.env.FRONTEND_URL,
+    stripe_enabled:
+      Boolean(stripe),
+    google_oauth_enabled:
+      Boolean(
+        process.env.GOOGLE_CLIENT_ID &&
+        process.env.GOOGLE_CLIENT_SECRET
+      ),
+    cities: CITIES.map(city => ({
+      name: city.name,
+      type: city.type
+    })),
+    os_modules: OS_MODULES,
+    scan_settings: {
+      batchSize:
+        SCAN_SETTINGS.batchSize,
+      requestDelay:
+        SCAN_SETTINGS.requestDelay,
+      requestTimeout:
+        SCAN_SETTINGS.requestTimeout,
+      scanTimeout:
+        SCAN_SETTINGS.scanTimeout,
+      cron:
+        SCAN_SETTINGS.cron,
+      concurrency:
+        SCAN_SETTINGS.concurrency
+    }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* AUTH                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/auth/google",
+  (req, res, next) => {
+    if (
+      !process.env.GOOGLE_CLIENT_ID ||
+      !process.env.GOOGLE_CLIENT_SECRET
+    ) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "Google OAuth is not configured"
+      });
+    }
+
+    passport.authenticate("google", {
+      scope: [
+        "profile",
+        "email"
+      ]
+    })(req, res, next);
+  }
+);
+
+app.get(
+  "/auth/google/callback",
+  (req, res, next) => {
+    passport.authenticate(
+      "google",
+      {
+        failureRedirect:
+          "/?auth=failed"
+      },
+      (error, user) => {
+        if (error || !user) {
+          return res.redirect(
+            "/?auth=failed"
+          );
+        }
+
+        req.logIn(
+          user,
+          loginError => {
+            if (loginError) {
+              return res.redirect(
+                "/?auth=failed"
+              );
+            }
+
+            return res.redirect(
+              "/?auth=success"
+            );
+          }
+        );
+      }
+    )(req, res, next);
+  }
+);
+
+app.get(
+  "/auth/me",
+  (req, res) => {
+    res.json({
+      ok: true,
+      authenticated:
+        Boolean(
+          req.isAuthenticated?.()
+        ),
+      user:
+        req.user || null
+    });
+  }
+);
+
+app.post(
+  "/auth/logout",
+  (req, res) => {
+    req.logout(error => {
+      if (error) {
+        return res.status(500).json({
+          ok: false,
+          error:
+            error.message
+        });
+      }
+
+      req.session.destroy(() => {
+        res.json({
+          ok: true
+        });
+      });
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* OS MODULES                                                                 */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/os-modules",
+  requireBrainAccess,
+  async (req, res) => {
+    const { data, error } =
+      await supabase
+        .from("os_modules")
+        .select("*")
+        .order("id", {
+          ascending: true
+        });
+
+    if (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error.message,
+        modules: OS_MODULES
+      });
+    }
+
+    res.json({
+      ok: true,
+      count: data?.length || 0,
+      modules: data || []
+    });
+  }
+);
+
+app.post(
+  "/api/os-toggle/:id",
+  requireAdmin,
+  async (req, res) => {
+    const id = Number(
+      req.params.id
+    );
+
+    if (
+      !Number.isInteger(id) ||
+      id < 1 ||
+      id > 12
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error:
+          "OS id must be between 1 and 12"
+      });
+    }
+
+    const enabled =
+      Boolean(req.body?.enabled);
+
+    const { data, error } =
+      await supabase
+        .from("os_modules")
+        .update({
+          enabled,
+          status: enabled
+            ? "active"
+            : "paused",
+          last_run:
+            enabled
+              ? new Date().toISOString()
+              : null
+        })
+        .eq("id", id)
+        .select()
+        .single();
+
+    if (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+
+    await logActivity({
+      eventType: "os",
+      action:
+        "module_toggled",
+      message:
+        `${data.name} ${enabled ? "enabled" : "disabled"}`,
+      metadata: {
+        os_id: id,
+        enabled
+      }
+    });
+
+    res.json({
+      ok: true,
+      module: data
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* OS ACTIVITY                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/activity",
+  requireBrainAccess,
+  async (req, res) => {
+    const limit = Math.min(
+      500,
+      Math.max(
+        1,
+        Number(req.query.limit || 100)
+      )
+    );
+
+    const activity =
+      await getActivity(limit);
+
+    res.json({
+      ok: true,
+      count: activity.length,
+      activity
+    });
+  }
+);
+
+app.get(
+  "/api/os-activity",
+  requireBrainAccess,
+  async (req, res) => {
+    const limit = Math.min(
+      500,
+      Math.max(
+        1,
+        Number(req.query.limit || 100)
+      )
+    );
+
+    const activity =
+      await getActivity(limit);
+
+    res.json({
+      ok: true,
+      count: activity.length,
+      activity
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* DASHBOARD                                                                  */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/dashboard",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const [
+        permitsResult,
+        leadsResult,
+        contractorsResult,
+        revenueResult,
+        projectsResult,
+        modulesResult,
+        integrationsResult,
+        dmResult
+      ] = await Promise.all([
+        supabase
+          .from("permits")
+          .select(
+            "id,city,permit_type,status,issued_date,permit_id,ai_confidence,ai_enriched,estimated_value,ai_score,predicted_revenue,ai_note,address,work_type,work_description,contractor_name,applicant_name,owner_name,latitude,longitude,created_at,updated_at"
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100),
+
+        supabase
+          .from("leads")
+          .select(
+            "id,trade_type,region,value_estimate,status,contractor_id,created_at,external_id"
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100),
+
+        supabase
+          .from("contractors")
+          .select(
+            "id,name,phone,email,trade_type,region,address,dm_sent_count,last_dm_at,os_module,paid_status,created_at"
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100),
+
+        supabase
+          .from("revenue_log")
+          .select(
+            "id,amount,source,contractor_id,lead_id,created_at"
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100),
+
+        supabase
+          .from("projects")
+          .select("*")
+          .order(
+            "updated_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100),
+
+        supabase
+          .from("os_modules")
+          .select("*")
+          .order(
+            "id",
+            {
+              ascending: true
+            }
+          ),
+
+        supabase
+          .from("integrations")
+          .select("*")
+          .order(
+            "id",
+            {
+              ascending: true
+            }
+          ),
+
+        supabase
+          .from("dm_logs")
+          .select("*")
+          .order(
+            "sent_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(100)
+      ]);
+
+      const permits =
+        permitsResult.data || [];
+
+      const leads =
+        leadsResult.data || [];
+
+      const contractors =
+        contractorsResult.data || [];
+
+      const revenue =
+        revenueResult.data || [];
+
+      const projects =
+        projectsResult.data || [];
+
+      const modules =
+        modulesResult.data || [];
+
+      const integrations =
+        integrationsResult.data || [];
+
+      const dms =
+        dmResult.data || [];
+
+      const totalRevenue =
+        revenue.reduce(
+          (sum, row) =>
+            sum +
+            safeNumber(row.amount),
+          0
+        );
+
+      const estimatedRevenue =
+        permits.reduce(
+          (sum, row) =>
+            sum +
+            safeNumber(
+              row.predicted_revenue
+            ),
+          0
+        );
+
+      const activeOS =
+        modules.filter(
+          row =>
+            row.enabled !== false &&
+            row.status !== "paused"
+        ).length;
+
+      const activeIntegrations =
+        integrations.filter(
+          row =>
+            row.status === "active" ||
+            row.status === "connected"
+        ).length;
+
+      const recentPermits =
+        permits.slice(0, 50);
+
+      const topLeads =
+        [...recentPermits]
+          .sort(
+            (a, b) =>
+              safeNumber(
+                b.ai_score
+              ) -
+              safeNumber(
+                a.ai_score
+              )
+          )
+          .slice(0, 20);
+
+      res.json({
+        ok: true,
+        version: VERSION,
+
+        metrics: {
+          total_leads:
+            leads.length ||
+            permits.length,
+
+          permits:
+            permits.length,
+
+          contractors:
+            contractors.length,
+
+          dms_sent:
+            dms.length,
+
+          projects:
+            projects.length,
+
+          est_revenue_month:
+            Number(
+              estimatedRevenue.toFixed(
+                2
+              )
+            ),
+
+          revenue:
+            Number(
+              totalRevenue.toFixed(
+                2
+              )
+            ),
+
+          os_active:
+            activeOS,
+
+          integrations_active:
+            activeIntegrations
+        },
+
+        engine: {
+          running:
+            ENGINE.running,
+
+          scanning:
+            ENGINE.scanning,
+
+          emergency_stopped:
+            ENGINE.emergencyStopped,
+
+          last_scan:
+            ENGINE.lastScan,
+
+          last_scan_duration:
+            ENGINE.lastScanDuration,
+
+          permits_found:
+            ENGINE.permitsFound,
+
+          errors:
+            ENGINE.errors,
+
+          last_error:
+            ENGINE.lastError
+        },
+
+        os_modules:
+          modules.length
+            ? modules
+            : OS_MODULES,
+
+        permits:
+          recentPermits,
+
+        top_leads:
+          topLeads,
+
+        leads,
+
+        contractors,
+
+        projects,
+
+        revenue,
+
+        integrations,
+
+        activity:
+          await getActivity(50)
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.stack ||
+          error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error:
+          error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* PERMITS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/permits",
+  requireBrainAccess,
+  async (req, res) => {
+    const limit = Math.min(
+      500,
+      Math.max(
+        1,
+        Number(req.query.limit || 100)
+      )
+    );
+
+    let query = supabase
+      .from("permits")
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending: false
+        }
+      )
+      .limit(limit);
+
+    if (req.query.city) {
+      query = query.eq(
+        "city",
+        req.query.city
+      );
+    }
+
+    if (req.query.status) {
+      query = query.eq(
+        "status",
+        req.query.status
+      );
+    }
+
+    const { data, error } =
+      await query;
+
+    if (error) {
+      return res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+
+    res.json({
+      ok: true,
+      count: data?.length || 0,
+      permits: data || []
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* SCAN NOW                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/scrape-now",
+  requireAdmin,
+  async (req, res) => {
+    if (ENGINE.scanning) {
+      return res.status(409).json({
+        ok: false,
+        error:
+          "A scan is already running"
+      });
+    }
+
+    if (
+      ENGINE.emergencyStopped
+    ) {
+      return res.status(423).json({
+        ok: false,
+        error:
+          "Emergency stop is active"
+      });
+    }
+
+    const requestId =
+      crypto.randomUUID();
+
+    scanPromise =
+      scanAllCities(requestId);
+
+    res.status(202).json({
+      ok: true,
+      message:
+        "Scan started",
+      request_id:
+        requestId,
+      version: VERSION
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* SCAN STATUS                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/scan-status",
+  requireBrainAccess,
+  (req, res) => {
+    res.json({
+      ok: true,
+      scanning:
+        ENGINE.scanning,
+      running:
+        ENGINE.running,
+      emergency_stopped:
+        ENGINE.emergencyStopped,
+      last_scan:
+        ENGINE.lastScan,
+      last_scan_duration:
+        ENGINE.lastScanDuration,
+      permits_found:
+        ENGINE.permitsFound,
+      errors:
+        ENGINE.errors,
+      last_error:
+        ENGINE.lastError
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* BRAIN CONTROL                                                              */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/brain/pause",
+  requireAdmin,
+  async (req, res) => {
+    ENGINE.running = false;
+
+    await logActivity({
+      eventType: "brain",
+      action: "paused",
+      message:
+        "GRIDV21 BRAIN paused"
+    });
+
+    res.json({
+      ok: true,
+      running:
+        ENGINE.running
+    });
+  }
+);
+
+app.post(
+  "/api/brain/resume",
+  requireAdmin,
+  async (req, res) => {
+    ENGINE.running = true;
+    ENGINE.emergencyStopped = false;
+
+    await logActivity({
+      eventType: "brain",
+      action: "resumed",
+      message:
+        "GRIDV21 BRAIN resumed"
+    });
+
+    res.json({
+      ok: true,
+      running:
+        ENGINE.running,
+      emergency_stopped:
+        ENGINE.emergencyStopped
+    });
+  }
+);
+
+app.post(
+  "/api/brain/emergency-stop",
+  requireAdmin,
+  async (req, res) => {
+    ENGINE.emergencyStopped = true;
+    ENGINE.running = false;
+
+    if (
+      currentScanAbortController
+    ) {
+      currentScanAbortController.abort();
+    }
+
+    await logActivity({
+      eventType: "brain",
+      action:
+        "emergency_stop",
+      message:
+        "GRIDV21 BRAIN emergency stop activated",
+      status: "warning"
+    });
+
+    res.json({
+      ok: true,
+      running:
+        ENGINE.running,
+      emergency_stopped:
+        ENGINE.emergencyStopped
+    });
+  }
+);
