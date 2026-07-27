@@ -2320,3 +2320,953 @@ app.post(
     });
   }
 );
+/* -------------------------------------------------------------------------- */
+/* FORECAST                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/forecast",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("permits")
+          .select(
+            "estimated_value,ai_score,predicted_revenue"
+          )
+          .limit(5000);
+
+      if (error) throw error;
+
+      const permits = data || [];
+
+      const pipeline =
+        permits.reduce(
+          (sum, permit) =>
+            sum +
+            safeNumber(
+              permit.estimated_value
+            ),
+          0
+        );
+
+      const projectedRevenue =
+        permits.reduce(
+          (sum, permit) =>
+            sum +
+            safeNumber(
+              permit.predicted_revenue
+            ),
+          0
+        );
+
+      const averageScore =
+        permits.length
+          ? Number(
+              (
+                permits.reduce(
+                  (sum, permit) =>
+                    sum +
+                    safeNumber(
+                      permit.ai_score
+                    ),
+                  0
+                ) /
+                permits.length
+              ).toFixed(2)
+            )
+          : 0;
+
+      res.json({
+        ok: true,
+        permits: permits.length,
+        estimated_pipeline:
+          Number(
+            pipeline.toFixed(2)
+          ),
+        projected_revenue:
+          Number(
+            projectedRevenue.toFixed(
+              2
+            )
+          ),
+        average_ai_score:
+          averageScore,
+        commission_rate: 0.03,
+        currency: "USD"
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* LEADS                                                                      */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/leads",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const limit = Math.min(
+        500,
+        Math.max(
+          1,
+          Number(
+            req.query.limit || 100
+          )
+        )
+      );
+
+      const { data, error } =
+        await supabase
+          .from("leads")
+          .select("*")
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(limit);
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        leads: data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/leads",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const {
+        trade_type,
+        region,
+        value_estimate,
+        permit_data,
+        status,
+        contractor_id,
+        external_id
+      } = req.body || {};
+
+      if (
+        !trade_type ||
+        !region
+      ) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "trade_type and region are required"
+        });
+      }
+
+      const { data, error } =
+        await supabase
+          .from("leads")
+          .insert({
+            trade_type,
+            region,
+            value_estimate:
+              value_estimate == null
+                ? null
+                : numberValue(
+                    value_estimate
+                  ),
+            permit_data:
+              safeJson(
+                permit_data
+              ),
+            status:
+              status || "new",
+            contractor_id:
+              contractor_id || null,
+            external_id:
+              external_id || null
+          })
+          .select()
+          .single();
+
+      if (error) throw error;
+
+      await logActivity({
+        eventType: "lead",
+        action: "lead_created",
+        message:
+          `Lead created for ${trade_type} in ${region}`,
+        metadata: {
+          lead_id: data.id
+        }
+      });
+
+      res.status(201).json({
+        ok: true,
+        lead: data
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* CONTRACTORS                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/contractors",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const limit = Math.min(
+        500,
+        Math.max(
+          1,
+          Number(
+            req.query.limit || 100
+          )
+        )
+      );
+
+      const { data, error } =
+        await supabase
+          .from("contractors")
+          .select("*")
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(limit);
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        contractors: data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* PROJECTS                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/projects",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("projects")
+          .select(
+            `
+            *,
+            os_modules (
+              id,
+              name,
+              layer,
+              status,
+              enabled
+            )
+            `
+          )
+          .order(
+            "updated_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(500);
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        projects: data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* PROPOSALS                                                                  */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/proposals",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("proposals")
+          .select("*")
+          .order(
+            "generated_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(500);
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        proposals: data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/proposals",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const {
+        lead_id,
+        company,
+        client,
+        value,
+        setup_fee,
+        ai_fee,
+        performance_fee,
+        total_estimate,
+        status
+      } = req.body || {};
+
+      const calculatedTotal =
+        total_estimate != null
+          ? numberValue(
+              total_estimate
+            )
+          : numberValue(value) +
+            numberValue(
+              setup_fee
+            ) +
+            numberValue(ai_fee);
+
+      const { data, error } =
+        await supabase
+          .from("proposals")
+          .insert({
+            lead_id:
+              lead_id || null,
+            company:
+              company || null,
+            client:
+              client || null,
+            value:
+              numberValue(value),
+            setup_fee:
+              numberValue(
+                setup_fee
+              ),
+            ai_fee:
+              numberValue(ai_fee),
+            performance_fee:
+              performance_fee ||
+              null,
+            total_estimate:
+              calculatedTotal,
+            generated_at:
+              new Date().toISOString(),
+            status:
+              status || "draft"
+          })
+          .select()
+          .single();
+
+      if (error) throw error;
+
+      await logActivity({
+        eventType: "proposal",
+        action:
+          "proposal_created",
+        message:
+          `Proposal created for ${company || client || "client"}`,
+        metadata: {
+          proposal_id:
+            data.id
+        }
+      });
+
+      res.status(201).json({
+        ok: true,
+        proposal: data
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* REVENUE                                                                    */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/revenue",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("revenue_log")
+          .select("*")
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(500);
+
+      if (error) throw error;
+
+      const rows = data || [];
+
+      const total =
+        rows.reduce(
+          (sum, row) =>
+            sum +
+            safeNumber(
+              row.amount
+            ),
+          0
+        );
+
+      res.json({
+        ok: true,
+        count: rows.length,
+        total:
+          Number(
+            total.toFixed(2)
+          ),
+        revenue: rows
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* INTEGRATIONS                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/integrations",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("integrations")
+          .select(
+            "id,name,status,api_key_present,last_sync,created_at"
+          )
+          .order(
+            "id",
+            {
+              ascending: true
+            }
+          );
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        integrations:
+          data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* SETTINGS                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/settings",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("settings")
+          .select(
+            "key,value,updated_at"
+          )
+          .order(
+            "key",
+            {
+              ascending: true
+            }
+          );
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        settings:
+          data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/settings",
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const {
+        key,
+        value
+      } = req.body || {};
+
+      if (!key) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "key is required"
+        });
+      }
+
+      const { data, error } =
+        await supabase
+          .from("settings")
+          .upsert(
+            {
+              key: String(key),
+              value:
+                value == null
+                  ? null
+                  : String(value),
+              updated_at:
+                new Date().toISOString()
+            },
+            {
+              onConflict: "key"
+            }
+          )
+          .select()
+          .single();
+
+      if (error) throw error;
+
+      await logActivity({
+        eventType: "settings",
+        action:
+          "setting_updated",
+        message:
+          `Setting ${key} updated`,
+        metadata: {
+          key
+        }
+      });
+
+      res.json({
+        ok: true,
+        setting: data
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* SYSTEM EVENTS                                                              */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/system-events",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const limit = Math.min(
+        500,
+        Math.max(
+          1,
+          Number(
+            req.query.limit || 100
+          )
+        )
+      );
+
+      const { data, error } =
+        await supabase
+          .from("system_events")
+          .select("*")
+          .order(
+            "created_at",
+            {
+              ascending: false
+            }
+          )
+          .limit(limit);
+
+      if (error) throw error;
+
+      res.json({
+        ok: true,
+        count: data?.length || 0,
+        events: data || []
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* CSV EXPORT                                                                 */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/export/permits.csv",
+  requireBrainAccess,
+  async (req, res) => {
+    try {
+      const { data, error } =
+        await supabase
+          .from("permits")
+          .select("*")
+          .order(
+            "issued_date",
+            {
+              ascending: false,
+              nullsFirst: false
+            }
+          )
+          .limit(10000);
+
+      if (error) throw error;
+
+      res.setHeader(
+        "Content-Type",
+        "text/csv; charset=utf-8"
+      );
+
+      res.setHeader(
+        "Content-Disposition",
+        'attachment; filename="gridv21-permits.csv"'
+      );
+
+      res.send(
+        Papa.unparse(
+          data || []
+        )
+      );
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* STRIPE                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/stripe/create-checkout-session",
+  requireAdmin,
+  async (req, res) => {
+    if (!stripe) {
+      return res.status(503).json({
+        ok: false,
+        error:
+          "Stripe is not configured"
+      });
+    }
+
+    try {
+      const {
+        priceId,
+        successUrl,
+        cancelUrl
+      } = req.body || {};
+
+      if (!priceId) {
+        return res.status(400).json({
+          ok: false,
+          error:
+            "priceId is required"
+        });
+      }
+
+      const checkout =
+        await stripe.checkout.sessions.create(
+          {
+            mode: "subscription",
+
+            line_items: [
+              {
+                price: priceId,
+                quantity: 1
+              }
+            ],
+
+            success_url:
+              successUrl ||
+              `${process.env.FRONTEND_URL}/?payment=success`,
+
+            cancel_url:
+              cancelUrl ||
+              `${process.env.FRONTEND_URL}/?payment=cancelled`
+          }
+        );
+
+      res.json({
+        ok: true,
+        id: checkout.id,
+        url: checkout.url
+      });
+    } catch (error) {
+      await logger.error(
+        req.id,
+        error.message
+      );
+
+      res.status(500).json({
+        ok: false,
+        error: error.message
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* ROOT API                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api",
+  (req, res) => {
+    res.json({
+      ok: true,
+      service:
+        "GRIDV21 BRAIN ENTERPRISE",
+      version: VERSION,
+      architecture:
+        "GRIDV21 BRAIN — 12 Intelligence OS",
+      os_count:
+        OS_MODULES.length,
+      message:
+        "API operational"
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* FRONTEND                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+    res.sendFile(
+      path.join(
+        __dirname,
+        "public",
+        "dashboard.html"
+      ),
+      error => {
+        if (
+          error &&
+          !res.headersSent
+        ) {
+          res.json({
+            ok: true,
+            service:
+              "GRIDV21 BRAIN ENTERPRISE",
+            version: VERSION
+          });
+        }
+      }
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* FAVICON                                                                    */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/favicon.ico",
+  (req, res) => {
+    res.status(204).end();
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* CRON                                                                       */
+/* -------------------------------------------------------------------------- */
+
+cron.schedule(
+  SCAN_SETTINGS.cron,
+  async () => {
+    if (
+      !ENGINE.running ||
+      ENGINE.scanning ||
+      ENGINE.emergencyStopped
+    ) {
+      return;
+    }
+
+    const requestId =
+      crypto.randomUUID();
+
+    scanPromise =
+      scanAllCities(
+        requestId
+      );
+
+    await scanPromise;
+  },
+  {
+    timezone:
+      process.env.CRON_TIMEZONE ||
+      "UTC"
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* 404                                                                      
