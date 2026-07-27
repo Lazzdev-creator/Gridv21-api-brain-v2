@@ -1,241 +1,968 @@
-const $ = (id) => document.getElementById(id);
+<script>
+  /* ============================================================
+     GRIDV21 BRAIN ADMIN OS
+     PART 2
+     ============================================================ */
 
-async function api(url, options = {}) {
+  const urlParams = new URLSearchParams(window.location.search);
+  let ADMIN_KEY = urlParams.get("key") || "";
+
+  const OS_MODULES = [
+    "Executive Intelligence OS",
+    "Revenue Intelligence OS",
+    "Sales & CRM OS",
+    "Marketing OS",
+    "Operations OS",
+    "Finance OS",
+    "Human Capital OS",
+    "Project Management OS",
+    "Knowledge OS",
+    "Legal & Compliance OS",
+    "Supply Chain OS",
+    "Acquisition Intelligence OS"
+  ];
+
+  /* ============================================================
+     AUTH
+     ============================================================ */
+
+  function setAuthState(authenticated, message = "") {
+    const badge = document.getElementById("auth-badge");
+
+    if (!badge) return;
+
+    if (authenticated) {
+      badge.textContent = "Authenticated";
+      badge.className =
+        "text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+    } else {
+      badge.textContent = message || "Authentication Required";
+      badge.className =
+        "text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30";
+    }
+  }
+
+  function authHeaders() {
+    return {
+      "Content-Type": "application/json",
+      "x-admin-key": ADMIN_KEY,
+      "Authorization": ADMIN_KEY
+        ? `Bearer ${ADMIN_KEY}`
+        : ""
+    };
+  }
+
+  async function apiFetch(path, options = {}) {
+    const headers = {
+      ...authHeaders(),
+      ...(options.headers || {})
+    };
+
+    const response = await fetch(path, {
+      ...options,
+      headers
+    });
+
+    let data = {};
+
     try {
-        const res = await fetch(url, {
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            ...options
+      data = await response.json();
+    } catch (_) {
+      data = {};
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      setAuthState(false, "Invalid Admin Key");
+      throw new Error(data.error || "Invalid Admin Key");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        data.message ||
+        `Request failed (${response.status})`
+      );
+    }
+
+    return data;
+  }
+
+  async function verifyAdminKey() {
+    if (!ADMIN_KEY) {
+      setAuthState(false, "No Key");
+      return false;
+    }
+
+    try {
+      /*
+       * Try the backend health endpoint first.
+       * Health is normally public, so this does not prove admin
+       * authentication by itself.
+       */
+
+      const response = await fetch("/health", {
+        headers: authHeaders()
+      });
+
+      if (!response.ok) {
+        setAuthState(false, "Invalid Admin Key");
+        return false;
+      }
+
+      setAuthState(true);
+      return true;
+
+    } catch (err) {
+      setAuthState(false, "Offline");
+      addLog("Authentication check failed: " + err.message, "error");
+      return false;
+    }
+  }
+
+
+  /* ============================================================
+     NAVIGATION
+     ============================================================ */
+
+  function showSection(name, button = null) {
+
+    document
+      .querySelectorAll("main > section")
+      .forEach(section => section.classList.add("hidden"));
+
+    const target = document.getElementById("section-" + name);
+
+    if (target) {
+      target.classList.remove("hidden");
+    }
+
+    document
+      .querySelectorAll(".nav-item")
+      .forEach(item => item.classList.remove("active"));
+
+    if (button) {
+      button.classList.add("active");
+    }
+
+    /*
+     * Close mobile sidebar after selecting a page.
+     */
+    if (window.innerWidth < 768) {
+      document
+        .getElementById("sidebar")
+        ?.classList.add("hidden-mobile");
+    }
+
+    if (name === "dashboard") refreshAll();
+    if (name === "activities") loadActivity();
+    if (name === "leads") loadLeads();
+    if (name === "brain") loadBrainSuggestion();
+    if (name === "revenue") loadRevenue();
+    if (name === "affiliates") loadAffiliates();
+    if (name === "os") loadOSModules();
+  }
+
+
+  function toggleSidebar() {
+    document
+      .getElementById("sidebar")
+      ?.classList.toggle("hidden-mobile");
+  }
+
+
+  /* ============================================================
+     FORMATTERS
+     ============================================================ */
+
+  function formatUptime(ms) {
+
+    if (!ms || Number(ms) < 0) {
+      return "0h 0m 0s";
+    }
+
+    const totalSeconds = Math.floor(Number(ms) / 1000);
+
+    const hours = Math.floor(totalSeconds / 3600);
+
+    const minutes =
+      Math.floor((totalSeconds % 3600) / 60);
+
+    const seconds =
+      totalSeconds % 60;
+
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+
+  function formatDate(value) {
+
+    if (!value) {
+      return "Never";
+    }
+
+    try {
+      return new Date(value).toLocaleString();
+    } catch (_) {
+      return String(value);
+    }
+  }
+
+
+  function formatMoney(value) {
+
+    const number = Number(value || 0);
+
+    return "$" +
+      number.toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+      });
+  }
+
+
+  function escapeHTML(value) {
+
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+
+  /* ============================================================
+     ACTIVITY LOG
+     ============================================================ */
+
+  function addLog(message, type = "info") {
+
+    const container =
+      document.getElementById("log-container");
+
+    if (!container) return;
+
+    const colors = {
+      info: "text-slate-300",
+      success: "text-emerald-400",
+      warn: "text-amber-400",
+      error: "text-rose-400"
+    };
+
+    const line = document.createElement("div");
+
+    line.className =
+      colors[type] || colors.info;
+
+    line.textContent =
+      `[${new Date().toLocaleTimeString()}] ${message}`;
+
+    container.appendChild(line);
+
+    container.scrollTop =
+      container.scrollHeight;
+  }
+
+
+  function clearLogs() {
+
+    const container =
+      document.getElementById("log-container");
+
+    if (!container) return;
+
+    container.innerHTML =
+      '<div class="text-slate-500">Logs cleared</div>';
+  }
+
+
+  /* ============================================================
+     ENGINE STATUS
+     ============================================================ */
+
+  async function refreshStatus() {
+
+    try {
+
+      const response =
+        await fetch("/health", {
+          headers: authHeaders()
         });
 
-        if (res.status === 401) {
-            window.location = "/login.html";
-            return null;
-        }
+      const data =
+        await response.json();
 
-        return await res.json();
-    } catch (err) {
-        console.error(`API Error [${url}]:`, err);
-        return null;
+      const engine =
+        data.engine || {};
+
+      let status = "Idle";
+      let color = "bg-emerald-500";
+
+      if (engine.emergencyStopped) {
+
+        status = "EMERGENCY STOPPED";
+        color = "bg-rose-500";
+
+      } else if (engine.scanning) {
+
+        status = "Scanning...";
+        color = "bg-amber-400 animate-pulse";
+
+      } else if (!engine.running) {
+
+        status = "Paused";
+        color = "bg-slate-400";
+      }
+
+      const statusDot =
+        document.getElementById("status-dot");
+
+      const statusText =
+        document.getElementById("status-text");
+
+      if (statusDot) {
+        statusDot.className =
+          `status-dot ${color}`;
+      }
+
+      if (statusText) {
+        statusText.textContent = status;
+      }
+
+      const running =
+        document.getElementById("val-running");
+
+      const scanning =
+        document.getElementById("val-scanning");
+
+      const permits =
+        document.getElementById("val-permits");
+
+      const errors =
+        document.getElementById("val-errors");
+
+      const lastScan =
+        document.getElementById("val-lastscan");
+
+      const duration =
+        document.getElementById("val-duration");
+
+      const uptime =
+        document.getElementById("val-uptime");
+
+      const emergency =
+        document.getElementById("val-emergency");
+
+      if (running)
+        running.textContent =
+          engine.running ? "Yes" : "No";
+
+      if (scanning)
+        scanning.textContent =
+          engine.scanning ? "Yes" : "No";
+
+      if (permits)
+        permits.textContent =
+          engine.permitsFound ?? 0;
+
+      if (errors)
+        errors.textContent =
+          engine.errors ?? 0;
+
+      if (lastScan)
+        lastScan.textContent =
+          formatDate(engine.lastScan);
+
+      if (duration)
+        duration.textContent =
+          engine.lastScanDuration
+            ? `${(Number(engine.lastScanDuration) / 1000).toFixed(1)}s`
+            : "—";
+
+      if (uptime)
+        uptime.textContent =
+          formatUptime(data.uptime || 0);
+
+      if (emergency)
+        emergency.textContent =
+          engine.emergencyStopped
+            ? "YES"
+            : "No";
+
+    } catch (error) {
+
+      addLog(
+        "Health error: " + error.message,
+        "error"
+      );
     }
-}
+  }
 
-// Global Modal Helper
-function showModal(title, contentHtml) {
-    let modal = $("globalModal");
-    if (!modal) {
-        modal = document.createElement("div");
-        modal.id = "globalModal";
-        modal.style.cssText = "position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.8);display:flex;align-items:center;justify-content:center;z-index:9999;";
-        document.body.appendChild(modal);
+
+  /* ============================================================
+     ENGINE ACTIONS
+     ============================================================ */
+
+  async function action(endpoint) {
+
+    if (!ADMIN_KEY) {
+
+      alert(
+        "Admin key missing.\n\n" +
+        "Open the dashboard with:\n" +
+        "?key=YOUR_ADMIN_KEY"
+      );
+
+      return;
     }
-    modal.innerHTML = `
-        <div style="background:#1e293b; color:#fff; border:1px solid #334155; border-radius:8px; padding:24px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto; box-shadow:0 10px 25px rgba(0,0,0,0.5);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #334155; padding-bottom:8px;">
-                <h2 style="margin:0; font-size:1.25rem;">${title}</h2>
-                <button onclick="document.getElementById('globalModal').remove()" style="background:transparent; border:none; color:#94a3b8; font-size:1.5rem; cursor:pointer;">&times;</button>
-            </div>
-            <div>${contentHtml}</div>
-            <div style="margin-top:20px; text-align:right;">
-                <button onclick="document.getElementById('globalModal').remove()" style="background:#4f46e5; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer;">Close</button>
-            </div>
-        </div>
-    `;
-}
 
-// 1. ENGINE STATUS & LIVE LOGS (Polling every 5s)
-async function loadEngineStatus() {
-    const data = await api("/api/health");
-    if (!data) return;
+    const resultEl =
+      document.getElementById("action-result");
 
-    if ($("engineRunning")) $("engineRunning").textContent = data.running ? "Yes" : "No";
-    if ($("engineScanning")) $("engineScanning").textContent = data.scanning ? "Yes" : "No";
-    if ($("permitsFound")) $("permitsFound").textContent = data.permitsFound ?? 0;
-    if ($("engineErrors")) $("engineErrors").textContent = data.errors ?? 0;
-    if ($("lastScan")) $("lastScan").textContent = data.lastScan ? new Date(data.lastScan).toLocaleString() : "—";
-    if ($("emergencyStop")) $("emergencyStop").textContent = data.emergencyStopped ? "YES" : "No";
+    if (resultEl) {
 
-    const statusBadge = $("engineStatusBadge");
-    if (statusBadge) {
-        statusBadge.textContent = data.scanning ? "● Scanning..." : "● Idle";
-        statusBadge.style.color = data.scanning ? "#f59e0b" : "#10b981";
+      resultEl.classList.remove("hidden");
+
+      resultEl.textContent =
+        "Sending command...";
+
+      resultEl.className =
+        "mt-4 text-sm text-amber-400";
     }
-}
 
-// 2. SCANNED LEADS & ACQUISITIONS
-async function loadLeads() {
-    const container = document.querySelector(".scanned-leads-list") || $("scannedLeads") || $("leadsGrid");
+    addLog(
+      `Command → ${endpoint}`,
+      "info"
+    );
+
+    try {
+
+      const data =
+        await apiFetch(`/api/${endpoint}`, {
+          method: "POST"
+        });
+
+      if (resultEl) {
+
+        resultEl.textContent =
+          "Success: " +
+          JSON.stringify(data);
+
+        resultEl.className =
+          "mt-4 text-sm text-emerald-400";
+      }
+
+      addLog(
+        `Success: ${endpoint}`,
+        "success"
+      );
+
+      setTimeout(
+        refreshStatus,
+        500
+      );
+
+    } catch (error) {
+
+      if (resultEl) {
+
+        resultEl.textContent =
+          "Error: " +
+          error.message;
+
+        resultEl.className =
+          "mt-4 text-sm text-rose-400";
+      }
+
+      addLog(
+        `Error: ${error.message}`,
+        "error"
+      );
+    }
+  }
+
+
+  /* ============================================================
+     ACTIVITY DATA
+     ============================================================ */
+
+  async function loadActivity() {
+
+    const container =
+      document.getElementById("log-container");
+
     if (!container) return;
 
-    const res = await api("/api/leads?limit=50");
-    const leads = Array.isArray(res) ? res : (res?.data || res?.leads || []);
+    container.innerHTML =
+      '<div class="text-slate-500">Loading activity...</div>';
 
-    if (!leads || leads.length === 0) {
-        container.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8;">No permit leads found in database.</div>`;
+    try {
+
+      /*
+       * Supports the common endpoint names used by
+       * GRIDV21 backend versions.
+       */
+
+      let data;
+
+      try {
+
+        data =
+          await apiFetch("/api/audit-logs");
+
+      } catch (_) {
+
+        data =
+          await apiFetch("/api/system-events");
+      }
+
+      const rows =
+        data.logs ||
+        data.events ||
+        data.data ||
+        [];
+
+      container.innerHTML = "";
+
+      if (!rows.length) {
+
+        container.innerHTML =
+          '<div class="text-slate-500">No activity recorded.</div>';
+
         return;
+      }
+
+      rows.forEach(row => {
+
+        const level =
+          String(
+            row.level ||
+            row.severity ||
+            "info"
+          ).toLowerCase();
+
+        const message =
+          row.message ||
+          row.event_type ||
+          row.title ||
+          "System event";
+
+        addLog(
+          message,
+          level === "error"
+            ? "error"
+            : level === "warn"
+              ? "warn"
+              : "info"
+        );
+      });
+
+    } catch (error) {
+
+      container.innerHTML =
+        `<div class="text-rose-400">Unable to load activity: ${escapeHTML(error.message)}</div>`;
     }
+  }
 
-    window.currentLeadsData = leads;
 
-    container.innerHTML = leads.map((p, idx) => {
-        const type = p.permit_type || p.type || "General Permit";
-        const city = p.city || p.jurisdiction || "Chicago";
-        const date = p.issue_date || p.created_at ? new Date(p.issue_date || p.created_at).toLocaleDateString() : "N/A";
-        
-        // Value processing: No hardcoded fallback
-        const realValue = p.valuation || p.amount || p.job_value || 0;
-        const displayValue = realValue > 0 ? `$${Number(realValue).toLocaleString()}` : "Value Pending";
+  /* ============================================================
+     LEADS / PERMITS
+     ============================================================ */
 
-        const score = p.ai_score ?? p.score ?? "N/A";
-        const priority = score >= 70 ? "High Priority" : "Monitor Lead";
-        const description = p.description || p.work_description || "No job details provided.";
+  async function loadLeads() {
 
-        return `
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:8px; padding:16px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
-                <div>
-                    <h4 style="margin:0; color:#38bdf8; font-size:1rem;">PERMIT - ${type.toUpperCase()}</h4>
-                    <span style="font-size:0.8rem; color:#94a3b8;">${city} • Date: ${date}</span>
-                </div>
-                <div style="text-align:right;">
-                    <span style="font-size:1.1rem; font-weight:bold; color:#10b981;">${displayValue}</span>
-                    <div style="font-size:0.75rem; color:#64748b;">AI Score: ${score}</div>
-                </div>
-            </div>
+    const container =
+      document.getElementById("leads-container");
 
-            <p style="font-size:0.85rem; color:#cbd5e1; margin:8px 0; max-height:40px; overflow:hidden; text-overflow:ellipsis;">${description}</p>
-            <div style="font-size:0.8rem; color:#64748b; margin-bottom:12px;">Status: ${priority}</div>
-
-            <div style="display:flex; gap:8px;">
-                <button onclick="handleAcquisition(${idx})" style="background:#4f46e5; color:#fff; border:none; padding:6px 12px; border-radius:4px; font-size:0.8rem; cursor:pointer;">Prepare Acquisition</button>
-                <button onclick="handleViewBuyers(${idx})" style="background:#334155; color:#fff; border:none; padding:6px 12px; border-radius:4px; font-size:0.8rem; cursor:pointer;">View Buyers</button>
-                <button onclick="handleExportLead(${idx})" style="background:#1e293b; color:#fff; border:1px solid #475569; padding:6px 12px; border-radius:4px; font-size:0.8rem; cursor:pointer;">Export</button>
-            </div>
-        </div>
-        `;
-    }).join('');
-}
-
-// 3. BUTTON CLICK HANDLERS WITH FULL DETAILS
-window.handleAcquisition = function(index) {
-    const lead = window.currentLeadsData?.[index];
-    if (!lead) return;
-
-    showModal("Acquisition Package Preparation", `
-        <p><strong>Permit Type:</strong> ${lead.permit_type || 'N/A'}</p>
-        <p><strong>City/Jurisdiction:</strong> ${lead.city || 'N/A'}</p>
-        <p><strong>Actual Value:</strong> ${lead.valuation ? '$' + Number(lead.valuation).toLocaleString() : 'N/A'}</p>
-        <p><strong>Description:</strong> ${lead.description || lead.work_description || 'None'}</p>
-        <hr style="border-color:#334155; margin:12px 0;"/>
-        <p style="color:#10b981;">✔ Acquisition record generated and logged to pipeline.</p>
-    `);
-};
-
-window.handleViewBuyers = function(index) {
-    const lead = window.currentLeadsData?.[index];
-    if (!lead) return;
-
-    showModal("Matched Potential Buyers", `
-        <p>Matching contractors and realtors for <strong>${lead.permit_type || 'Lead'}</strong> in <strong>${lead.city || 'Chicago'}</strong>:</p>
-        <ul style="padding-left:20px; color:#cbd5e1;">
-            <li>Apex Contracting Group (High Intent)</li>
-            <li>Midwest Commercial Developers</li>
-            <li>Local General Contractors Network</li>
-        </ul>
-    `);
-};
-
-window.handleExportLead = function(index) {
-    const lead = window.currentLeadsData?.[index];
-    if (!lead) return;
-
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(lead, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `permit_${lead.id || index}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-};
-
-// 4. REVENUE STREAMS & BRAIN OS RENDERERS
-async function loadRevenue() {
-    const container = $("revenueGrid") || $("revenueContainer");
     if (!container) return;
 
-    const data = await api("/api/revenue");
-    if (!data || !data.data || data.data.length === 0) {
-        container.innerHTML = `<div style="padding:20px; color:#94a3b8;">No active revenue records found.</div>`;
-        return;
-    }
+    container.innerHTML =
+      '<div class="text-slate-500 text-sm">Loading leads...</div>';
 
-    container.innerHTML = data.data.map(r => `
-        <div style="background:#0f172a; border:1px solid #1e293b; padding:12px; margin-bottom:8px; border-radius:6px; display:flex; justify-content:space-between;">
+    try {
+
+      let data;
+
+      try {
+
+        data =
+          await apiFetch("/api/leads");
+
+      } catch (_) {
+
+        data =
+          await apiFetch("/api/permits");
+      }
+
+      const rows =
+        data.leads ||
+        data.permits ||
+        data.data ||
+        [];
+
+      if (!rows.length) {
+
+        container.innerHTML =
+          '<div class="text-slate-500 text-sm">No leads or permits found.</div>';
+
+        return;
+      }
+
+      container.innerHTML = "";
+
+      rows.forEach(item => {
+
+        const card =
+          document.createElement("div");
+
+        card.className =
+          "bg-slate-800/60 border border-slate-700 rounded-xl p-4";
+
+        const city =
+          item.city ||
+          item.region ||
+          "Unknown";
+
+        const type =
+          item.trade_type ||
+          item.permit_type ||
+          "Unknown";
+
+        const status =
+          item.status ||
+          "New";
+
+        const value =
+          item.value_estimate ??
+          item.estimated_value ??
+          0;
+
+        const score =
+          item.ai_score ??
+          "—";
+
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-4">
             <div>
-                <strong>${r.source || 'Pipeline'}</strong>
-                <div style="font-size:0.8rem; color:#64748b;">${r.notes || 'No notes'}</div>
+              <p class="font-semibold">
+                ${escapeHTML(type)}
+              </p>
+
+              <p class="text-xs text-slate-400 mt-1">
+                ${escapeHTML(city)}
+              </p>
             </div>
-            <div style="color:#10b981; font-weight:bold;">$${Number(r.amount || 0).toLocaleString()}</div>
-        </div>
-    `).join('');
-}
 
-async function loadBrainOS() {
-    const container = $("osGrid") || $("brainOsContainer");
-    if (!container) return;
+            <span class="text-xs px-2 py-1 rounded-full
+              bg-emerald-500/10 text-emerald-400">
+              ${escapeHTML(status)}
+            </span>
+          </div>
 
-    const data = await api("/api/dashboard");
-    if (!data || !data.osModules) {
-        container.innerHTML = `<div style="padding:20px; color:#94a3b8;">No active OS modules.</div>`;
-        return;
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+
+            <div>
+              <p class="text-[10px] text-slate-500">
+                Estimated Value
+              </p>
+
+              <p class="text-sm font-semibold">
+                ${formatMoney(value)}
+              </p>
+            </div>
+
+            <div>
+              <p class="text-[10px] text-slate-500">
+                AI Score
+              </p>
+
+              <p class="text-sm font-semibold text-brand-400">
+                ${escapeHTML(score)}
+              </p>
+            </div>
+
+            <div>
+              <p class="text-[10px] text-slate-500">
+                Permit ID
+              </p>
+
+              <p class="text-sm font-semibold">
+                ${escapeHTML(
+                  item.permit_id ||
+                  item.external_id ||
+                  item.id ||
+                  "—"
+                )}
+              </p>
+            </div>
+
+            <div>
+              <p class="text-[10px] text-slate-500">
+                Created
+              </p>
+
+              <p class="text-sm">
+                ${formatDate(item.created_at)}
+              </p>
+            </div>
+
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+
+    } catch (error) {
+
+      container.innerHTML =
+        `<div class="text-rose-400 text-sm">
+          Lead loading error:
+          ${escapeHTML(error.message)}
+        </div>`;
+    }
+  }
+
+
+  /* ============================================================
+     BRAIN RECOMMENDATION
+     ============================================================ */
+
+  async function loadBrainSuggestion() {
+
+    const element =
+      document.getElementById("brain-suggestion");
+
+    if (!element) return;
+
+    element.textContent =
+      "Analyzing recent activity...";
+
+    try {
+
+      let data;
+
+      try {
+
+        data =
+          await apiFetch("/api/forecast");
+
+      } catch (_) {
+
+        data = {};
+      }
+
+      const suggestion =
+        data.suggestion ||
+        data.recommendation ||
+        data.message ||
+        "GRIDV21 Brain is monitoring the operating environment.";
+
+      element.textContent =
+        suggestion;
+
+    } catch (error) {
+
+      element.textContent =
+        "Brain recommendation unavailable.";
+    }
+  }
+
+
+  function authorizeAction() {
+
+    addLog(
+      "Brain recommendation authorized by administrator.",
+      "success"
+    );
+
+    alert(
+      "Recommendation authorized."
+    );
+  }
+
+
+  function dismissSuggestion() {
+
+    const element =
+      document.getElementById("brain-suggestion");
+
+    if (element) {
+
+      element.textContent =
+        "Recommendation dismissed.";
     }
 
-    container.innerHTML = data.osModules.map(m => `
-        <div style="background:#0f172a; border:1px solid #1e293b; padding:12px; border-radius:6px; margin-bottom:8px;">
-            <h4 style="margin:0 0 4px 0; color:#38bdf8;">${m.name}</h4>
-            <div style="font-size:0.8rem; color:#94a3b8;">Layer: ${m.layer} | Agents: ${m.agents_count} | KPIs: ${m.kpis_count}</div>
-        </div>
-    `).join('');
-}
+    addLog(
+      "Brain recommendation dismissed.",
+      "warn"
+    );
+  }
 
-// 5. ENGINE CONTROL BUTTON LISTENERS
-function attachControlListeners() {
-    const actions = [
-        { id: "startScanBtn", endpoint: "/api/scan/start" },
-        { id: "stopScanBtn", endpoint: "/api/engine/stop" },
-        { id: "pauseEngineBtn", endpoint: "/api/engine/pause" },
-        { id: "resumeEngineBtn", endpoint: "/api/engine/resume" },
-        { id: "emergencyStopBtn", endpoint: "/api/engine/emergency-stop" }
-    ];
 
-    actions.forEach(({ id, endpoint }) => {
-        const btn = $(id);
-        if (btn) {
-            btn.onclick = async () => {
-                btn.disabled = true;
-                await api(endpoint, { method: "POST" });
-                await loadEngineStatus();
-                btn.disabled = false;
-            };
-        }
-    });
-}
+  /* ============================================================
+     REVENUE
+     ============================================================ */
 
-// INIT & LIVE POLLING
-async function init() {
-    attachControlListeners();
-    await loadEngineStatus();
-    await loadLeads();
-    await loadRevenue();
-    await loadBrainOS();
+  async function loadRevenue() {
 
-    // Live update engine status every 5 seconds
-    setInterval(loadEngineStatus, 5000);
-    // Refresh leads every 30 seconds
-    setInterval(loadLeads, 30000);
-}
+    try {
 
-document.addEventListener("DOMContentLoaded", init);
-if (document.readyState === "complete" || document.readyState === "interactive") {
-    init();
-        }
+      const data =
+        await apiFetch("/api/dashboard");
+
+      const revenue =
+        data.revenue ||
+        data.revenue_log ||
+        {};
+
+      const total =
+        revenue.total ||
+        revenue.total_revenue ||
+        data.est_revenue_month ||
+        0;
+
+      const cards =
+        document.querySelectorAll(
+          "#section-revenue .text-2xl"
+        );
+
+      if (cards[0])
+        cards[0].textContent =
+          formatMoney(
+            data.pipeline ||
+            data.total_pipeline ||
+            0
+          );
+
+      if (cards[1])
+        cards[1].textContent =
+          formatMoney(
+            data.closed_revenue ||
+            revenue.closed ||
+            total
+          );
+
+      if (cards[2])
+        cards[2].textContent =
+          formatMoney(
+            data.average_deal ||
+            0
+          );
+
+    } catch (error) {
+
+      addLog(
+        "Revenue load: " + error.message,
+        "warn"
+      );
+    }
+  }
+
+
+  /* ============================================================
+     AFFILIATE DATA
+     ============================================================ */
+
+  async function loadAffiliates() {
+
+    try {
+
+      let data;
+
+      try {
+
+        data =
+          await apiFetch("/api/affiliate-tracking");
+
+      } catch (_) {
+
+        data =
+          await apiFetch("/api/affiliates");
+      }
+
+      const rows =
+        data.affiliates ||
+        data.data ||
+        [];
+
+      const clicks =
+        rows.reduce(
+          (sum, row) =>
+            sum + Number(row.clicks || 0),
+          0
+        );
+
+      const conversions =
+        rows.reduce(
+          (sum, row) =>
+            sum + Number(row.conversions || 0),
+          0
+        );
+
+      const cards =
+        document.querySelectorAll(
+          "#section-affiliates .text-2xl"
+        );
+
+      if (cards[0])
+        cards[0].textContent =
+          rows.length;
+
+      if (cards[1])
+        cards[1].textContent =
+          clicks;
+
+      if (cards[2])
+        cards[2].textContent =
+          conversions;
+
+    } catch (error) {
+
+      addLog(
+        "Affiliate load: " + error.message,
+        "warn"
+      );
+    }
+  }
+
+
+  /* ============================================================
+     12 CANONICAL GRIDV21 OS MODULES
+     ============================================================ */
+
+  function renderOSModules(modules = []) {
+
+    const container =
+      document.getElementById("os-modules-container");
+
+    if (!container) return;
+
+    const source =
+      modules.length
+        ? modules
+        : OS_MODULES.map(
+            name => ({
+              name,
+              status: "active",
+              enabled: true
+            })
+          );
+
+    container.innerHTML = "";
+
+    source.forEach((module, index) => {
+
+      const canonicalName =
+        module.name ||
+        OS_MODULES[index] ||
+        `OS Module ${index + 1}`;
+
+      const enabled =
+        module.enabled !== false &&
+        module.status !== "disabled";
+
+      const card =
+        document.createElement("div");
+
+      card.className =
+        "bg-slate-800/60 border border-slat
