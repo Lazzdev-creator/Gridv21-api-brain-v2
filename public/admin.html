@@ -1037,3 +1037,161 @@
       'success'
     );
   }
+  // ========== INITIALIZATION ==========
+  document.addEventListener('DOMContentLoaded', () => {
+
+    // Initial dashboard load
+    refreshStatus();
+
+    // Keep dashboard status current
+    setInterval(
+      refreshStatus,
+      15000
+    );
+
+    // Keep OS module state current
+    // Only runs if the function exists in this version.
+    if (typeof loadOSModules === 'function') {
+      setInterval(
+        loadOSModules,
+        30000
+      );
+    }
+
+    // Close mobile sidebar after navigation
+    document.querySelectorAll('.nav-item').forEach(button => {
+      button.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          document
+            .getElementById('sidebar')
+            .classList.add('hidden-mobile');
+        }
+      });
+    });
+
+    // Log startup
+    addLog(
+      'GRIDV21 Brain Admin OS initialized',
+      'success'
+    );
+  });
+
+
+  // ========== GLOBAL ERROR HANDLING ==========
+  window.addEventListener('error', event => {
+    if (typeof addLog === 'function') {
+      addLog(
+        'Frontend error: ' +
+        (event.message || 'Unknown error'),
+        'error'
+      );
+    }
+  });
+
+
+  window.addEventListener('unhandledrejection', event => {
+    if (typeof addLog === 'function') {
+      addLog(
+        'Unhandled request error: ' +
+        (
+          event.reason?.message ||
+          String(event.reason || 'Unknown error')
+        ),
+        'error'
+      );
+    }
+  });
+
+
+  // ========== KEYBOARD SHORTCUT ==========
+  document.addEventListener('keydown', event => {
+
+    // Ctrl/Cmd + R is left untouched.
+    // Escape closes the mobile sidebar.
+    if (event.key === 'Escape') {
+      const sidebar =
+        document.getElementById('sidebar');
+
+      if (
+        sidebar &&
+        window.innerWidth <= 768
+      ) {
+        sidebar.classList.add(
+          'hidden-mobile'
+        );
+      }
+    }
+  });
+
+
+  // ========== MOBILE SIDEBAR ==========
+  window.addEventListener('resize', () => {
+    const sidebar =
+      document.getElementById('sidebar');
+
+    if (!sidebar) return;
+
+    if (window.innerWidth > 768) {
+      sidebar.classList.remove(
+        'hidden-mobile'
+      );
+    }
+  });
+
+
+  // ========== AUTO REFRESH ==========
+  // Refresh the visible section every 60 seconds.
+  setInterval(async () => {
+
+    try {
+      await refreshStatus();
+
+      const active =
+        document.querySelector(
+          'main > section:not(.hidden)'
+        );
+
+      if (!active) return;
+
+      switch (active.id) {
+
+        case 'section-activities':
+          await loadActivity();
+          break;
+
+        case 'section-leads':
+          await loadLeads();
+          break;
+
+        case 'section-brain':
+          await loadBrainSuggestion();
+          break;
+
+        case 'section-revenue':
+          await loadRevenue();
+          break;
+
+        case 'section-affiliates':
+          await loadAffiliates();
+          break;
+
+        default:
+          break;
+      }
+
+    } catch (err) {
+
+      addLog(
+        'Auto-refresh error: ' +
+        err.message,
+        'error'
+      );
+    }
+
+  }, 60000);
+
+
+</script>
+
+</body>
+</html>
