@@ -750,3 +750,680 @@ function mapPermitData(cityName, raw) {
     ai_enriched: true
   };
 }
+export const AI_ENGINE = {
+  async enrichPermit(permit) {
+    const score = scoreLead(permit);
+
+    return {
+      ...permit,
+      ai_enriched: true,
+      ai_confidence: Number(
+        (
+          0.70 +
+          Math.min(score, 100) / 333
+        ).toFixed(2)
+      ),
+      ai_score: score,
+      ai_note: "GRIDV21 heuristic AI engine"
+    };
+  },
+
+  scoreLead,
+
+  predictRevenue(permit) {
+    const value = Number(
+      permit.estimated_value || 0
+    );
+
+    return Number(
+      (value * 0.03).toFixed(2)
+    );
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* OS DATABASE SYNCHRONIZATION                                                */
+/* -------------------------------------------------------------------------- */
+
+async function syncOSModules() {
+  try {
+    const payload = OS_MODULES.map(module => ({
+      id: module.id,
+      name: module.name,
+      status: "active",
+      kpis_count: module.kpis_count,
+      agents_count: module.agents_count,
+      layer: module.layer,
+      enabled: true
+    }));
+
+    const { error } = await supabase
+      .from("os_modules")
+      .upsert(payload, {
+        onConflict: "id"
+      });
+
+    if (error) throw error;
+
+    const {
+      error: cleanupError
+    } = await supabase
+      .from("os_modules")
+      .delete()
+      .gt("id", 12);
+
+    if (cleanupError) {
+      throw cleanupError;
+    }
+
+    console.log(
+      `[OS] GRIDV21 synchronized ${OS_MODULES.length} canonical modules`
+    );
+  } catch (error) {
+    console.warn(
+      `[OS] Module synchronization skipped: ${error.message}`
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* ACTIVITY LOGGING                                                           */
+/* -------------------------------------------------------------------------- */
+
+async function logActivity({
+  eventType = "system",
+  action = "activity",
+  message = "",
+  status = "success",
+  permitId = null,
+  city = null,
+  metadata = {}
+} = {}) {
+  try {
+    const { error } = await supabase
+      .from("os_activity_logs")
+      .insert({
+        event_type: eventType,
+        action,
+        message: String(message).slice(0, 5000),
+        status,
+        permit_id: permitId,
+        city,
+        metadata: safeJson(metadata)
+      });
+
+    if (error) {
+      if (
+        !/relation .*os_activity_logs.* does not exist/i.test(
+          error.message || ""
+        )
+      ) {
+        console.warn(
+          `[ACTIVITY] ${error.message}`
+        );
+      }
+
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.warn(
+      `[ACTIVITY] ${error.message}`
+    );
+
+    return false;
+  }
+}
+
+async function getActivity(limit = 100) {
+  const primary = await supabase
+    .from("os_activity_logs")
+    .select("*")
+    .order("created_at", {
+      ascending: false
+    })
+    .limit(limit);
+
+  if (!primary.error) {
+    return primary.data || [];
+  }
+
+  /* Graceful fallback while migration is being applied. */
+  const fallback = await supabase
+    .from("audit_logs")
+    .select("*")
+    .order("timestamp", {
+      ascending: false
+    })
+    .limit(limit);
+
+  if (fallback.error) {
+    return [];
+  }
+
+  return (fallback.data || []).map(row => ({
+    id: row.id,
+    event_type: "audit",
+    action: "error",
+    message: row.message,
+    status: row.level || "error",
+    created_at: row.timestamp,
+    metadata: {
+      request_id: row.request_id
+    }
+  }));
+}
+
+/* -------------------------------------------------------------------------- */
+/* FETCH + SCANNER                                                            */
+/* -------------------------------------------------------------------------- */
+
+async function axiosWithAbort(
+  url,
+  reqId,
+  signal,
+  retries = 3
+) {
+  let lastError;
+
+  for (
+    let attempt = 1;
+    attempt <= retries;
+    attempt++
+  ) {
+    try {
+      const response = await axios.get(
+        url,
+        {
+          signal,
+          timeout:
+            SCAN_SETTINGS.requestTimeout,
+          responseType: "text",
+          headers: {
+            "User-Agent":
+              `GRIDV21-BRAIN/${VERSION}`,
+            Accept:
+              "application/json,text/csv,*/*"
+          },
+          validateStatus:
+            status =>
+              status >= 200 &&
+              status < 300
+        }
+      );
+
+      logger.info(
+        reqId,
+        `Fetched ${url} (${response.status})`
+      );
+
+      return response.data;
+    } catch (error) {
+      lastError = error;
+
+      if (signal?.aborted) {
+        throw new Error("Scan aborted");
+      }
+
+      logger.warn(
+        reqId,
+        `Fetch attempt ${attempt}/${retries} failed: ${error.message}`
+      );
+
+      if (attempt < retries) {
+        await sleep(500 * attempt);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function supabaseBatchInsert(
+  table,
+  rows
+) {
+  if (!rows.length) {
+    return {
+      inserted: 0,
+      errors: 0
+    };
+  }
+
+  let inserted = 0;
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i += SCAN_SETTINGS.batchSize
+  ) {
+    const batch = rows.slice(
+      i,
+      i + SCAN_SETTINGS.batchSize
+    );
+
+    const { error } = await supabase
+      .from(table)
+      .insert(batch);
+
+    if (error) {
+      throw error;
+    }
+
+    inserted += batch.length;
+  }
+
+  return {
+    inserted,
+    errors: 0
+  };
+}
+
+async function insertNewPermits(rows) {
+  if (!rows.length) {
+    return {
+      inserted: 0,
+      skipped: 0,
+      updated: 0
+    };
+  }
+
+  /* Keep one record per source permit and refresh existing rows with the
+     newly-normalized detailed fields. This fixes old rows that were saved
+     with generic defaults such as $25,000 or missing dates. */
+
+  const unique = [];
+  const seen = new Set();
+
+  for (const row of rows) {
+    if (
+      !row.permit_id ||
+      seen.has(row.permit_id)
+    ) {
+      continue;
+    }
+
+    seen.add(row.permit_id);
+    unique.push(row);
+  }
+
+  if (!unique.length) {
+    return {
+      inserted: 0,
+      skipped: rows.length,
+      updated: 0
+    };
+  }
+
+  let affected = 0;
+
+  for (
+    let i = 0;
+    i < unique.length;
+    i += SCAN_SETTINGS.batchSize
+  ) {
+    const batch = unique.slice(
+      i,
+      i + SCAN_SETTINGS.batchSize
+    );
+
+    const { error } = await supabase
+      .from("permits")
+      .upsert(
+        batch,
+        {
+          onConflict: "permit_id"
+        }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    affected += batch.length;
+  }
+
+  return {
+    inserted: affected,
+    skipped:
+      rows.length - unique.length,
+    updated: affected
+  };
+}
+
+async function writeScanLog(payload) {
+  try {
+    const { error } = await supabase
+      .from("scan_logs")
+      .insert(payload);
+
+    if (
+      error &&
+      !/relation .*scan_logs.* does not exist/i.test(
+        error.message || ""
+      )
+    ) {
+      logger.warn(
+        "scan-log",
+        error.message
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      "scan-log",
+      error.message
+    );
+  }
+}
+
+async function scanCity(
+  city,
+  reqId,
+  signal
+) {
+  const rawText = await axiosWithAbort(
+    city.url,
+    reqId,
+    signal
+  );
+
+  let records;
+
+  if (city.type === "csv") {
+    const parsed = Papa.parse(
+      rawText,
+      {
+        header: true,
+        skipEmptyLines: true,
+        dynamicTyping: false
+      }
+    );
+
+    if (parsed.errors?.length) {
+      logger.warn(
+        reqId,
+        `${city.name}: ${parsed.errors.length} CSV parse warnings`
+      );
+    }
+
+    records = parsed.data || [];
+  } else {
+    try {
+      records =
+        typeof rawText === "string"
+          ? JSON.parse(rawText)
+          : rawText;
+    } catch (error) {
+      throw new Error(
+        `${city.name}: invalid JSON response: ${error.message}`
+      );
+    }
+  }
+
+  if (!Array.isArray(records)) {
+    records = records?.data || [];
+  }
+
+  return {
+    city: city.name,
+    fetched: records.length,
+    mapped: records
+      .map(row =>
+        mapPermitData(
+          city.name,
+          row
+        )
+      )
+      .filter(Boolean)
+  };
+}
+
+let currentScanAbortController = null;
+let scanPromise = null;
+
+export async function scanAllCities(
+  reqId = crypto.randomUUID()
+) {
+  if (ENGINE.scanning) {
+    return {
+      ok: false,
+      status: "already_scanning",
+      message:
+        "A scan is already running."
+    };
+  }
+
+  if (!ENGINE.running) {
+    return {
+      ok: false,
+      status: "paused",
+      message: "Brain is paused."
+    };
+  }
+
+  if (ENGINE.emergencyStopped) {
+    return {
+      ok: false,
+      status: "emergency_stopped",
+      message:
+        "Emergency stop is active."
+    };
+  }
+
+  ENGINE.scanning = true;
+  ENGINE.lastError = null;
+  ENGINE.permitsFound = 0;
+  ENGINE.errors = 0;
+
+  const started = Date.now();
+
+  const result = {
+    ok: true,
+    status: "completed",
+    started_at:
+      new Date().toISOString(),
+    finished_at: null,
+    duration_ms: 0,
+    cities: [],
+    fetched: 0,
+    inserted: 0,
+    skipped: 0,
+    errors: 0
+  };
+
+  currentScanAbortController =
+    new AbortController();
+
+  const timeout = setTimeout(
+    () =>
+      currentScanAbortController?.abort(),
+    SCAN_SETTINGS.scanTimeout
+  );
+
+  await logActivity({
+    eventType: "scanner",
+    action: "scan_started",
+    message:
+      `Permit scan started (${CITIES.length} sources)`
+  });
+
+  try {
+    for (const city of CITIES) {
+      if (
+        !ENGINE.running ||
+        ENGINE.emergencyStopped ||
+        currentScanAbortController
+          .signal.aborted
+      ) {
+        result.status = "aborted";
+        break;
+      }
+
+      try {
+        const cityResult =
+          await scanCity(
+            city,
+            reqId,
+            currentScanAbortController.signal
+          );
+
+        const saved =
+          await insertNewPermits(
+            cityResult.mapped
+          );
+
+        result.fetched +=
+          cityResult.fetched;
+
+        result.inserted +=
+          saved.inserted;
+
+        result.skipped +=
+          saved.skipped;
+
+        ENGINE.permitsFound +=
+          saved.inserted;
+
+        result.cities.push({
+          name: city.name,
+          fetched:
+            cityResult.fetched,
+          inserted:
+            saved.inserted,
+          skipped:
+            saved.skipped
+        });
+
+        await logActivity({
+          eventType: "scanner",
+          action:
+            "city_scan_completed",
+          message:
+            `${city.name}: ${cityResult.fetched} fetched, ${saved.inserted} new permits`,
+          city: city.name,
+          metadata: {
+            fetched:
+              cityResult.fetched,
+            inserted:
+              saved.inserted,
+            skipped:
+              saved.skipped
+          }
+        });
+
+        await sleep(
+          SCAN_SETTINGS.requestDelay
+        );
+      } catch (error) {
+        result.errors++;
+        ENGINE.errors++;
+        ENGINE.lastError =
+          `${city.name}: ${error.message}`;
+
+        result.cities.push({
+          name: city.name,
+          fetched: 0,
+          inserted: 0,
+          skipped: 0,
+          error: error.message
+        });
+
+        await logger.error(
+          reqId,
+          `${city.name}: ${error.message}`
+        );
+
+        await logActivity({
+          eventType: "scanner",
+          action:
+            "city_scan_failed",
+          message:
+            `${city.name}: ${error.message}`,
+          status: "error",
+          city: city.name
+        });
+      }
+    }
+
+    result.finished_at =
+      new Date().toISOString();
+
+    result.duration_ms =
+      Date.now() - started;
+
+    ENGINE.lastScan =
+      result.finished_at;
+
+    ENGINE.lastScanDuration =
+      result.duration_ms;
+
+    await writeScanLog({
+      request_id: reqId,
+      status: result.status,
+      started_at:
+        result.started_at,
+      finished_at:
+        result.finished_at,
+      duration_ms:
+        result.duration_ms,
+      fetched:
+        result.fetched,
+      inserted:
+        result.inserted,
+      skipped:
+        result.skipped,
+      permits_found:
+        result.inserted,
+      errors:
+        result.errors
+    });
+
+    await logActivity({
+      eventType: "scanner",
+      action: "scan_completed",
+      message:
+        `Scan ${result.status}: ${result.inserted} new permits from ${result.fetched} records`,
+      status:
+        result.errors
+          ? "warning"
+          : "success",
+      metadata: result
+    });
+
+    return result;
+  } catch (error) {
+    ENGINE.errors++;
+    ENGINE.lastError =
+      error.message;
+
+    result.ok = false;
+    result.status = "failed";
+    result.errors++;
+    result.finished_at =
+      new Date().toISOString();
+    result.duration_ms =
+      Date.now() - started;
+
+    await logger.error(
+      reqId,
+      error.stack ||
+        error.message
+    );
+
+    await logActivity({
+      eventType: "scanner",
+      action: "scan_failed",
+      message: error.message,
+      status: "error"
+    });
+
+    return result;
+  } finally {
+    clearTimeout(timeout);
+
+    ENGINE.scanning = false;
+    currentScanAbortController = null;
+    scanPromise = null;
+  }
+    }
