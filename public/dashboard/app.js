@@ -966,3 +966,189 @@
 
       card.className =
         "bg-slate-800/60 border border-slat
+      card.innerHTML = `
+
+        <div class="flex items-start justify-between gap-3">
+
+          <div class="flex gap-3">
+
+            <div class="w-9 h-9 rounded-lg
+              bg-brand-600/20
+              text-brand-400
+              flex items-center justify-center
+              font-bold text-sm">
+              ${index + 1}
+            </div>
+
+            <div>
+              <p class="font-medium">
+                ${escapeHTML(canonicalName)}
+              </p>
+
+              <p class="text-xs text-slate-500 mt-1">
+                ${enabled ? "Operational" : "Disabled"}
+              </p>
+            </div>
+
+          </div>
+
+          <span class="text-xs px-2 py-1 rounded-full ${
+            enabled
+              ? "bg-emerald-500/10 text-emerald-400"
+              : "bg-slate-700 text-slate-400"
+          }">
+            ${enabled ? "ACTIVE" : "OFF"}
+          </span>
+
+        </div>
+
+      `;
+
+      container.appendChild(card);
+    });
+  }
+
+
+  /* ============================================================
+     LOAD 12 GRIDV21 OS MODULES
+     ============================================================ */
+
+  async function loadOSModules() {
+
+    try {
+
+      const data =
+        await apiFetch("/api/os-modules");
+
+      const modules =
+        data.modules ||
+        data.os_modules ||
+        data.data ||
+        [];
+
+      renderOSModules(modules);
+
+    } catch (error) {
+
+      /*
+       * Fallback:
+       * Always display the canonical 12-module
+       * GRIDV21 architecture if the backend
+       * route is unavailable.
+       */
+
+      renderOSModules([]);
+
+      addLog(
+        "OS API unavailable; displaying canonical modules.",
+        "warn"
+      );
+    }
+  }
+
+
+  /* ============================================================
+     REFRESH ALL
+     ============================================================ */
+
+  async function refreshAll() {
+
+    addLog(
+      "Refreshing GRIDV21 Brain dashboard...",
+      "info"
+    );
+
+    await Promise.allSettled([
+      refreshStatus(),
+      loadOSModules()
+    ]);
+
+    addLog(
+      "Dashboard refresh complete.",
+      "success"
+    );
+  }
+
+
+  /* ============================================================
+     INITIALIZE DASHBOARD
+     ============================================================ */
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
+
+      /*
+       * Dashboard opens by default.
+       */
+
+      document
+        .querySelectorAll("main > section")
+        .forEach(section => {
+
+          if (
+            section.id ===
+            "section-dashboard"
+          ) {
+            section.classList.remove("hidden");
+          } else {
+            section.classList.add("hidden");
+          }
+
+        });
+
+
+      /*
+       * Authentication badge.
+       */
+
+      if (ADMIN_KEY) {
+
+        setAuthState(
+          true,
+          "Authenticated"
+        );
+
+      } else {
+
+        setAuthState(
+          false,
+          "No Key"
+        );
+
+      }
+
+
+      /*
+       * Initial dashboard load.
+       */
+
+      await refreshAll();
+
+
+      /*
+       * Keep engine status current.
+       */
+
+      setInterval(
+        refreshStatus,
+        15000
+      );
+
+
+      /*
+       * Keep OS module state current.
+       */
+
+      setInterval(
+        loadOSModules,
+        30000
+      );
+
+    }
+  );
+
+</script>
+
+</body>
+</html>
