@@ -25,15 +25,24 @@ import crypto from "crypto";
 import { createClient as createRedisClient } from "redis";
 import { RedisStore } from "connect-redis";
 
+import fs from 'fs';
+
 dotenv.config();
 
 // Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 📍 DEFINE YOUR DIRECTORY PATHS HERE (Now safe to use __dirname)
+// Auto-detect whether the folder is named 'dashboard', 'Dashboard', 'public', or root
+const possibleDashboardPaths = [
+  path.join(__dirname, 'dashboard'),
+  path.join(__dirname, 'Dashboard'),
+  path.join(__dirname, 'public'),
+  __dirname
+];
+
+const DASHBOARD_DIR = possibleDashboardPaths.find(p => fs.existsSync(p)) || __dirname;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
 
 const app = express();
 export const VERSION = "6.3.6";
@@ -272,28 +281,18 @@ app.use(express.urlencoded({ extended: true }));
 // ===================================================
 // STATIC FRONTEND (Cleaned & Fixed)
 // ===================================================
-app.use(
-  express.static(PUBLIC_DIR, {
-    index: false,
-    extensions: ["html"],
-    fallthrough: true
-  })
-);
+// Serve static frontend files
+app.use('/dashboard', express.static(DASHBOARD_DIR));
+app.use(express.static(DASHBOARD_DIR));
 
-// Serve all static dashboard files (index.html, styles.css, app.js)
-app.use(
-  "/dashboard",
-  express.static(DASHBOARD_DIR, {
-    index: "index.html",
-    fallthrough: true // Allows Express to fall back gracefully if needed
-  })
-);
-
-// Redirect root domain to /dashboard/
-app.get("/", (req, res) => {
-  res.redirect("/dashboard/");
+// Direct user to dashboard index.html
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(DASHBOARD_DIR, 'index.html'));
 });
 
+app.get('/', (req, res) => {
+  res.redirect('/dashboard');
+});
 // ===================================================
 // END STATIC FRONTEND
 // ===================================================
