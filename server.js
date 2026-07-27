@@ -3267,6 +3267,196 @@ cron.schedule(
       "UTC"
   }
 );
+/* -------------------------------------------------------------------------- */
+/* 404                                                                        */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (req, res) => {
+    res.status(404).json({
+      ok: false,
+      error: "Route not found",
+      path: req.originalUrl,
+      request_id: req.id
+    });
+  }
+);
 
 /* -------------------------------------------------------------------------- */
-/* 404                                                                      
+/* GLOBAL ERROR HANDLER                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  async (
+    error,
+    req,
+    res,
+    next
+  ) => {
+    try {
+      await logger.error(
+        req.id || "unknown",
+        error.stack ||
+          error.message ||
+          String(error)
+      );
+    } catch (logError) {
+      console.error(
+        "[ERROR LOGGER FAILED]",
+        logError
+      );
+    }
+
+    if (res.headersSent) {
+      return next(error);
+    }
+
+    res.status(500).json({
+      ok: false,
+      error: "Internal server error",
+      request_id:
+        req.id || null
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* PROCESS EVENTS                                                             */
+/* -------------------------------------------------------------------------- */
+
+process.on(
+  "unhandledRejection",
+  reason => {
+    console.error(
+      "[PROCESS] Unhandled rejection:",
+      reason
+    );
+  }
+);
+
+process.on(
+  "uncaughtException",
+  error => {
+    console.error(
+      "[PROCESS] Uncaught exception:",
+      error
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* STARTUP                                                                    */
+/* -------------------------------------------------------------------------- */
+
+try {
+  await syncOSModules();
+
+  console.log(
+    `[GRIDV21] OS synchronisation complete: ${OS_MODULES.length} modules`
+  );
+} catch (error) {
+  console.error(
+    "[GRIDV21] OS synchronisation failed:",
+    error.message
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* SERVER                                                                     */
+/* -------------------------------------------------------------------------- */
+
+const server = app.listen(
+  PORT,
+  () => {
+    console.log(
+      "============================================================"
+    );
+
+    console.log(
+      `GRIDV21 BRAIN ENTERPRISE v${VERSION}`
+    );
+
+    console.log(
+      `Server listening on port ${PORT}`
+    );
+
+    console.log(
+      `Environment: ${
+        IS_PRODUCTION
+          ? "production"
+          : "development"
+      }`
+    );
+
+    console.log(
+      `Intelligence OS modules: ${OS_MODULES.length}`
+    );
+
+    console.log(
+      "============================================================"
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* GRACEFUL SHUTDOWN                                                          */
+/* -------------------------------------------------------------------------- */
+
+async function shutdown(signal) {
+  console.log(
+    `[SHUTDOWN] ${signal} received`
+  );
+
+  ENGINE.running = false;
+
+  if (
+    currentScanAbortController
+  ) {
+    try {
+      currentScanAbortController.abort();
+    } catch (_) {}
+  }
+
+  try {
+    server.close(
+      async () => {
+        try {
+          if (
+            redisClient &&
+            redisClient.isOpen
+          ) {
+            await redisClient.quit();
+          }
+        } catch (error) {
+          console.error(
+            "[SHUTDOWN] Redis close error:",
+            error.message
+          );
+        }
+
+        console.log(
+          "[SHUTDOWN] GRIDV21 BRAIN stopped cleanly"
+        );
+
+        process.exit(0);
+      }
+    );
+  } catch (error) {
+    console.error(
+      "[SHUTDOWN] Error:",
+      error.message
+    );
+
+    process.exit(1);
+  }
+}
+
+process.on(
+  "SIGTERM",
+  () => shutdown("SIGTERM")
+);
+
+process.on(
+  "SIGINT",
+  () => shutdown("SIGINT")
+);
