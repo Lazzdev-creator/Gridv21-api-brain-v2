@@ -25,10 +25,6 @@ import crypto from "crypto";
 import { createClient as createRedisClient } from "redis";
 import { RedisStore } from "connect-redis";
 
-// Define __dirname for ES Modules (Node.js)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 // 📍 DEFINE YOUR DIRECTORY PATHS HERE
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
