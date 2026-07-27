@@ -1,5 +1,5 @@
 /*****************************************************************************/
-/* GRIDV21 BRAIN ENTERPRISE v6.3.5                                           */
+/* GRIDV21 BRAIN ENTERPRISE v6.3.6                                           */
 /* OWNER: LAZARUS TAKUDZWA CHENANA                                           */
 /* Production backend: scanner + detailed permits + acquisitions + activity */
 /*****************************************************************************/
@@ -31,9 +31,100 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 
-export const VERSION = "6.3.5";
+export const VERSION = "6.3.6";
 const PORT = Number(process.env.PORT || 3000);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
+
+/* -------------------------------------------------------------------------- */
+/* GRIDV21 BRAIN — CANONICAL 12 INTELLIGENCE OS MODULES                      */
+/* -------------------------------------------------------------------------- */
+
+export const OS_MODULES = [
+  {
+    id: 1,
+    name: "Executive Intelligence OS",
+    layer: "Strategy",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 2,
+    name: "Revenue Intelligence OS",
+    layer: "Revenue",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 3,
+    name: "Sales & CRM OS",
+    layer: "Sales",
+    kpis_count: 12,
+    agents_count: 4
+  },
+  {
+    id: 4,
+    name: "Marketing OS",
+    layer: "Growth",
+    kpis_count: 12,
+    agents_count: 4
+  },
+  {
+    id: 5,
+    name: "Operations OS",
+    layer: "Operations",
+    kpis_count: 12,
+    agents_count: 4
+  },
+  {
+    id: 6,
+    name: "Finance OS",
+    layer: "Finance",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 7,
+    name: "Human Capital OS",
+    layer: "People",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 8,
+    name: "Project Management OS",
+    layer: "Projects",
+    kpis_count: 12,
+    agents_count: 4
+  },
+  {
+    id: 9,
+    name: "Knowledge OS",
+    layer: "Knowledge",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 10,
+    name: "Legal & Compliance OS",
+    layer: "Compliance",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 11,
+    name: "Supply Chain OS",
+    layer: "Supply",
+    kpis_count: 12,
+    agents_count: 3
+  },
+  {
+    id: 12,
+    name: "Acquisition Intelligence OS",
+    layer: "Acquisition",
+    kpis_count: 12,
+    agents_count: 4
+  }
+];
 
 const REQUIRED_ENV = [
   "SUPABASE_URL",
@@ -74,7 +165,9 @@ if (process.env.REDIS_URL) {
     sessionStore = new RedisStore({ client: redisClient });
     console.log("[REDIS] Redis session store enabled");
   } catch (error) {
-    console.warn(`[REDIS] Redis unavailable. Using memory sessions: ${error.message}`);
+    console.warn(
+      `[REDIS] Redis unavailable. Using memory sessions: ${error.message}`
+    );
     redisClient = null;
     sessionStore = undefined;
   }
@@ -131,16 +224,20 @@ const logger = {
   info(id, msg) {
     console.log(`[INFO ${id} ${new Date().toISOString()}] ${msg}`);
   },
+
   warn(id, msg) {
     console.warn(`[WARN ${id} ${new Date().toISOString()}] ${msg}`);
   },
+
   async error(id, msg) {
     console.error(`[ERROR ${id} ${new Date().toISOString()}] ${msg}`);
+
     try {
       await supabase.from("audit_logs").insert({
         level: "error",
         message: String(msg).slice(0, 5000),
-        request_id: id
+        request_id: id,
+        timestamp: new Date().toISOString()
       });
     } catch (_) {}
   }
@@ -167,6 +264,7 @@ app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
+
 app.use(
   "/api",
   rateLimit({
@@ -194,6 +292,7 @@ app.use(
 
 app.use(passport.initialize());
 app.use(passport.session());
+
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
@@ -207,6 +306,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           process.env.GOOGLE_CALLBACK_URL ||
           `${process.env.FRONTEND_URL}/auth/google/callback`
       },
+
       async (accessToken, refreshToken, profile, done) => {
         done(null, {
           id: profile.id,
@@ -228,30 +328,39 @@ function pick(obj, keys) {
       obj?.[key] !== undefined &&
       obj?.[key] !== null &&
       String(obj[key]).trim() !== ""
-    ) return obj[key];
+    ) {
+      return obj[key];
+    }
   }
+
   return null;
 }
 
 function numberValue(value) {
   if (value === null || value === undefined || value === "") return null;
+
   const n = Number(
     String(value)
       .replace(/[$,]/g, "")
       .replace(/[^0-9.-]/g, "")
   );
+
   return Number.isFinite(n) ? n : null;
 }
 
 function dateValue(value) {
   if (!value) return null;
+
   const d = new Date(value);
+
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function normalizeText(value) {
   if (value === null || value === undefined) return null;
+
   const result = String(value).trim();
+
   return result || null;
 }
 
@@ -261,12 +370,15 @@ function sleep(ms) {
 
 function safeNumber(value, fallback = 0) {
   const n = Number(value);
+
   return Number.isFinite(n) ? n : fallback;
 }
 
 function safeJson(value) {
   try {
-    return value == null ? {} : JSON.parse(JSON.stringify(value));
+    return value == null
+      ? {}
+      : JSON.parse(JSON.stringify(value));
   } catch (_) {
     return {};
   }
@@ -274,19 +386,57 @@ function safeJson(value) {
 
 function scoreLead(permit) {
   let score = 50;
-  const type = String(permit.permit_type || "").toLowerCase();
-  const work = String(permit.work_type || "").toLowerCase();
-  const description = String(permit.work_description || "").toLowerCase();
-  const value = Number(permit.estimated_value || 0);
+
+  const type = String(
+    permit.permit_type || ""
+  ).toLowerCase();
+
+  const work = String(
+    permit.work_type || ""
+  ).toLowerCase();
+
+  const description = String(
+    permit.work_description || ""
+  ).toLowerCase();
+
+  const value = Number(
+    permit.estimated_value || 0
+  );
+
   const text = `${type} ${work} ${description}`;
 
   if (text.includes("commercial")) score += 25;
-  if (text.includes("building") || text.includes("construction")) score += 10;
-  if (text.includes("remodel") || text.includes("renovation") || text.includes("alteration")) score += 8;
-  if (text.includes("restaurant") || text.includes("retail") || text.includes("office")) score += 5;
-  if (value >= 1000000) score += 20;
-  else if (value >= 500000) score += 15;
-  else if (value >= 100000) score += 10;
+
+  if (
+    text.includes("building") ||
+    text.includes("construction")
+  ) {
+    score += 10;
+  }
+
+  if (
+    text.includes("remodel") ||
+    text.includes("renovation") ||
+    text.includes("alteration")
+  ) {
+    score += 8;
+  }
+
+  if (
+    text.includes("restaurant") ||
+    text.includes("retail") ||
+    text.includes("office")
+  ) {
+    score += 5;
+  }
+
+  if (value >= 1000000) {
+    score += 20;
+  } else if (value >= 500000) {
+    score += 15;
+  } else if (value >= 100000) {
+    score += 10;
+  }
 
   return Math.min(100, score);
 }
@@ -297,17 +447,48 @@ function addressFromRaw(city, raw) {
     const direction = pick(raw, ["street_direction"]);
     const street = pick(raw, ["street_name"]);
     const type = pick(raw, ["street_type"]);
-    const zip = pick(raw, ["zip_code", "zipcode", "zip"]);
-    const base = [number, direction, street, type].filter(Boolean).join(" ");
-    return [base, zip].filter(Boolean).join(", ") || null;
+    const zip = pick(raw, [
+      "zip_code",
+      "zipcode",
+      "zip"
+    ]);
+
+    const base = [
+      number,
+      direction,
+      street,
+      type
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return [
+      base,
+      zip
+    ]
+      .filter(Boolean)
+      .join(", ") || null;
   }
 
   if (city === "Austin") {
     return [
-      pick(raw, ["original_address1", "address", "street_number"]),
-      pick(raw, ["original_address2", "street_name"]),
-      pick(raw, ["zip", "zipcode", "zip_code"])
-    ].filter(Boolean).join(" ") || null;
+      pick(raw, [
+        "original_address1",
+        "address",
+        "street_number"
+      ]),
+      pick(raw, [
+        "original_address2",
+        "street_name"
+      ]),
+      pick(raw, [
+        "zip",
+        "zipcode",
+        "zip_code"
+      ])
+    ]
+      .filter(Boolean)
+      .join(" ") || null;
   }
 
   return normalizeText(
@@ -388,29 +569,117 @@ function mapPermitData(cityName, raw) {
     ])
   );
 
-  const address = addressFromRaw(cityName, raw);
+  const address = addressFromRaw(
+    cityName,
+    raw
+  );
+
   const workDescription = normalizeText(
-    pick(raw, ["work_description", "description", "work_desc", "project_description"])
+    pick(raw, [
+      "work_description",
+      "description",
+      "work_desc",
+      "project_description"
+    ])
   );
-  const workType = normalizeText(pick(raw, ["work_type", "construction_type", "job_type"]));
-  const reviewType = normalizeText(pick(raw, ["review_type"]));
-  const milestone = normalizeText(pick(raw, ["permit_milestone"]));
-  const condition = normalizeText(pick(raw, ["permit_condition"]));
+
+  const workType = normalizeText(
+    pick(raw, [
+      "work_type",
+      "construction_type",
+      "job_type"
+    ])
+  );
+
+  const reviewType = normalizeText(
+    pick(raw, ["review_type"])
+  );
+
+  const milestone = normalizeText(
+    pick(raw, ["permit_milestone"])
+  );
+
+  const condition = normalizeText(
+    pick(raw, ["permit_condition"])
+  );
+
   const contractorName = normalizeText(
-    pick(raw, ["contractor_name", "contact_1_name", "contact_2_name"])
+    pick(raw, [
+      "contractor_name",
+      "contact_1_name",
+      "contact_2_name"
+    ])
   );
-  const applicantName = normalizeText(pick(raw, ["applicant_name", "applicant"]));
-  const ownerName = normalizeText(pick(raw, ["owner_name", "owner"]));
+
+  const applicantName = normalizeText(
+    pick(raw, [
+      "applicant_name",
+      "applicant"
+    ])
+  );
+
+  const ownerName = normalizeText(
+    pick(raw, [
+      "owner_name",
+      "owner"
+    ])
+  );
+
   const contractorLicense = normalizeText(
-    pick(raw, ["contractor_license", "contact_1_license", "license_number"])
+    pick(raw, [
+      "contractor_license",
+      "contact_1_license",
+      "license_number"
+    ])
   );
-  const latitude = numberValue(pick(raw, ["latitude", "lat"]));
-  const longitude = numberValue(pick(raw, ["longitude", "lon", "lng"]));
-  const processingTime = numberValue(pick(raw, ["processing_time"]));
-  const streetNumber = normalizeText(pick(raw, ["street_number"]));
-  const streetDirection = normalizeText(pick(raw, ["street_direction"]));
-  const streetName = normalizeText(pick(raw, ["street_name"]));
-  const postalCode = normalizeText(pick(raw, ["zip_code", "zipcode", "zip", "postal_code"]));
+
+  const latitude = numberValue(
+    pick(raw, [
+      "latitude",
+      "lat"
+    ])
+  );
+
+  const longitude = numberValue(
+    pick(raw, [
+      "longitude",
+      "lon",
+      "lng"
+    ])
+  );
+
+  const processingTime = numberValue(
+    pick(raw, [
+      "processing_time"
+    ])
+  );
+
+  const streetNumber = normalizeText(
+    pick(raw, [
+      "street_number"
+    ])
+  );
+
+  const streetDirection = normalizeText(
+    pick(raw, [
+      "street_direction"
+    ])
+  );
+
+  const streetName = normalizeText(
+    pick(raw, [
+      "street_name"
+    ])
+  );
+
+  const postalCode = normalizeText(
+    pick(raw, [
+      "zip_code",
+      "zipcode",
+      "zip",
+      "postal_code"
+    ])
+  );
 
   const stableSource = JSON.stringify({
     cityName,
@@ -458,234 +727,26 @@ function mapPermitData(cityName, raw) {
     postal_code: postalCode,
     latitude,
     longitude,
-    source_url: CITIES.find(c => c.name === cityName)?.url || null,
+    source_url:
+      CITIES.find(c => c.name === cityName)?.url || null,
     raw_data: safeJson(raw)
   };
 
   /* Do not invent a project value. The UI will show "Not reported" if source data is null. */
-  const score = scoreLead({ ...base, estimated_value: valuation || 0 });
+  const score = scoreLead({
+    ...base,
+    estimated_value: valuation || 0
+  });
 
   return {
     ...base,
     ai_score: score,
-    ai_confidence: Number((0.70 + Math.min(score, 100) / 333).toFixed(2)),
+    ai_confidence: Number(
+      (
+        0.70 +
+        Math.min(score, 100) / 333
+      ).toFixed(2)
+    ),
     ai_enriched: true
   };
 }
-
-export const AI_ENGINE = {
-  async enrichPermit(permit) {
-    const score = scoreLead(permit);
-    return {
-      ...permit,
-      ai_enriched: true,
-      ai_confidence: Number((0.70 + Math.min(score, 100) / 333).toFixed(2)),
-      ai_score: score,
-      ai_note: "GRIDV21 heuristic AI engine"
-    };
-  },
-  scoreLead,
-  predictRevenue(permit) {
-    const value = Number(permit.estimated_value || 0);
-    return Number((value * 0.03).toFixed(2));
-  }
-};
-
-/* -------------------------------------------------------------------------- */
-/* ACTIVITY LOGGING                                                           */
-/* -------------------------------------------------------------------------- */
-
-async function logActivity({
-  eventType = "system",
-  action = "activity",
-  message = "",
-  status = "success",
-  permitId = null,
-  city = null,
-  metadata = {}
-} = {}) {
-  try {
-    const { error } = await supabase.from("os_activity_logs").insert({
-      event_type: eventType,
-      action,
-      message: String(message).slice(0, 5000),
-      status,
-      permit_id: permitId,
-      city,
-      metadata: safeJson(metadata)
-    });
-    if (error) {
-      if (!/relation .*os_activity_logs.* does not exist/i.test(error.message || "")) {
-        console.warn(`[ACTIVITY] ${error.message}`);
-      }
-      return false;
-    }
-    return true;
-  } catch (error) {
-    console.warn(`[ACTIVITY] ${error.message}`);
-    return false;
-  }
-}
-
-async function getActivity(limit = 100) {
-  const primary = await supabase
-    .from("os_activity_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (!primary.error) return primary.data || [];
-
-  /* Graceful fallback while migration is being applied. */
-  const fallback = await supabase
-    .from("audit_logs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (fallback.error) return [];
-
-  return (fallback.data || []).map(row => ({
-    id: row.id,
-    event_type: "audit",
-    action: "error",
-    message: row.message,
-    status: row.level || "error",
-    created_at: row.created_at,
-    metadata: { request_id: row.request_id }
-  }));
-}
-
-/* -------------------------------------------------------------------------- */
-/* FETCH + SCANNER                                                            */
-/* -------------------------------------------------------------------------- */
-
-async function axiosWithAbort(url, reqId, signal, retries = 3) {
-  let lastError;
-
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const response = await axios.get(url, {
-        signal,
-        timeout: SCAN_SETTINGS.requestTimeout,
-        responseType: "text",
-        headers: {
-          "User-Agent": `GRIDV21-BRAIN/${VERSION}`,
-          Accept: "application/json,text/csv,*/*"
-        },
-        validateStatus: status => status >= 200 && status < 300
-      });
-
-      logger.info(reqId, `Fetched ${url} (${response.status})`);
-      return response.data;
-    } catch (error) {
-      lastError = error;
-      if (signal?.aborted) throw new Error("Scan aborted");
-      logger.warn(reqId, `Fetch attempt ${attempt}/${retries} failed: ${error.message}`);
-      if (attempt < retries) await sleep(500 * attempt);
-    }
-  }
-
-  throw lastError;
-}
-
-async function supabaseBatchInsert(table, rows) {
-  if (!rows.length) return { inserted: 0, errors: 0 };
-  let inserted = 0;
-
-  for (let i = 0; i < rows.length; i += SCAN_SETTINGS.batchSize) {
-    const batch = rows.slice(i, i + SCAN_SETTINGS.batchSize);
-    const { error } = await supabase.from(table).insert(batch);
-    if (error) throw error;
-    inserted += batch.length;
-  }
-
-  return { inserted, errors: 0 };
-}
-
-async function insertNewPermits(rows) {
-  if (!rows.length) return { inserted: 0, skipped: 0, updated: 0 };
-
-  /* Keep one record per source permit and refresh existing rows with the
-     newly-normalized detailed fields. This fixes old rows that were saved
-     with generic defaults such as $25,000 or missing dates. */
-  const unique = [];
-  const seen = new Set();
-
-  for (const row of rows) {
-    if (!row.permit_id || seen.has(row.permit_id)) continue;
-    seen.add(row.permit_id);
-    unique.push(row);
-  }
-
-  if (!unique.length) return { inserted: 0, skipped: rows.length, updated: 0 };
-
-  let affected = 0;
-  for (let i = 0; i < unique.length; i += SCAN_SETTINGS.batchSize) {
-    const batch = unique.slice(i, i + SCAN_SETTINGS.batchSize);
-    const { error } = await supabase
-      .from("permits")
-      .upsert(batch, { onConflict: "permit_id" });
-    if (error) throw error;
-    affected += batch.length;
-  }
-
-  return {
-    inserted: affected,
-    skipped: rows.length - unique.length,
-    updated: affected
-  };
-}
-
-async function writeScanLog(payload) {
-  try {
-    const { error } = await supabase.from("scan_logs").insert(payload);
-    if (error && !/relation .*scan_logs.* does not exist/i.test(error.message || "")) {
-      logger.warn("scan-log", error.message);
-    }
-  } catch (error) {
-    logger.warn("scan-log", error.message);
-  }
-}
-
-async function scanCity(city, reqId, signal) {
-  const rawText = await axiosWithAbort(city.url, reqId, signal);
-  let records;
-
-  if (city.type === "csv") {
-    const parsed = Papa.parse(rawText, {
-      header: true,
-      skipEmptyLines: true,
-      dynamicTyping: false
-    });
-    if (parsed.errors?.length) {
-      logger.warn(reqId, `${city.name}: ${parsed.errors.length} CSV parse warnings`);
-    }
-    records = parsed.data || [];
-  } else {
-    try {
-      records = typeof rawText === "string" ? JSON.parse(rawText) : rawText;
-    } catch (error) {
-      throw new Error(`${city.name}: invalid JSON response: ${error.message}`);
-    }
-  }
-
-  if (!Array.isArray(records)) records = records?.data || [];
-
-  return {
-    city: city.name,
-    fetched: records.length,
-    mapped: records.map(row => mapPermitData(city.name, row)).filter(Boolean)
-  };
-}
-
-let currentScanAbortController = null;
-let scanPromise = null;
-
-export async function scanAllCities(reqId = crypto.randomUUID()) {
-  if (ENGINE.scanning) return { ok: false, status: "already_scanning", message: "A scan is already running." };
-  if (!ENGINE.running) return { ok: false, status: "paused", message: "Brain is paused." };
-  if (ENGINE.emergencyStopped) return { ok: false, status: "emergency_stopped", message: "Emergency stop is active." };
-
-  ENGINE.scanning = true;
-  ENGINE.las
