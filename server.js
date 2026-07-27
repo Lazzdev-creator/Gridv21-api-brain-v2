@@ -267,7 +267,6 @@ app.use(express.urlencoded({ extended: true }));
 // ===================================================
 // STATIC FRONTEND (Cleaned & Fixed)
 // ===================================================
-
 app.use(
   express.static(PUBLIC_DIR, {
     index: false,
