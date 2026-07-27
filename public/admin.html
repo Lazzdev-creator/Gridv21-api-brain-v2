@@ -373,147 +373,667 @@
   // ========== ACTIVITY LOGS ==========
   async function loadActivity() {
     const container = document.getElementById('log-container');
-    container.innerHTML = '<div class="text-slate-500">Loading activity...</div>';
+
+    container.innerHTML =
+      '<div class="text-slate-500">Loading activity logs...</div>';
 
     try {
-      const res = await fetch('/api/activity?limit=100', {
-        headers: { 'x-admin-key': ADMIN_KEY }
+      const res = await fetch('/api/activity', {
+        headers: {
+          'x-admin-key': ADMIN_KEY
+        }
       });
-      const json = await res.json();
-      const logs = json.data || [];
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to load activity logs');
+      }
+
+      container.innerHTML = '';
+
+      const logs =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data.logs)
+            ? data.logs
+            : Array.isArray(data.activities)
+              ? data.activities
+              : [];
 
       if (!logs.length) {
-        container.innerHTML = '<div class="text-slate-500">No activity yet</div>';
+        container.innerHTML =
+          '<div class="text-slate-500">No activity logs available.</div>';
         return;
       }
 
-      container.innerHTML = logs.map(log => {
-        const color = {
+      logs.forEach(log => {
+        const line = document.createElement('div');
+
+        const type =
+          String(log.type || log.level || 'info').toLowerCase();
+
+        const classes = {
           info: 'text-slate-300',
           success: 'text-emerald-400',
           warn: 'text-amber-400',
+          warning: 'text-amber-400',
           error: 'text-rose-400'
-        }[log.level] || 'text-slate-300';
+        };
 
-        return `<div class="${color}">[${formatDate(log.created_at)}] ${log.action || ''} – ${log.message}</div>`;
-      }).join('');
+        line.className = classes[type] || classes.info;
+
+        const timestamp =
+          log.created_at ||
+          log.createdAt ||
+          log.timestamp ||
+          log.time;
+
+        const message =
+          log.message ||
+          log.action ||
+          log.event ||
+          JSON.stringify(log);
+
+        line.textContent =
+          `[${timestamp ? new Date(timestamp).toLocaleString() : new Date().toLocaleTimeString()}] ${message}`;
+
+        container.appendChild(line);
+      });
+
+      container.scrollTop = container.scrollHeight;
+
     } catch (err) {
-      container.innerHTML = `<div class="text-rose-400">Failed to load activity: ${err.message}</div>`;
+      container.innerHTML =
+        '<div class="text-rose-400">Activity error: ' +
+        escapeHtml(err.message) +
+        '</div>';
+
+      addLog(
+        'Activity logs error: ' + err.message,
+        'error'
+      );
     }
   }
 
-  // ========== LEADS ==========
+
+  // ========== SCANNED LEADS ==========
   async function loadLeads() {
-    const container = document.getElementById('leads-container');
-    container.innerHTML = '<div class="text-slate-400 text-sm">Loading leads...</div>';
+    const container =
+      document.getElementById('leads-container');
+
+    container.innerHTML =
+      '<div class="text-slate-500 text-sm">Loading scanned leads...</div>';
 
     try {
-      const res = await fetch('/api/leads?limit=25', {
-        headers: { 'x-admin-key': ADMIN_KEY }
+      const res = await fetch('/api/permits', {
+        headers: {
+          'x-admin-key': ADMIN_KEY
+        }
       });
-      const json = await res.json();
-      const leads = json.data || [];
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.error || 'Failed to load leads'
+        );
+      }
+
+      const leads =
+        Array.isArray(data)
+          ? data
+          : Array.isArray(data.permits)
+            ? data.permits
+            : Array.isArray(data.leads)
+              ? data.leads
+              : [];
+
+      container.innerHTML = '';
 
       if (!leads.length) {
-        container.innerHTML = '<div class="text-slate-500 text-sm">No permits found yet. Run a scan first.</div>';
+        container.innerHTML =
+          '<div class="text-slate-500 text-sm">No scanned leads found.</div>';
         return;
       }
 
-      container.innerHTML = leads.map(lead => {
-        const value = formatMoney(lead.estimated_value);
-        const score = lead.ai_score || 0;
-        const type = lead.permit_type || 'Unknown';
-        const city = lead.city || '';
-        const advice = lead.advice || 'No advice';
-        const buyers = (lead.possible_buyers || []).join(', ');
-        const commission = formatMoney(lead.estimated_commission);
+      leads.forEach(lead => {
+        const card = document.createElement('div');
 
-        return `
-          <div class="bg-slate-800/50 rounded-xl p-5 border border-slate-700">
-            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-              <div>
-                <p class="font-medium">${type}</p>
-                <p class="text-xs text-slate-400 mt-0.5">${city} • ${lead.issued_date || 'No date'}</p>
+        card.className =
+          'bg-slate-800/60 border border-slate-700 rounded-xl p-4';
+
+        const address =
+          lead.address ||
+          lead.property_address ||
+          lead.location ||
+          'Unknown address';
+
+        const city =
+          lead.city ||
+          lead.location_city ||
+          'Unknown city';
+
+        const type =
+          lead.type ||
+          lead.project_type ||
+          lead.permit_type ||
+          'Unknown';
+
+        const value =
+          lead.estimated_value ??
+          lead.project_value ??
+          lead.value ??
+          0;
+
+        const score =
+          lead.score ??
+          lead.ai_score ??
+          lead.lead_score ??
+          '—';
+
+        const created =
+          lead.created_at ||
+          lead.createdAt ||
+          lead.date ||
+          null;
+
+        card.innerHTML = `
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+
+            <div class="min-w-0 flex-1">
+
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+
+                <span class="text-xs px-2 py-1 rounded-full
+                  bg-brand-500/20 text-brand-400
+                  border border-brand-500/30">
+                  ${escapeHtml(type)}
+                </span>
+
+                <span class="text-xs px-2 py-1 rounded-full
+                  bg-emerald-500/20 text-emerald-400
+                  border border-emerald-500/30">
+                  AI Score: ${escapeHtml(String(score))}
+                </span>
+
               </div>
-              <div class="text-right">
-                <p class="text-lg font-bold text-emerald-400">${value}</p>
-                <p class="text-xs text-slate-400">AI Score: ${score} • Est. Comm: ${commission}</p>
+
+              <h3 class="font-semibold text-white">
+                ${escapeHtml(address)}
+              </h3>
+
+              <p class="text-sm text-slate-400 mt-1">
+                ${escapeHtml(city)}
+              </p>
+
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wide text-slate-500">
+                    Estimated Value
+                  </p>
+                  <p class="text-sm font-semibold text-emerald-400">
+                    ${formatMoney(value)}
+                  </p>
+                </div>
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wide text-slate-500">
+                    Lead Score
+                  </p>
+                  <p class="text-sm font-semibold">
+                    ${escapeHtml(String(score))}
+                  </p>
+                </div>
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wide text-slate-500">
+                    City
+                  </p>
+                  <p class="text-sm font-semibold">
+                    ${escapeHtml(city)}
+                  </p>
+                </div>
+
+                <div>
+                  <p class="text-[10px] uppercase tracking-wide text-slate-500">
+                    Date
+                  </p>
+                  <p class="text-sm font-semibold">
+                    ${created
+                      ? escapeHtml(
+                          new Date(created).toLocaleDateString()
+                        )
+                      : '—'}
+                  </p>
+                </div>
+
               </div>
+
             </div>
-            <p class="text-sm text-slate-300 mb-2">${advice}</p>
-            <p class="text-xs text-slate-400 mb-4">Possible buyers: ${buyers}</p>
-            <div class="flex flex-wrap gap-2">
-              <button class="btn text-xs bg-brand-600 hover:bg-brand-500 text-white px-3 py-1.5 rounded-lg">Prepare Acquisition</button>
-              <button class="btn text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg">View Buyers</button>
-              <button class="btn text-xs bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-lg">Export</button>
-            </div>
+
           </div>
         `;
-      }).join('');
+
+        container.appendChild(card);
+      });
+
     } catch (err) {
-      container.innerHTML = `<div class="text-rose-400 text-sm">Failed to load leads: ${err.message}</div>`;
+
+      container.innerHTML = `
+        <div class="bg-rose-500/10 border border-rose-500/30
+                    rounded-xl p-4 text-rose-400 text-sm">
+          Failed to load leads: ${escapeHtml(err.message)}
+        </div>
+      `;
+
+      addLog(
+        'Lead loading error: ' + err.message,
+        'error'
+      );
     }
   }
+
 
   // ========== BRAIN OS ==========
   async function loadBrainSuggestion() {
-    const el = document.getElementById('brain-suggestion');
-    el.textContent = 'Analyzing...';
+    const el =
+      document.getElementById('brain-suggestion');
+
+    if (!el) return;
+
+    el.textContent = 'Analyzing recent activity...';
 
     try {
       const res = await fetch('/api/brain/suggestion', {
-        headers: { 'x-admin-key': ADMIN_KEY }
+        headers: {
+          'x-admin-key': ADMIN_KEY
+        }
       });
+
       const data = await res.json();
-      el.textContent = data.suggestion || 'No suggestion available';
+
+      if (!res.ok) {
+        throw new Error(
+          data.error || 'Brain recommendation unavailable'
+        );
+      }
+
+      el.textContent =
+        data.suggestion ||
+        data.recommendation ||
+        data.message ||
+        'No recommendation available yet.';
+
     } catch (err) {
-      el.textContent = 'Failed to load suggestion: ' + err.message;
+
+      el.textContent =
+        'Brain recommendation unavailable.';
+
+      addLog(
+        'Brain error: ' + err.message,
+        'warn'
+      );
     }
   }
 
+
   function authorizeAction() {
-    addLog('Brain recommendation AUTHORIZED by admin', 'success');
-    document.getElementById('brain-suggestion').textContent = 'Action authorized.';
+    const suggestion =
+      document.getElementById('brain-suggestion');
+
+    if (!suggestion) return;
+
+    const text =
+      suggestion.textContent.trim();
+
+    if (
+      !text ||
+      text === 'Analyzing recent activity...' ||
+      text === 'Brain recommendation unavailable.'
+    ) {
+      alert('There is no active recommendation to authorize.');
+      return;
+    }
+
+    if (
+      !confirm(
+        'Authorize this Brain OS recommendation?\n\n' +
+        text
+      )
+    ) {
+      return;
+    }
+
+    addLog(
+      'Brain recommendation authorized',
+      'success'
+    );
+
+    suggestion.textContent =
+      'Recommendation authorized.';
+
+    executeBrainAuthorization(text);
   }
 
-  function dismissSuggestion() {
-    document.getElementById('brain-suggestion').textContent = 'Suggestion dismissed. Waiting for new signals...';
+
+  async function executeBrainAuthorization(suggestion) {
+    try {
+      const res = await fetch(
+        '/api/brain/authorize',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': ADMIN_KEY
+          },
+          body: JSON.stringify({
+            suggestion
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+          'Authorization request failed'
+        );
+      }
+
+      addLog(
+        'Brain authorization completed',
+        'success'
+      );
+
+    } catch (err) {
+
+      addLog(
+        'Brain authorization error: ' +
+        err.message,
+        'error'
+      );
+
+      alert(
+        'Brain authorization failed: ' +
+        err.message
+      );
+    }
   }
+
+
+  function dismissSuggestion() {
+    const el =
+      document.getElementById('brain-suggestion');
+
+    if (!el) return;
+
+    el.textContent =
+      'Recommendation dismissed.';
+
+    addLog(
+      'Brain recommendation dismissed',
+      'warn'
+    );
+  }
+
 
   // ========== REVENUE ==========
   async function loadRevenue() {
     try {
       const res = await fetch('/api/revenue', {
-        headers: { 'x-admin-key': ADMIN_KEY }
+        headers: {
+          'x-admin-key': ADMIN_KEY
+        }
       });
-      const json = await res.json();
-      // You can expand this later to render a full table
-      console.log('Revenue data:', json);
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+
+      const cards =
+        document.querySelectorAll(
+          '#section-revenue .text-2xl'
+        );
+
+      if (cards.length >= 3) {
+        cards[0].textContent =
+          formatMoney(
+            data.pipeline ??
+            data.totalPipeline ??
+            0
+          );
+
+        cards[1].textContent =
+          formatMoney(
+            data.closedRevenue ??
+            data.closed ??
+            0
+          );
+
+        cards[2].textContent =
+          formatMoney(
+            data.averageDeal ??
+            data.avgDealSize ??
+            0
+          );
+      }
+
     } catch (err) {
-      console.error(err);
+      addLog(
+        'Revenue loading error: ' +
+        err.message,
+        'warn'
+      );
     }
   }
+
 
   // ========== AFFILIATES ==========
   async function loadAffiliates() {
     try {
       const res = await fetch('/api/affiliates', {
-        headers: { 'x-admin-key': ADMIN_KEY }
+        headers: {
+          'x-admin-key': ADMIN_KEY
+        }
       });
-      const json = await res.json();
-      console.log('Affiliates:', json);
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json();
+
+      const cards =
+        document.querySelectorAll(
+          '#section-affiliates .text-2xl'
+        );
+
+      if (cards.length >= 3) {
+        cards[0].textContent =
+          Number(
+            data.active ??
+            data.activeAffiliates ??
+            0
+          ).toLocaleString();
+
+        cards[1].textContent =
+          Number(
+            data.clicks ??
+            data.clicks30d ??
+            0
+          ).toLocaleString();
+
+        cards[2].textContent =
+          Number(
+            data.conversions ??
+            0
+          ).toLocaleString();
+      }
+
     } catch (err) {
-      console.error(err);
+      addLog(
+        'Affiliate loading error: ' +
+        err.message,
+        'warn'
+      );
     }
   }
 
-  function refreshAll() {
-    refreshStatus();
-    addLog('Manual refresh triggered', 'info');
+
+  // ========== EXPORT HELPERS ==========
+  async function prepareExport(type, filter = 'all') {
+    if (!ADMIN_KEY) {
+      alert('Admin key missing');
+      return;
+    }
+
+    addLog(
+      `Preparing ${type} export...`,
+      'info'
+    );
+
+    try {
+      const res = await fetch(
+        `/api/export/${encodeURIComponent(type)}?filter=${encodeURIComponent(filter)}`,
+        {
+          headers: {
+            'x-admin-key': ADMIN_KEY
+          }
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          data.error ||
+          'Export preparation failed'
+        );
+      }
+
+      if (data.url) {
+        window.open(
+          data.url,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      } else if (data.csv) {
+        downloadTextFile(
+          data.csv,
+          `gridv21-${type}-export.csv`,
+          'text/csv'
+        );
+      } else {
+        alert(
+          data.message ||
+          'Export prepared successfully.'
+        );
+      }
+
+      addLog(
+        `${type} export prepared`,
+        'success'
+      );
+
+    } catch (err) {
+
+      addLog(
+        `${type} export error: ${err.message}`,
+        'error'
+      );
+
+      alert(
+        'Export failed: ' +
+        err.message
+      );
+    }
   }
 
-  // Init
-  refreshStatus();
-  setInterval(refreshStatus, 10000);
-  </script>
-  
+
+  function downloadTextFile(
+    content,
+    filename,
+    mime = 'text/plain'
+  ) {
+    const blob =
+      new Blob(
+        [content],
+        { type: mime }
+      );
+
+    const url =
+      URL.createObjectURL(blob);
+
+    const link =
+      document.createElement('a');
+
+    link.href = url;
+    link.download = filename;
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+  }
+
+
+  // ========== SECURITY ==========
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+
+  // ========== REFRESH ALL ==========
+  async function refreshAll() {
+    addLog(
+      'Refreshing GRIDV21 Admin OS...',
+      'info'
+    );
+
+    await refreshStatus();
+
+    const active =
+      document.querySelector(
+        'main > section:not(.hidden)'
+      );
+
+    if (!active) return;
+
+    const id = active.id;
+
+    if (id === 'section-activities') {
+      await loadActivity();
+    }
+
+    if (id === 'section-leads') {
+      await loadLeads();
+    }
+
+    if (id === 'section-brain') {
+      await loadBrainSuggestion();
+    }
+
+    if (id === 'section-revenue') {
+      await loadRevenue();
+    }
+
+    if (id === 'section-affiliates') {
+      await loadAffiliates();
+    }
+
+    addLog(
+      'Refresh completed',
+      'success'
+    );
+  }
