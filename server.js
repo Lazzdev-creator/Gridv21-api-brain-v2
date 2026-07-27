@@ -264,13 +264,9 @@ app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ============================================================
-// STATIC FRONTEND
-// GRIDV21 BRAIN ENTERPRISE v6.3.6
-// ============================================================
-
-const PUBLIC_DIR = path.join(__dirname, "public");
-const DASHBOARD_DIR = path.join(PUBLIC_DIR, "dashboard");
+// ===================================================
+// STATIC FRONTEND (Cleaned & Fixed)
+// ===================================================
 
 app.use(
   express.static(PUBLIC_DIR, {
@@ -280,35 +276,23 @@ app.use(
   })
 );
 
+// Serve all static dashboard files (index.html, styles.css, app.js)
 app.use(
   "/dashboard",
   express.static(DASHBOARD_DIR, {
     index: "index.html",
-    fallthrough: false
+    fallthrough: true // Allows Express to fall back gracefully if needed
   })
 );
 
-app.get("/dashboard", (req, res) => {
-  res.sendFile(path.join(DASHBOARD_DIR, "index.html"));
-});
-
-app.get("/dashboard/index.html", (req, res) => {
-  res.sendFile(path.join(DASHBOARD_DIR, "index.html"));
-});
-
-app.get("/dashboard/styles.css", (req, res) => {
-  res.sendFile(path.join(DASHBOARD_DIR, "styles.css"));
-});
-// Serve ALL static files in DASHBOARD_DIR (CSS, JS, images, etc.)
-app.use("/dashboard", express.static(DASHBOARD_DIR));
-
-// Redirect root to dashboard
+// Redirect root domain to /dashboard/
 app.get("/", (req, res) => {
   res.redirect("/dashboard/");
 });
-// ============================================================
+
+// ===================================================
 // END STATIC FRONTEND
-// ============================================================
+// ===================================================
 
 app.use(
   "/api",
