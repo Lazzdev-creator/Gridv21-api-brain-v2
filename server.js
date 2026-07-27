@@ -299,19 +299,13 @@ app.get("/dashboard/index.html", (req, res) => {
 app.get("/dashboard/styles.css", (req, res) => {
   res.sendFile(path.join(DASHBOARD_DIR, "styles.css"));
 });
+// Serve ALL static files in DASHBOARD_DIR (CSS, JS, images, etc.)
+app.use("/dashboard", express.static(DASHBOARD_DIR));
 
-app.get("/dashboard/app.js", (req, res) => {
-  res.sendFile(path.join(DASHBOARD_DIR, "app.js"));
-});
-
-app.get("/dashboard/supabaseClient.js", (req, res) => {
-  res.sendFile(path.join(DASHBOARD_DIR, "supabaseClient.js"));
-});
-
+// Redirect root to dashboard
 app.get("/", (req, res) => {
   res.redirect("/dashboard/");
 });
-
 // ============================================================
 // END STATIC FRONTEND
 // ============================================================
