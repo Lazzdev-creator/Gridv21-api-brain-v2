@@ -25,15 +25,17 @@ import crypto from "crypto";
 import { createClient as createRedisClient } from "redis";
 import { RedisStore } from "connect-redis";
 
-// 📍 DEFINE YOUR DIRECTORY PATHS HERE
-const PUBLIC_DIR = path.join(__dirname, 'public');
-const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
 dotenv.config();
 
+// Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const app = express();
 
+// 📍 DEFINE YOUR DIRECTORY PATHS HERE (Now safe to use __dirname)
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const DASHBOARD_DIR = path.join(__dirname, 'dashboard');
+
+const app = express();
 export const VERSION = "6.3.6";
 const PORT = Number(process.env.PORT || 3000);
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
