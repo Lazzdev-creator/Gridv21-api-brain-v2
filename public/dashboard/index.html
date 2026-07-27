@@ -2,276 +2,972 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GRIDV21 BRAIN ADMIN OS</title>
-  <style>
-    :root {
-      --bg-dark: #0b0f19;
-      --card-bg: #111827;
-      --border-color: #1f2937;
-      --accent-blue: #38bdf8;
-      --accent-purple: #6366f1;
-      --text-main: #f3f4f6;
-      --text-muted: #9ca3af;
-    }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  >
 
-    body {
-      background-color: var(--bg-dark);
-      color: var(--text-main);
-      display: flex;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
+  <meta
+    name="theme-color"
+    content="#0b1120"
+  >
 
-    /* SIDEBAR */
-    aside {
-      width: 240px;
-      background-color: #0d1322;
-      border-right: 1px solid var(--border-color);
-      padding: 20px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      position: fixed;
-      height: 100vh;
-      z-index: 10;
-    }
+  <meta
+    name="description"
+    content="GRIDV21 BRAIN Enterprise Intelligence Operating System"
+  >
 
-    .brand {
-      font-weight: 800;
-      font-size: 1.1rem;
-      letter-spacing: 0.5px;
-      color: #fff;
-      padding: 0 12px;
-    }
-    .brand span { font-size: 0.65rem; color: var(--text-muted); display: block; font-weight: 400; }
+  <title>GRIDV21 BRAIN • Enterprise OS</title>
 
-    .nav-menu { display: flex; flex-direction: column; gap: 4px; }
-    .nav-item {
-      padding: 10px 12px;
-      border-radius: 6px;
-      color: var(--text-muted);
-      text-decoration: none;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .nav-item:hover, .nav-item.active {
-      background-color: #1e293b;
-      color: #fff;
-    }
-
-    /* MAIN CONTENT AREA */
-    main {
-      margin-left: 240px;
-      flex: 1;
-      padding: 20px 30px;
-      max-width: 1400px;
-    }
-
-    .header-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .status-badge {
-      background: rgba(16, 185, 129, 0.1);
-      color: #10b981;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      border: 1px solid rgba(16, 185, 129, 0.2);
-    }
-
-    /* DASHBOARD CARDS & SECTIONS */
-    .view-section { display: none; }
-    .view-section.active { display: block; }
-
-    .panel-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-
-    .panel-title {
-      font-size: 1rem;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    /* ENGINE METRICS GRID */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-      gap: 16px;
-      margin-bottom: 20px;
-    }
-    .metric-box {
-      background: #0d1322;
-      border: 1px solid var(--border-color);
-      padding: 12px;
-      border-radius: 6px;
-    }
-    .metric-label { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px; }
-    .metric-value { font-size: 1.1rem; font-weight: 700; color: #fff; }
-
-    /* CONTROLS */
-    .controls-grid {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .btn {
-      padding: 8px 16px;
-      border-radius: 6px;
-      border: none;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    .btn:hover { opacity: 0.9; }
-    .btn-success { background: #059669; color: #fff; }
-    .btn-warning { background: #d97706; color: #fff; }
-    .btn-info { background: #4f46e5; color: #fff; }
-    .btn-danger { background: #dc2626; color: #fff; }
-    .btn-secondary { background: #374151; color: #fff; }
-
-    /* LEADS LIST & CARDS */
-    .scanned-leads-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-  </style>
+  <link
+    rel="stylesheet"
+    href="/dashboard/styles.css"
+  >
 </head>
+
 <body>
 
-  <!-- LEFT SIDEBAR -->
-  <aside>
-    <div class="brand">
-      GRIDV21
-      <span>BRAIN ADMIN OS</span>
-    </div>
+  <!-- ================================================================
+       GRIDV21 BRAIN
+       ENTERPRISE INTELLIGENCE OPERATING SYSTEM
+       VERSION 6.3.6
+       ================================================================ -->
 
-    <nav class="nav-menu">
-      <a class="nav-item active" onclick="switchView('dashboard', this)">Dashboard</a>
-      <a class="nav-item" onclick="switchView('activities', this)">OS Activities</a>
-      <a class="nav-item" onclick="switchView('leads', this)">Scanned Leads</a>
-      <a class="nav-item" onclick="switchView('brainOs', this)">Brain OS</a>
-      <a class="nav-item" onclick="switchView('revenue', this)">Revenue Streams</a>
-      <a class="nav-item" onclick="switchView('export', this)">Acquisition Export</a>
-    </nav>
-  </aside>
+  <div id="app">
 
-  <!-- MAIN VIEW -->
-  <main>
-    <div class="header-bar">
-      <div></div>
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <span class="status-badge" id="health">Authenticated</span>
-        <button class="btn btn-secondary" onclick="init()">Refresh All</button>
+    <!-- ================================================================
+         MOBILE OVERLAY
+         ================================================================ -->
+
+    <div
+      id="sidebar-overlay"
+      class="sidebar-overlay"
+      onclick="toggleSidebar(false)"
+    ></div>
+
+
+    <!-- ================================================================
+         SIDEBAR
+         ================================================================ -->
+
+    <aside
+      id="sidebar"
+      class="sidebar"
+      aria-label="GRIDV21 navigation"
+    >
+
+      <!-- BRAND -->
+
+      <div class="sidebar-brand">
+
+        <div class="brand-mark">
+          G
+        </div>
+
+        <div class="brand-copy">
+
+          <div class="brand-name">
+            GRIDV21
+          </div>
+
+          <div class="brand-subtitle">
+            BRAIN ENTERPRISE
+          </div>
+
+        </div>
+
+        <button
+          id="mobile-sidebar-close"
+          class="icon-button mobile-only"
+          type="button"
+          aria-label="Close navigation"
+          onclick="toggleSidebar(false)"
+        >
+          ×
+        </button>
+
       </div>
-    </div>
 
-    <!-- 1. DASHBOARD VIEW -->
-    <div id="view-dashboard" class="view-section active">
-      <div class="panel-card">
-        <div class="panel-title">
-          <span>Engine Status</span>
-          <span id="engineStatusBadge" style="font-size: 0.85rem; color: #f59e0b;">● Live</span>
-        </div>
 
-        <div class="metrics-grid">
-          <div class="metric-box"><div class="metric-label">Running</div><div class="metric-value" id="engineRunning">--</div></div>
-          <div class="metric-box"><div class="metric-label">Scanning</div><div class="metric-value" id="engineScanning">--</div></div>
-          <div class="metric-box"><div class="metric-label">Permits Found</div><div class="metric-value" id="permitsFound">0</div></div>
-          <div class="metric-box"><div class="metric-label">Errors</div><div class="metric-value" id="engineErrors" style="color: #ef4444;">0</div></div>
-          <div class="metric-box"><div class="metric-label">Emergency Stop</div><div class="metric-value" id="emergencyStop">No</div></div>
-        </div>
+      <!-- SYSTEM STATUS -->
+
+      <div class="sidebar-system">
+
+        <span
+          id="sidebar-status-dot"
+          class="status-dot status-online"
+        ></span>
+
+        <span id="sidebar-status-text">
+          System Online
+        </span>
+
       </div>
 
-      <div class="panel-card">
-        <div class="panel-title">Scan & Engine Controls</div>
-        <div class="controls-grid">
-          <button class="btn btn-success" id="startScanBtn">Start Scan</button>
-          <button class="btn btn-warning" id="stopScanBtn">Stop Scan</button>
-          <button class="btn btn-secondary" id="pauseEngineBtn">Pause Engine</button>
-          <button class="btn btn-info" id="resumeEngineBtn">Resume Engine</button>
-          <button class="btn btn-danger" id="emergencyStopBtn">Emergency Stop</button>
+
+      <!-- NAVIGATION -->
+
+      <nav class="sidebar-nav">
+
+        <div class="nav-heading">
+          COMMAND
         </div>
+
+        <button
+          type="button"
+          class="nav-item active"
+          data-section="dashboard"
+          onclick="showSection('dashboard')"
+        >
+          <span class="nav-icon">⌂</span>
+          <span>Executive Dashboard</span>
+        </button>
+
+
+        <div class="nav-heading">
+          INTELLIGENCE OS
+        </div>
+
+
+        <!-- 1 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="executive"
+          onclick="showSection('executive')"
+        >
+          <span class="nav-icon">◆</span>
+          <span>Executive Intelligence</span>
+        </button>
+
+
+        <!-- 2 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="revenue"
+          onclick="showSection('revenue')"
+        >
+          <span class="nav-icon">£</span>
+          <span>Revenue Intelligence</span>
+        </button>
+
+
+        <!-- 3 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="sales"
+          onclick="showSection('sales')"
+        >
+          <span class="nav-icon">◎</span>
+          <span>Sales & CRM</span>
+        </button>
+
+
+        <!-- 4 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="marketing"
+          onclick="showSection('marketing')"
+        >
+          <span class="nav-icon">◇</span>
+          <span>Marketing</span>
+        </button>
+
+
+        <!-- 5 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="operations"
+          onclick="showSection('operations')"
+        >
+          <span class="nav-icon">⚙</span>
+          <span>Operations</span>
+        </button>
+
+
+        <!-- 6 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="finance"
+          onclick="showSection('finance')"
+        >
+          <span class="nav-icon">₤</span>
+          <span>Finance</span>
+        </button>
+
+
+        <!-- 7 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="human-capital"
+          onclick="showSection('human-capital')"
+        >
+          <span class="nav-icon">♙</span>
+          <span>Human Capital</span>
+        </button>
+
+
+        <!-- 8 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="projects"
+          onclick="showSection('projects')"
+        >
+          <span class="nav-icon">▣</span>
+          <span>Project Management</span>
+        </button>
+
+
+        <!-- 9 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="knowledge"
+          onclick="showSection('knowledge')"
+        >
+          <span class="nav-icon">◇</span>
+          <span>Knowledge OS</span>
+        </button>
+
+
+        <!-- 10 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="legal"
+          onclick="showSection('legal')"
+        >
+          <span class="nav-icon">§</span>
+          <span>Legal & Compliance</span>
+        </button>
+
+
+        <!-- 11 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="supply"
+          onclick="showSection('supply')"
+        >
+          <span class="nav-icon">⇄</span>
+          <span>Supply Chain</span>
+        </button>
+
+
+        <!-- 12 -->
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="acquisition"
+          onclick="showSection('acquisition')"
+        >
+          <span class="nav-icon">⌁</span>
+          <span>Acquisition Intelligence</span>
+        </button>
+
+
+        <div class="nav-heading">
+          SYSTEM
+        </div>
+
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="leads"
+          onclick="showSection('leads')"
+        >
+          <span class="nav-icon">●</span>
+          <span>Lead Intelligence</span>
+        </button>
+
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="permits"
+          onclick="showSection('permits')"
+        >
+          <span class="nav-icon">▤</span>
+          <span>Permit Intelligence</span>
+        </button>
+
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="integrations"
+          onclick="showSection('integrations')"
+        >
+          <span class="nav-icon">⌘</span>
+          <span>Integrations</span>
+        </button>
+
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="audit"
+          onclick="showSection('audit')"
+        >
+          <span class="nav-icon">≡</span>
+          <span>Audit & System Events</span>
+        </button>
+
+
+        <button
+          type="button"
+          class="nav-item"
+          data-section="settings"
+          onclick="showSection('settings')"
+        >
+          <span class="nav-icon">⚙</span>
+          <span>System Settings</span>
+        </button>
+
+      </nav>
+
+
+      <!-- SIDEBAR FOOTER -->
+
+      <div class="sidebar-footer">
+
+        <div class="version-label">
+          GRIDV21 BRAIN
+        </div>
+
+        <div class="version-number">
+          v6.3.6 • 12 OS
+        </div>
+
+        <div class="owner-label">
+          Enterprise Intelligence Platform
+        </div>
+
       </div>
-    </div>
 
-    <!-- 2. SCANNED LEADS VIEW -->
-    <div id="view-leads" class="view-section">
-      <div class="panel-card">
-        <div class="panel-title">
-          <span>Scanned Leads & Acquisitions</span>
-          <button class="btn btn-secondary" id="refreshLeadsBtn">Refresh Leads</button>
+    </aside>
+
+
+    <!-- ================================================================
+         MAIN APPLICATION
+         ================================================================ -->
+
+    <div class="main-wrapper">
+
+
+      <!-- ==============================================================
+           TOP HEADER
+           ============================================================== -->
+
+      <header class="topbar">
+
+        <div class="topbar-left">
+
+          <button
+            id="mobile-menu-button"
+            class="icon-button mobile-only"
+            type="button"
+            aria-label="Open navigation"
+            onclick="toggleSidebar(true)"
+          >
+            ☰
+          </button>
+
+
+          <div class="page-heading">
+
+            <div
+              id="page-kicker"
+              class="page-kicker"
+            >
+              GRIDV21 BRAIN
+            </div>
+
+            <h1
+              id="page-title"
+              class="page-title"
+            >
+              Executive Dashboard
+            </h1>
+
+          </div>
+
         </div>
-        <div id="scannedLeads" class="scanned-leads-list">
-          <!-- Lead cards injected dynamically via app.js -->
+
+
+        <div class="topbar-right">
+
+          <div
+            id="global-status"
+            class="system-pill"
+          >
+
+            <span
+              id="global-status-dot"
+              class="status-dot status-online"
+            ></span>
+
+            <span id="global-status-text">
+              Online
+            </span>
+
+          </div>
+
+
+          <button
+            type="button"
+            class="topbar-button"
+            onclick="refreshAll()"
+          >
+            ↻
+            <span class="desktop-only">
+              Refresh
+            </span>
+          </button>
+
+
+          <button
+            type="button"
+            class="topbar-button danger-button"
+            onclick="logout()"
+          >
+            Logout
+          </button>
+
         </div>
-      </div>
-    </div>
 
-    <!-- 3. REVENUE STREAMS VIEW -->
-    <div id="view-revenue" class="view-section">
-      <div class="panel-card">
-        <div class="panel-title">Revenue Streams & Pipeline</div>
-        <div id="revenueContainer">
-          <!-- Revenue records injected dynamically via app.js -->
-        </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- 4. BRAIN OS VIEW -->
-    <div id="view-brainOs" class="view-section">
-      <div class="panel-card">
-        <div class="panel-title">Brain OS Active Modules</div>
-        <div id="brainOsContainer">
-          <!-- OS module cards injected dynamically via app.js -->
-        </div>
-      </div>
-    </div>
 
-    <!-- 5. ACTIVITIES VIEW -->
-    <div id="view-activities" class="view-section">
-      <div class="panel-card">
-        <div class="panel-title">System Scan Logs</div>
-        <div id="scanTable">
-          <!-- Scan logs injected dynamically -->
-        </div>
-      </div>
-    </div>
-  </main>
+      <!-- ==============================================================
+           MAIN CONTENT
+           ============================================================== -->
 
-  <script>
-    function switchView(viewName, element) {
-      // Toggle sidebar active state
-      document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
-      if (element) element.classList.add('active');
+      <main
+        id="main-content"
+        class="main-content"
+      >
 
-      // Toggle visible view section
-      document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
-      const target = document.getElementById(`view-${viewName}`);
-      if (target) target.classList.add('active');
-    }
-  </script>
 
-  <!-- Main JavaScript File -->
-  <script src="app.js"></script>
-</body>
-  </html>
+        <!-- ============================================================
+             EXECUTIVE DASHBOARD
+             ============================================================ -->
+
+        <section
+          id="section-dashboard"
+          class="dashboard-section active-section"
+        >
+
+          <div class="section-header">
+
+            <div>
+
+              <div class="eyebrow">
+                ENTERPRISE COMMAND CENTRE
+              </div>
+
+              <h2>
+                GRIDV21 BRAIN
+              </h2>
+
+              <p>
+                Unified intelligence across all 12 operating systems.
+              </p>
+
+            </div>
+
+            <div class="section-actions">
+
+              <button
+                type="button"
+                class="button button-primary"
+                onclick="refreshAll()"
+              >
+                Refresh Intelligence
+              </button>
+
+            </div>
+
+          </div>
+
+
+          <!-- ENGINE STATUS -->
+
+          <div class="metric-grid">
+
+            <article class="metric-card">
+
+              <div class="metric-label">
+                ENGINE STATUS
+              </div>
+
+              <div
+                id="metric-engine"
+                class="metric-value"
+              >
+                —
+              </div>
+
+              <div
+                id="metric-engine-sub"
+                class="metric-sub"
+              >
+                Loading
+              </div>
+
+            </article>
+
+
+            <article class="metric-card">
+
+              <div class="metric-label">
+                ACTIVE OS
+              </div>
+
+              <div
+                id="metric-os"
+                class="metric-value"
+              >
+                12
+              </div>
+
+              <div class="metric-sub">
+                Canonical modules
+              </div>
+
+            </article>
+
+
+            <article class="metric-card">
+
+              <div class="metric-label">
+                LEADS
+              </div>
+
+              <div
+                id="metric-leads"
+                class="metric-value"
+              >
+                —
+              </div>
+
+              <div class="metric-sub">
+                Intelligence pipeline
+              </div>
+
+            </article>
+
+
+            <article class="metric-card">
+
+              <div class="metric-label">
+                EST. REVENUE
+              </div>
+
+              <div
+                id="metric-revenue"
+                class="metric-value"
+              >
+                £0
+              </div>
+
+              <div class="metric-sub">
+                Current pipeline
+              </div>
+
+            </article>
+
+          </div>
+
+
+          <!-- ENGINE CONTROL -->
+
+          <div class="panel">
+
+            <div class="panel-header">
+
+              <div>
+
+                <h3>
+                  Brain Engine Control
+                </h3>
+
+                <p>
+                  Control scanning and autonomous intelligence operations.
+                </p>
+
+              </div>
+
+              <div
+                id="engine-badge"
+                class="badge badge-neutral"
+              >
+                INITIALISING
+              </div>
+
+            </div>
+
+
+            <div class="control-grid">
+
+              <button
+                type="button"
+                class="control-button success"
+                onclick="engineAction('scan/start')"
+              >
+                <span>▶</span>
+                Start Scan
+              </button>
+
+
+              <button
+                type="button"
+                class="control-button warning"
+                onclick="engineAction('scan/stop')"
+              >
+                <span>■</span>
+                Stop Scan
+              </button>
+
+
+              <button
+                type="button"
+                class="control-button neutral"
+                onclick="engineAction('engine/pause')"
+              >
+                <span>Ⅱ</span>
+                Pause Engine
+              </button>
+
+
+              <button
+                type="button"
+                class="control-button primary"
+                onclick="engineAction('engine/resume')"
+              >
+                <span>▶</span>
+                Resume Engine
+              </button>
+
+
+              <button
+                type="button"
+                class="control-button danger"
+                onclick="emergencyStop()"
+              >
+                <span>!</span>
+                Emergency Stop
+              </button>
+
+            </div>
+
+
+            <div
+              id="action-message"
+              class="action-message"
+              hidden
+            ></div>
+
+          </div>
+
+
+          <!-- ENGINE TELEMETRY -->
+
+          <div class="two-column-grid">
+
+            <div class="panel">
+
+              <div class="panel-header">
+
+                <div>
+
+                  <h3>
+                    Engine Telemetry
+                  </h3>
+
+                  <p>
+                    Live GRIDV21 scanner state.
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <div class="data-list">
+
+                <div class="data-row">
+
+                  <span>
+                    Running
+                  </span>
+
+                  <strong id="telemetry-running">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Scanning
+                  </span>
+
+                  <strong id="telemetry-scanning">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Permits Found
+                  </span>
+
+                  <strong id="telemetry-permits">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Errors
+                  </span>
+
+                  <strong id="telemetry-errors">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Last Scan
+                  </span>
+
+                  <strong id="telemetry-last-scan">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Scan Duration
+                  </span>
+
+                  <strong id="telemetry-duration">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Uptime
+                  </span>
+
+                  <strong id="telemetry-uptime">
+                    —
+                  </strong>
+
+                </div>
+
+
+                <div class="data-row">
+
+                  <span>
+                    Emergency Stop
+                  </span>
+
+                  <strong id="telemetry-emergency">
+                    —
+                  </strong>
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            <!-- BRAIN RECOMMENDATION -->
+
+            <div class="panel">
+
+              <div class="panel-header">
+
+                <div>
+
+                  <h3>
+                    Brain Recommendation
+                  </h3>
+
+                  <p>
+                    Decision intelligence.
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <div class="recommendation-box">
+
+                <div class="recommendation-icon">
+                  ◆
+                </div>
+
+                <div>
+
+                  <div class="recommendation-label">
+                    NEXT BEST ACTION
+                  </div>
+
+                  <div
+                    id="brain-recommendation"
+                    class="recommendation-text"
+                  >
+                    Analysing current system state...
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div class="recommendation-actions">
+
+                <button
+                  type="button"
+                  class="button button-primary"
+                  onclick="authorizeRecommendation()"
+                >
+                  Authorise
+                </button>
+
+                <button
+                  type="button"
+                  class="button button-secondary"
+                  onclick="dismissRecommendation()"
+                >
+                  Dismiss
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <!-- OS OVERVIEW -->
+
+          <div class="panel">
+
+            <div class="panel-header">
+
+              <div>
+
+                <h3>
+                  Intelligence Operating Systems
+                </h3>
+
+                <p>
+                  GRIDV21 BRAIN canonical architecture.
+                </p>
+
+              </div>
+
+              <span class="badge badge-primary">
+                12 MODULES
+              </span>
+
+            </div>
+
+
+            <div
+              id="os-overview-grid"
+              class="os-grid"
+            >
+
+              <!-- OS CARDS ARE POPULATED BY app.js -->
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ============================================================
+             1. EXECUTIVE INTELLIGENCE OS
+             ============================================================ -->
+
+        <section
+          id="section-executive"
+          class="dashboard-section"
+          hidden
+        >
+
+          <div class="section-header">
+
+            <div>
+
+              <div class="eyebrow">
+                OS 01
+              </div>
+
+              <h2>
+                Executive Intelligence OS
+              </h2>
+
+              <p>
+                Strategy, command visibility and enterprise-level decisions.
+              </p>
+
+            </div>
+
+          </div>
+
+
+          <div class="metric-grid">
+
+            <article class="metric-card">
+              <div class="metric-label">STRATEGIC SIGNALS</div>
+              <div id="executive-signals" class="metric-value">—</div>
+ 
