@@ -1,5 +1,4 @@
 <!doctype html>
-
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -8,951 +7,174 @@
   <meta name="description" content="GRIDV21 BRAIN Enterprise Intelligence Operating System">
   <title>GRIDV21 BRAIN • Enterprise OS v6.3.6</title>
   <link rel="stylesheet" href="styles.css">
-</head><body>
-<div id="app">  <div id="sidebar-overlay" class="sidebar-overlay"></div>  <aside id="sidebar" class="sidebar">
+</head>
+<body>
+<div id="app">
+  <div id="sidebar-overlay" class="sidebar-overlay"></div>
+
+  <aside id="sidebar" class="sidebar">
     <div class="brand">
-      <div class="brand-mark">G</div>  <div>
-    <div class="brand-name">GRIDV21</div>
-    <div class="brand-sub">BRAIN ENTERPRISE</div>
-  </div>
-
-  <button
-    id="close-sidebar"
-    class="icon-btn mobile-only"
-    aria-label="Close navigation"
-    type="button"
-  >×</button>
-</div>
-
-<div class="system-pill">
-  <span id="sidebar-status-dot" class="status-dot online"></span>
-  <span id="sidebar-status-text">Checking system…</span>
-</div>
-
-<nav class="nav">
-
-  <div class="nav-label">COMMAND</div>
-
-  <button class="nav-item active" data-section="dashboard" type="button">
-    ⌂ <span>Executive Dashboard</span>
-  </button>
-
-  <div class="nav-label">INTELLIGENCE OS</div>
-
-  <button class="nav-item" data-section="executive" type="button">
-    ◆ <span>Executive Intelligence</span>
-  </button>
-
-  <button class="nav-item" data-section="revenue" type="button">
-    £ <span>Revenue Intelligence</span>
-  </button>
-
-  <button class="nav-item" data-section="sales" type="button">
-    ◎ <span>Sales & CRM</span>
-  </button>
-
-  <button class="nav-item" data-section="marketing" type="button">
-    ◇ <span>Marketing</span>
-  </button>
-
-  <button class="nav-item" data-section="operations" type="button">
-    ⚙ <span>Operations</span>
-  </button>
-
-  <button class="nav-item" data-section="finance" type="button">
-    ₤ <span>Finance</span>
-  </button>
-
-  <button class="nav-item" data-section="human-capital" type="button">
-    ♙ <span>Human Capital</span>
-  </button>
-
-  <button class="nav-item" data-section="projects" type="button">
-    ▣ <span>Project Management</span>
-  </button>
-
-  <button class="nav-item" data-section="knowledge" type="button">
-    ⌘ <span>Knowledge Intelligence</span>
-  </button>
-
-  <button class="nav-item" data-section="legal" type="button">
-    § <span>Legal & Compliance</span>
-  </button>
-
-  <button class="nav-item" data-section="supply" type="button">
-    ⇄ <span>Supply Chain</span>
-  </button>
-
-  <button class="nav-item" data-section="acquisition" type="button">
-    ⌁ <span>Acquisition Intelligence</span>
-  </button>
-
-  <button class="nav-item" data-section="customer-success" type="button">
-    ✓ <span>Customer Success</span>
-  </button>
-
-  <button class="nav-item" data-section="it-security" type="button">
-    ⌘ <span>IT & Security</span>
-  </button>
-
-  <button class="nav-item" data-section="analytics" type="button">
-    ▥ <span>Analytics & BI</span>
-  </button>
-
-  <div class="nav-label">DATA & CONTROL</div>
-
-  <button class="nav-item" data-section="leads" type="button">
-    ● <span>Leads</span>
-  </button>
-
-  <button class="nav-item" data-section="permits" type="button">
-    ▤ <span>Permits</span>
-  </button>
-
-  <button class="nav-item" data-section="integrations" type="button">
-    ↔ <span>Integrations</span>
-  </button>
-
-  <button class="nav-item" data-section="audit" type="button">
-    ≡ <span>Audit & Activity</span>
-  </button>
-
-  <button class="nav-item" data-section="settings" type="button">
-    ⚙ <span>Settings</span>
-  </button>
-
-</nav>
-
-<div class="sidebar-footer">
-  <span>GRIDV21 BRAIN</span>
-  <strong>v6.3.6</strong>
-</div>
-
-  </aside>  <main class="main"><header class="topbar">
-
-  <div class="topbar-left">
-
-    <button
-      id="open-sidebar"
-      class="icon-btn mobile-only"
-      aria-label="Open navigation"
-      type="button"
-    >☰</button>
-
-    <div>
-      <div id="page-kicker" class="kicker">
-        COMMAND CENTRE
-      </div>
-
-      <h1 id="page-title">
-        Executive Dashboard
-      </h1>
-    </div>
-
-  </div>
-
-  <div class="topbar-actions">
-
-    <span id="global-status" class="badge badge-muted">
-      <span id="global-status-dot" class="status-dot"></span>
-      <span id="global-status-text">Connecting</span>
-    </span>
-
-    <button
-      id="refresh-btn"
-      class="btn btn-secondary"
-      type="button"
-    >
-      Refresh
-    </button>
-
-    <button
-      id="logout-btn"
-      class="btn btn-danger"
-      type="button"
-    >
-      Clear Key
-    </button>
-
-  </div>
-
-</header>
-
-<div
-  id="toast"
-  class="toast"
-  role="status"
-  aria-live="polite"
-></div>
-
-<div class="content">
-
-  <!-- =========================
-       EXECUTIVE DASHBOARD
-  ========================== -->
-
-  <section
-    id="section-dashboard"
-    class="section active-section"
-  >
-
-    <div class="hero">
-
+      <div class="brand-mark">G</div>
       <div>
-        <span class="eyebrow">
-          ENTERPRISE INTELLIGENCE OPERATING SYSTEM
-        </span>
-
-        <h2>
-          GRIDV21 BRAIN Command Centre
-        </h2>
-
-        <p>
-          Live operational telemetry, lead intelligence,
-          revenue pipeline and autonomous engine controls.
-        </p>
+        <div class="brand-name">GRIDV21</div>
+        <div class="brand-sub">BRAIN ENTERPRISE</div>
       </div>
-
-      <div class="hero-actions">
-
-        <button
-          class="btn btn-primary"
-          data-action="scan-start"
-          type="button"
-        >
-          Start Scan
-        </button>
-
-        <button
-          class="btn btn-secondary"
-          data-action="scan-stop"
-          type="button"
-        >
-          Stop Scan
-        </button>
-
-        <button
-          class="btn btn-secondary"
-          data-action="brain-pause"
-          type="button"
-        >
-          Pause Engine
-        </button>
-
-        <button
-          class="btn btn-secondary"
-          data-action="brain-resume"
-          type="button"
-        >
-          Resume Engine
-        </button>
-
-        <button
-          class="btn btn-danger"
-          data-action="emergency-stop"
-          type="button"
-        >
-          Emergency Stop
-        </button>
-
-      </div>
-
+      <button id="close-sidebar" class="icon-btn mobile-only" aria-label="Close navigation">×</button>
     </div>
 
-    <div class="metric-grid">
-
-      <article class="metric-card">
-        <span>Engine</span>
-        <strong id="metric-engine">—</strong>
-        <small id="metric-engine-sub">Loading</small>
-      </article>
-
-      <article class="metric-card">
-        <span>Active OS</span>
-        <strong id="metric-os">—</strong>
-        <small>Canonical modules</small>
-      </article>
-
-      <article class="metric-card">
-        <span>Leads</span>
-        <strong id="metric-leads">—</strong>
-        <small>Current data set</small>
-      </article>
-
-      <article class="metric-card">
-        <span>Revenue</span>
-        <strong id="metric-revenue">—</strong>
-        <small>Logged revenue</small>
-      </article>
-
+    <div class="system-pill">
+      <span id="sidebar-status-dot" class="status-dot"></span>
+      <span id="sidebar-status-text">Checking system…</span>
     </div>
 
-    <div class="two-col">
+    <nav class="nav">
+      <div class="nav-label">COMMAND</div>
+      <button class="nav-item active" data-section="dashboard">⌂ <span>Executive Dashboard</span></button>
 
-      <article class="panel">
+      <div class="nav-label">INTELLIGENCE OS</div>
+      <button class="nav-item" data-section="executive">◆ <span>Executive Intelligence</span></button>
+      <button class="nav-item" data-section="revenue">£ <span>Revenue Intelligence</span></button>
+      <button class="nav-item" data-section="sales">◎ <span>Sales & CRM</span></button>
+      <button class="nav-item" data-section="marketing">◇ <span>Marketing</span></button>
+      <button class="nav-item" data-section="operations">⚙ <span>Operations</span></button>
+      <button class="nav-item" data-section="finance">₤ <span>Finance</span></button>
+      <button class="nav-item" data-section="human-capital">♙ <span>Human Capital</span></button>
+      <button class="nav-item" data-section="projects">▣ <span>Project Management</span></button>
+      <button class="nav-item" data-section="knowledge">⌘ <span>Knowledge Intelligence</span></button>
+      <button class="nav-item" data-section="legal">§ <span>Legal & Compliance</span></button>
+      <button class="nav-item" data-section="supply">⇄ <span>Supply Chain</span></button>
+      <button class="nav-item" data-section="acquisition">⌁ <span>Acquisition Intelligence</span></button>
+      <button class="nav-item" data-section="customer-success">✓ <span>Customer Success</span></button>
+      <button class="nav-item" data-section="it-security">⌘ <span>IT & Security</span></button>
+      <button class="nav-item" data-section="analytics">▥ <span>Analytics & BI</span></button>
 
-        <div class="panel-head">
+      <div class="nav-label">DATA & CONTROL</div>
+      <button class="nav-item" data-section="leads">● <span>Leads</span></button>
+      <button class="nav-item" data-section="permits">▤ <span>Permits</span></button>
+      <button class="nav-item" data-section="integrations">↔ <span>Integrations</span></button>
+      <button class="nav-item" data-section="audit">≡ <span>Audit & Activity</span></button>
+      <button class="nav-item" data-section="settings">⚙ <span>Settings</span></button>
+    </nav>
 
-          <div>
-            <span class="eyebrow">
-              ENGINE TELEMETRY
-            </span>
-
-            <h3>
-              Runtime Status
-            </h3>
-          </div>
-
-          <span
-            id="engine-badge"
-            class="badge badge-muted"
-          >
-            Loading
-          </span>
-
-        </div>
-
-        <div class="telemetry-grid">
-
-          <div>
-            <span>Running</span>
-            <strong id="telemetry-running">—</strong>
-          </div>
-
-          <div>
-            <span>Scanning</span>
-            <strong id="telemetry-scanning">—</strong>
-          </div>
-
-          <div>
-            <span>Permits Found</span>
-            <strong id="telemetry-permits">—</strong>
-          </div>
-
-          <div>
-            <span>Errors</span>
-            <strong id="telemetry-errors">—</strong>
-          </div>
-
-          <div>
-            <span>Last Scan</span>
-            <strong id="telemetry-last-scan">—</strong>
-          </div>
-
-          <div>
-            <span>Duration</span>
-            <strong id="telemetry-duration">—</strong>
-          </div>
-
-          <div>
-            <span>Uptime</span>
-            <strong id="telemetry-uptime">—</strong>
-          </div>
-
-          <div>
-            <span>Emergency</span>
-            <strong id="telemetry-emergency">—</strong>
-          </div>
-
-        </div>
-
-        <div
-          id="action-message"
-          class="inline-message"
-        >
-          Ready.
-        </div>
-
-      </article>
-
-      <article class="panel">
-
-        <div class="panel-head">
-
-          <div>
-            <span class="eyebrow">
-              BRAIN SIGNAL
-            </span>
-
-            <h3>
-              AI Recommendation
-            </h3>
-          </div>
-
-        </div>
-
-        <div
-          id="brain-recommendation"
-          class="recommendation"
-        >
-          Loading recommendation…
-        </div>
-
-      </article>
-
+    <div class="sidebar-footer">
+      <span>GRIDV21 BRAIN</span>
+      <strong>v6.3.6</strong>
     </div>
+  </aside>
 
-    <article class="panel">
-
-      <div class="panel-head">
-
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button id="open-sidebar" class="icon-btn mobile-only" aria-label="Open navigation">☰</button>
         <div>
-          <span class="eyebrow">
-            OPERATING SYSTEM
-          </span>
-
-          <h3>
-            OS Overview
-          </h3>
-        </div>
-
-        <button
-          class="btn btn-secondary"
-          data-section-target="analytics"
-          type="button"
-        >
-          Analytics
-        </button>
-
-      </div>
-
-      <div
-        id="os-overview-grid"
-        class="os-grid"
-      >
-        <div class="loading">
-          Loading modules…
+          <div id="page-kicker" class="kicker">COMMAND CENTRE</div>
+          <h1 id="page-title">Executive Dashboard</h1>
         </div>
       </div>
+      <div class="topbar-actions">
+        <span id="global-status" class="badge badge-muted">
+          <span id="global-status-dot" class="status-dot"></span>
+          <span id="global-status-text">Connecting</span>
+        </span>
+        <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+        <button id="logout-btn" class="btn btn-danger">Clear Key</button>
+      </div>
+    </header>
 
-    </article>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <div class="two-col">
-
-      <article class="panel">
-
-        <div class="panel-head">
-
+    <div class="content">
+      <section id="section-dashboard" class="section active-section">
+        <div class="hero">
           <div>
-            <span class="eyebrow">
-              HIGH-VALUE PIPELINE
-            </span>
-
-            <h3>
-              Top Leads
-            </h3>
+            <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
+            <h2>GRIDV21 BRAIN Command Centre</h2>
+            <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
           </div>
-
-        </div>
-
-        <div class="table-wrap">
-
-          <table>
-
-            <thead>
-              <tr>
-                <th>City</th>
-                <th>Type</th>
-                <th>Score</th>
-                <th>Value</th>
-              </tr>
-            </thead>
-
-            <tbody id="top-leads-body">
-              <tr>
-                <td
-                  colspan="4"
-                  class="empty"
-                >
-                  Loading…
-                </td>
-              </tr>
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </article>
-
-      <article class="panel">
-
-        <div class="panel-head">
-
-          <div>
-            <span class="eyebrow">
-              ACTIVITY
-            </span>
-
-            <h3>
-              Latest Events
-            </h3>
-          </div>
-
-        </div>
-
-        <div
-          id="dashboard-activity"
-          class="activity-list"
-        >
-          <div class="loading">
-            Loading…
+          <div class="hero-actions">
+            <button class="btn btn-primary" data-action="scan-start">Start Scan</button>
+            <button class="btn btn-secondary" data-action="scan-stop">Stop Scan</button>
+            <button class="btn btn-secondary" data-action="brain-pause">Pause Engine</button>
+            <button class="btn btn-secondary" data-action="brain-resume">Resume Engine</button>
+            <button class="btn btn-danger" data-action="emergency-stop">Emergency Stop</button>
           </div>
         </div>
 
-      </article>
+        <div class="metric-grid">
+          <article class="metric-card"><span>Engine</span><strong id="metric-engine">—</strong><small id="metric-engine-sub">Loading</small></article>
+          <article class="metric-card"><span>Active OS</span><strong id="metric-os">—</strong><small>Canonical modules</small></article>
+          <article class="metric-card"><span>Leads</span><strong id="metric-leads">—</strong><small>Current data set</small></article>
+          <article class="metric-card"><span>Revenue</span><strong id="metric-revenue">—</strong><small>Logged revenue</small></article>
+        </div>
 
+        <div class="two-col">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">ENGINE TELEMETRY</span><h3>Runtime Status</h3></div><span id="engine-badge" class="badge badge-muted">Loading</span></div>
+            <div class="telemetry-grid">
+              <div><span>Running</span><strong id="telemetry-running">—</strong></div>
+              <div><span>Scanning</span><strong id="telemetry-scanning">—</strong></div>
+              <div><span>Permits Found</span><strong id="telemetry-permits">—</strong></div>
+              <div><span>Errors</span><strong id="telemetry-errors">—</strong></div>
+              <div><span>Last Scan</span><strong id="telemetry-last-scan">—</strong></div>
+              <div><span>Duration</span><strong id="telemetry-duration">—</strong></div>
+              <div><span>Uptime</span><strong id="telemetry-uptime">—</strong></div>
+              <div><span>Emergency</span><strong id="telemetry-emergency">—</strong></div>
+            </div>
+            <div id="action-message" class="inline-message">Ready.</div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">BRAIN SIGNAL</span><h3>AI Recommendation</h3></div></div>
+            <div id="brain-recommendation" class="recommendation">Loading recommendation…</div>
+          </article>
+        </div>
+
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">OPERATING SYSTEM</span><h3>OS Overview</h3></div><button class="btn btn-secondary" data-section-target="analytics">Analytics</button></div>
+          <div id="os-overview-grid" class="os-grid"><div class="loading">Loading modules…</div></div>
+        </article>
+
+        <div class="two-col">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">HIGH-VALUE PIPELINE</span><h3>Top Leads</h3></div></div>
+            <div class="table-wrap"><table><thead><tr><th>City</th><th>Type</th><th>Score</th><th>Value</th></tr></thead><tbody id="top-leads-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody></table></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">ACTIVITY</span><h3>Latest Events</h3></div></div>
+            <div id="dashboard-activity" class="activity-list"><div class="loading">Loading…</div></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="section-executive" class="section"><div class="section-head"><div><span class="eyebrow">STRATEGY</span><h2>Executive Intelligence</h2><p>Enterprise-level signals derived from current operating data.</p></div></div><div id="executive-signals" class="card-grid"></div></section>
+      <section id="section-revenue" class="section"><div class="section-head"><div><span class="eyebrow">REVENUE</span><h2>Revenue Intelligence</h2><p>Pipeline, projected revenue and logged monetisation.</p></div></div><div id="revenue-content"></div></section>
+      <section id="section-sales" class="section"><div class="section-head"><div><span class="eyebrow">SALES</span><h2>Sales & CRM</h2></div></div><div id="sales-content"></div></section>
+      <section id="section-marketing" class="section"><div class="section-head"><div><span class="eyebrow">GROWTH</span><h2>Marketing</h2></div></div><div class="empty-panel">Marketing intelligence endpoints can be connected here without changing the dashboard shell.</div></section>
+      <section id="section-operations" class="section"><div class="section-head"><div><span class="eyebrow">OPERATIONS</span><h2>Operations</h2></div></div><div id="operations-content"></div></section>
+      <section id="section-finance" class="section"><div class="section-head"><div><span class="eyebrow">FINANCE</span><h2>Finance</h2></div></div><div id="finance-content"></div></section>
+      <section id="section-human-capital" class="section"><div class="section-head"><div><span class="eyebrow">PEOPLE</span><h2>Human Capital</h2></div></div><div class="empty-panel">Human Capital OS shell online.</div></section>
+      <section id="section-projects" class="section"><div class="section-head"><div><span class="eyebrow">PROJECTS</span><h2>Project Management</h2></div></div><div id="projects-content"></div></section>
+      <section id="section-knowledge" class="section"><div class="section-head"><div><span class="eyebrow">KNOWLEDGE</span><h2>Knowledge Intelligence</h2></div></div><div class="empty-panel">Knowledge graph interface ready.</div></section>
+      <section id="section-legal" class="section"><div class="section-head"><div><span class="eyebrow">COMPLIANCE</span><h2>Legal & Compliance</h2></div></div><div class="empty-panel">Compliance OS shell online.</div></section>
+      <section id="section-supply" class="section"><div class="section-head"><div><span class="eyebrow">SUPPLY</span><h2>Supply Chain</h2></div></div><div class="empty-panel">Supply Chain OS shell online.</div></section>
+      <section id="section-acquisition" class="section"><div class="section-head"><div><span class="eyebrow">ACQUISITION</span><h2>Acquisition Intelligence</h2></div></div><div id="acquisition-content"></div></section>
+      <section id="section-customer-success" class="section"><div class="section-head"><div><span class="eyebrow">CUSTOMER SUCCESS</span><h2>Customer Success</h2></div></div><div class="empty-panel">Customer Success OS shell online.</div></section>
+      <section id="section-it-security" class="section"><div class="section-head"><div><span class="eyebrow">SECURITY</span><h2>IT & Security</h2></div></div><div id="security-content"></div></section>
+      <section id="section-analytics" class="section"><div class="section-head"><div><span class="eyebrow">BI</span><h2>Analytics & BI</h2></div></div><div id="analytics-content"></div></section>
+
+      <section id="section-leads" class="section"><div class="section-head"><div><span class="eyebrow">ACQUISITION DATA</span><h2>Leads</h2></div><button class="btn btn-secondary" data-action="refresh">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Trade</th><th>Region</th><th>Value</th><th>Status</th><th>Created</th></tr></thead><tbody id="leads-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody></table></div></section>
+
+      <section id="section-permits" class="section"><div class="section-head"><div><span class="eyebrow">SOURCE DATA</span><h2>Permits</h2></div><a class="btn btn-secondary" href="/api/export/permits.csv" target="_blank" rel="noopener">Export CSV</a></div><div class="table-wrap"><table><thead><tr><th>City</th><th>Permit</th><th>Status</th><th>AI Score</th><th>Estimated Value</th></tr></thead><tbody id="permits-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody></table></div></section>
+
+      <section id="section-integrations" class="section"><div class="section-head"><div><span class="eyebrow">CONNECTIVITY</span><h2>Integrations</h2></div></div><div id="integrations-grid" class="card-grid"></div></section>
+
+      <section id="section-audit" class="section"><div class="section-head"><div><span class="eyebrow">GOVERNANCE</span><h2>Audit & Activity</h2></div><button class="btn btn-secondary" data-action="clear-logs">Clear View</button></div><div id="log-container" class="log-container"></div></section>
+
+      <section id="section-settings" class="section"><div class="section-head"><div><span class="eyebrow">ADMINISTRATION</span><h2>Settings</h2><p>Administrative controls require the configured admin key.</p></div></div><div id="settings-content"></div></section>
     </div>
-
-  </section>
-
-  <!-- =========================
-       INTELLIGENCE OS
-  ========================== -->
-
-  <section
-    id="section-executive"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">STRATEGY</span>
-        <h2>Executive Intelligence</h2>
-        <p>
-          Enterprise-level signals derived from current operating data.
-        </p>
-      </div>
-    </div>
-
-    <div
-      id="executive-signals"
-      class="card-grid"
-    ></div>
-  </section>
-
-  <section
-    id="section-revenue"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">REVENUE</span>
-        <h2>Revenue Intelligence</h2>
-        <p>
-          Pipeline, projected revenue and logged monetisation.
-        </p>
-      </div>
-    </div>
-
-    <div id="revenue-content"></div>
-  </section>
-
-  <section
-    id="section-sales"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">SALES</span>
-        <h2>Sales & CRM</h2>
-      </div>
-    </div>
-
-    <div id="sales-content"></div>
-  </section>
-
-  <section
-    id="section-marketing"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">GROWTH</span>
-        <h2>Marketing</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Marketing intelligence endpoints can be connected here without changing the dashboard shell.
-    </div>
-  </section>
-
-  <section
-    id="section-operations"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">OPERATIONS</span>
-        <h2>Operations</h2>
-      </div>
-    </div>
-
-    <div id="operations-content"></div>
-  </section>
-
-  <section
-    id="section-finance"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">FINANCE</span>
-        <h2>Finance</h2>
-      </div>
-    </div>
-
-    <div id="finance-content"></div>
-  </section>
-
-  <section
-    id="section-human-capital"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">PEOPLE</span>
-        <h2>Human Capital</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Human Capital OS shell online.
-    </div>
-  </section>
-
-  <section
-    id="section-projects"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">PROJECTS</span>
-        <h2>Project Management</h2>
-      </div>
-    </div>
-
-    <div id="projects-content"></div>
-  </section>
-
-  <section
-    id="section-knowledge"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">KNOWLEDGE</span>
-        <h2>Knowledge Intelligence</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Knowledge graph interface ready.
-    </div>
-  </section>
-
-  <section
-    id="section-legal"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">COMPLIANCE</span>
-        <h2>Legal & Compliance</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Compliance OS shell online.
-    </div>
-  </section>
-
-  <section
-    id="section-supply"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">SUPPLY</span>
-        <h2>Supply Chain</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Supply Chain OS shell online.
-    </div>
-  </section>
-
-  <section
-    id="section-acquisition"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">ACQUISITION</span>
-        <h2>Acquisition Intelligence</h2>
-      </div>
-    </div>
-
-    <div id="acquisition-content"></div>
-  </section>
-
-  <section
-    id="section-customer-success"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">CUSTOMER SUCCESS</span>
-        <h2>Customer Success</h2>
-      </div>
-    </div>
-
-    <div class="empty-panel">
-      Customer Success OS shell online.
-    </div>
-  </section>
-
-  <section
-    id="section-it-security"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">SECURITY</span>
-        <h2>IT & Security</h2>
-      </div>
-    </div>
-
-    <div id="security-content"></div>
-  </section>
-
-  <section
-    id="section-analytics"
-    class="section"
-  >
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">BI</span>
-        <h2>Analytics & BI</h2>
-      </div>
-    </div>
-
-    <div id="analytics-content"></div>
-  </section>
-
-  <!-- =========================
-       DATA
-  ========================== -->
-
-  <section
-    id="section-leads"
-    class="section"
-  >
-
-    <div class="section-head">
-
-      <div>
-        <span class="eyebrow">
-          ACQUISITION DATA
-        </span>
-
-        <h2>
-          Leads
-        </h2>
-      </div>
-
-      <button
-        class="btn btn-secondary"
-        data-action="refresh"
-        type="button"
-      >
-        Refresh
-      </button>
-
-    </div>
-
-    <div class="table-wrap">
-
-      <table>
-
-        <thead>
-          <tr>
-            <th>Trade</th>
-            <th>Region</th>
-            <th>Value</th>
-            <th>Status</th>
-            <th>Created</th>
-          </tr>
-        </thead>
-
-        <tbody id="leads-body">
-          <tr>
-            <td
-              colspan="5"
-              class="empty"
-            >
-              Loading…
-            </td>
-          </tr>
-        </tbody>
-
-      </table>
-
-    </div>
-
-  </section>
-
-  <section
-    id="section-permits"
-    class="section"
-  >
-
-    <div class="section-head">
-
-      <div>
-        <span class="eyebrow">
-          SOURCE DATA
-        </span>
-
-        <h2>
-          Permits
-        </h2>
-      </div>
-
-      <a
-        class="btn btn-secondary"
-        href="/api/export/permits.csv"
-        target="_blank"
-        rel="noopener"
-      >
-        Export CSV
-      </a>
-
-    </div>
-
-    <div class="table-wrap">
-
-      <table>
-
-        <thead>
-          <tr>
-            <th>City</th>
-            <th>Permit</th>
-            <th>Status</th>
-            <th>AI Score</th>
-            <th>Estimated Value</th>
-          </tr>
-        </thead>
-
-        <tbody id="permits-body">
-          <tr>
-            <td
-              colspan="5"
-              class="empty"
-            >
-              Loading…
-            </td>
-          </tr>
-        </tbody>
-
-      </table>
-
-    </div>
-
-  </section>
-
-  <section
-    id="section-integrations"
-    class="section"
-  >
-
-    <div class="section-head">
-
-      <div>
-        <span class="eyebrow">
-          CONNECTIVITY
-        </span>
-
-        <h2>
-          Integrations
-        </h2>
-      </div>
-
-    </div>
-
-    <div
-      id="integrations-grid"
-      class="card-grid"
-    ></div>
-
-  </section>
-
-  <section
-    id="section-audit"
-    class="section"
-  >
-
-    <div class="section-head">
-
-      <div>
-        <span class="eyebrow">
-          GOVERNANCE
-        </span>
-
-        <h2>
-          Audit & Activity
-        </h2>
-
-      </div>
-
-      <button
-        class="btn btn-secondary"
-        data-action="clear-logs"
-        type="button"
-      >
-        Clear View
-      </button>
-
-    </div>
-
-    <div
-      id="log-container"
-      class="log-container"
-    ></div>
-
-  </section>
-
-  <section
-    id="section-settings"
-    class="section"
-  >
-
-    <div class="section-head">
-
-      <div>
-        <span class="eyebrow">
-          ADMINISTRATION
-        </span>
-
-        <h2>
-          Settings
-        </h2>
-
-        <p>
-          Administrative controls require the configured admin key.
-        </p>
-
-      </div>
-
-    </div>
-
-    <div id="settings-content"></div>
-
-  </section>
-
-</div>
-
   </main>
-</div><script src="app.js" defer></script></body>
-    </html>
+</div>
+<script src="app.js" defer></script>
+</body>
+                                             </html>
+        
