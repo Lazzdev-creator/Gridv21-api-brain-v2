@@ -1960,3 +1960,718 @@
     renderLatestEvents,
     renderOSOverview
   };
+/* ==========================================================================
+ * GRIDV21 BRAIN ENTERPRISE — DASHBOARD APP
+ * VERSION: 6.3.7
+ *
+ * PART 3 / 4
+ * - Engine controls
+ * - Scan controls
+ * - Brain pause/resume
+ * - Emergency stop
+ * - OS toggles
+ * - Control error handling
+ * ========================================================================== */
+
+
+  /* ========================================================================
+   * GENERIC CONTROL REQUEST
+   * ====================================================================== */
+
+  async function controlRequest(
+    url,
+    options = {}
+  ) {
+    try {
+      const payload =
+        await apiFetch(
+          url,
+          {
+            method:
+              options.method || "POST",
+
+            body:
+              options.body !== undefined
+                ? JSON.stringify(
+                    options.body
+                  )
+                : undefined,
+
+            headers:
+              options.headers || {}
+          }
+        );
+
+      state.authenticated =
+        true;
+
+      setGlobalStatus(
+        true,
+        "Connected"
+      );
+
+      return payload;
+
+    } catch (error) {
+      handleAuthFailure(
+        error
+      );
+
+      console.error(
+        "[GRIDV21] Control request failed:",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+
+  /* ========================================================================
+   * ENGINE ACTION
+   *
+   * Supported actions:
+   *   scan/start
+   *   scan/stop
+   *   brain/pause
+   *   brain/resume
+   * ====================================================================== */
+
+  async function engineAction(
+    action
+  ) {
+    const normalized =
+      String(action || "")
+        .trim()
+        .toLowerCase();
+
+
+    const actionMap = {
+      "scan/start":
+        API.scrapeNow,
+
+      "scan/stop":
+        API.scanStop,
+
+      "brain/pause":
+        API.brainPause,
+
+      "brain/resume":
+        API.brainResume
+    };
+
+
+    const endpoint =
+      actionMap[normalized];
+
+
+    if (!endpoint) {
+      showToast(
+        `Unknown engine action: ${normalized}`,
+        "error"
+      );
+
+      return false;
+    }
+
+
+    const button =
+      document.querySelector(
+        `[data-action="${CSS.escape(normalized.replace("/", "-"))}"]`
+      );
+
+
+    if (button) {
+      button.disabled =
+        true;
+    }
+
+
+    const labels = {
+      "scan/start":
+        "Starting scan...",
+
+      "scan/stop":
+        "Stopping scan...",
+
+      "brain/pause":
+        "Pausing engine...",
+
+      "brain/resume":
+        "Resuming engine..."
+    };
+
+
+    if (button) {
+      button.dataset.originalText =
+        button.textContent;
+
+      button.textContent =
+        labels[normalized];
+    }
+
+
+    try {
+      const payload =
+        await controlRequest(
+          endpoint,
+          {
+            method: "POST"
+          }
+        );
+
+
+      const messages = {
+        "scan/start":
+          "Scan started successfully.",
+
+        "scan/stop":
+          "Scan stop requested.",
+
+        "brain/pause":
+          "Brain engine paused.",
+
+        "brain/resume":
+          "Brain engine resumed."
+      };
+
+
+      showToast(
+        payload?.message ||
+        messages[normalized],
+        "success"
+      );
+
+
+      /*
+       * Give the backend a moment to update
+       * ENGINE telemetry before refreshing.
+       */
+
+      await wait(350);
+
+      await refreshDashboardData();
+
+      return true;
+
+    } catch (error) {
+
+      const messages = {
+        "scan/start":
+          "Unable to start scan.",
+
+        "scan/stop":
+          "Unable to stop scan.",
+
+        "brain/pause":
+          "Unable to pause engine.",
+
+        "brain/resume":
+          "Unable to resume engine."
+      };
+
+
+      showToast(
+        error?.message ||
+        messages[normalized],
+        "error"
+      );
+
+      return false;
+
+    } finally {
+
+      if (button) {
+        button.disabled =
+          false;
+
+        button.textContent =
+          button.dataset.originalText ||
+          button.textContent;
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * EMERGENCY STOP
+   * ====================================================================== */
+
+  async function emergencyStop() {
+
+    const confirmed =
+      window.confirm(
+        "EMERGENCY STOP\n\n" +
+        "This will request an immediate GRIDV21 engine stop.\n\n" +
+        "Continue?"
+      );
+
+
+    if (!confirmed) {
+      return false;
+    }
+
+
+    const button =
+      document.querySelector(
+        '[data-action="emergency-stop"]'
+      );
+
+
+    if (button) {
+      button.disabled =
+        true;
+
+      button.dataset.originalText =
+        button.textContent;
+
+      button.textContent =
+        "Stopping...";
+    }
+
+
+    try {
+
+      const payload =
+        await controlRequest(
+          API.emergencyStop,
+          {
+            method: "POST"
+          }
+        );
+
+
+      showToast(
+        payload?.message ||
+        "Emergency stop requested.",
+        "success"
+      );
+
+
+      await wait(500);
+
+      await refreshDashboardData();
+
+      return true;
+
+    } catch (error) {
+
+      showToast(
+        error?.message ||
+        "Emergency stop request failed.",
+        "error"
+      );
+
+      return false;
+
+    } finally {
+
+      if (button) {
+        button.disabled =
+          false;
+
+        button.textContent =
+          button.dataset.originalText ||
+          "Emergency Stop";
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * OS TOGGLE
+   * ====================================================================== */
+
+  async function toggleOS(
+    moduleId
+  ) {
+    const id =
+      String(moduleId ?? "")
+        .trim();
+
+
+    if (!id) {
+      showToast(
+        "Invalid OS module.",
+        "error"
+      );
+
+      return false;
+    }
+
+
+    const button =
+      document.querySelector(
+        `[data-os-toggle="${CSS.escape(id)}"]`
+      );
+
+
+    if (button) {
+      button.disabled =
+        true;
+    }
+
+
+    try {
+
+      /*
+       * Backend versions may accept:
+       *   { enabled: true/false }
+       *
+       * We derive the requested state from
+       * the current button state.
+       */
+
+      const currentlyEnabled =
+        button?.getAttribute(
+          "aria-pressed"
+        ) === "true";
+
+
+      const nextEnabled =
+        !currentlyEnabled;
+
+
+      const payload =
+        await controlRequest(
+          API.osToggle(id),
+          {
+            method: "POST",
+
+            body: {
+              enabled:
+                nextEnabled
+            }
+          }
+        );
+
+
+      showToast(
+        payload?.message ||
+        (
+          nextEnabled
+            ? "OS module enabled."
+            : "OS module disabled."
+        ),
+        "success"
+      );
+
+
+      await wait(250);
+
+      await refreshDashboardData();
+
+      return true;
+
+    } catch (error) {
+
+      showToast(
+        error?.message ||
+        "Unable to update OS module.",
+        "error"
+      );
+
+      return false;
+
+    } finally {
+
+      if (button) {
+        button.disabled =
+          false;
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * WAIT HELPER
+   * ====================================================================== */
+
+  function wait(
+    milliseconds
+  ) {
+    return new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          milliseconds
+        )
+    );
+  }
+
+
+  /* ========================================================================
+   * NAVIGATION
+   * ====================================================================== */
+
+  function navigate(
+    section
+  ) {
+    const target =
+      String(section || "")
+        .trim();
+
+
+    if (!target) {
+      return;
+    }
+
+
+    /*
+     * Hide all sections.
+     */
+
+    $$(".section")
+      .forEach(
+        element => {
+          element.classList.remove(
+            "active-section"
+          );
+
+          element.classList.remove(
+            "active"
+          );
+        }
+      );
+
+
+    /*
+     * Activate requested section.
+     */
+
+    const sectionElement =
+      byId(
+        `section-${target}`
+      );
+
+
+    if (sectionElement) {
+      sectionElement.classList.add(
+        "active-section"
+      );
+
+      sectionElement.classList.add(
+        "active"
+      );
+    }
+
+
+    /*
+     * Update navigation state.
+     */
+
+    $$(".nav-item")
+      .forEach(
+        button => {
+          const active =
+            button.dataset.section ===
+            target;
+
+          button.classList.toggle(
+            "active",
+            active
+          );
+
+          button.setAttribute(
+            "aria-current",
+            active
+              ? "page"
+              : "false"
+          );
+        }
+      );
+
+
+    /*
+     * Update page title.
+     */
+
+    const activeNav =
+      document.querySelector(
+        `.nav-item[data-section="${CSS.escape(target)}"]`
+      );
+
+
+    const label =
+      activeNav
+        ?.querySelector("span")
+        ?.textContent
+        ?.trim();
+
+
+    if (label) {
+      text(
+        "page-title",
+        label
+      );
+    }
+
+
+    /*
+     * Dashboard is the default command centre.
+     */
+
+    if (
+      target === "dashboard"
+    ) {
+      text(
+        "page-kicker",
+        "COMMAND CENTRE"
+      );
+    } else {
+      text(
+        "page-kicker",
+        "INTELLIGENCE OS"
+      );
+    }
+
+
+    closeMobileSidebar();
+  }
+
+
+  /* ========================================================================
+   * MOBILE SIDEBAR
+   * ====================================================================== */
+
+  function openMobileSidebar() {
+    state.mobileSidebarOpen =
+      true;
+
+
+    document.body.classList.add(
+      "sidebar-open"
+    );
+
+
+    const sidebar =
+      document.querySelector(
+        ".sidebar"
+      );
+
+
+    if (sidebar) {
+      sidebar.classList.add(
+        "open"
+      );
+    }
+
+
+    const overlay =
+      byId(
+        "sidebar-overlay"
+      );
+
+
+    if (overlay) {
+      overlay.classList.add(
+        "active"
+      );
+    }
+  }
+
+
+  function closeMobileSidebar() {
+    state.mobileSidebarOpen =
+      false;
+
+
+    document.body.classList.remove(
+      "sidebar-open"
+    );
+
+
+    const sidebar =
+      document.querySelector(
+        ".sidebar"
+      );
+
+
+    if (sidebar) {
+      sidebar.classList.remove(
+        "open"
+      );
+    }
+
+
+    const overlay =
+      byId(
+        "sidebar-overlay"
+      );
+
+
+    if (overlay) {
+      overlay.classList.remove(
+        "active"
+      );
+    }
+  }
+
+
+  /* ========================================================================
+   * DISABLE CONTROL BUTTONS WHEN AUTHENTICATION IS LOST
+   * ====================================================================== */
+
+  function setControlsEnabled(
+    enabled
+  ) {
+    const selectors = [
+      '[data-action="scan-start"]',
+      '[data-action="scan-stop"]',
+      '[data-action="brain-pause"]',
+      '[data-action="brain-resume"]',
+      '[data-action="emergency-stop"]',
+      "[data-os-toggle]"
+    ];
+
+
+    selectors.forEach(
+      selector => {
+        $$(selector)
+          .forEach(
+            button => {
+              button.disabled =
+                !enabled;
+            }
+          );
+      }
+    );
+  }
+
+
+  /* ========================================================================
+   * EXPORT ENGINE CONTROLS
+   * ====================================================================== */
+
+  window.GRIDV21 = {
+    ...(window.GRIDV21 || {}),
+
+    engineAction,
+    emergencyStop,
+    toggleOS,
+
+    navigate,
+
+    openMobileSidebar,
+    closeMobileSidebar,
+
+    setControlsEnabled
+  };
+
+
+  /*
+   * Legacy/global compatibility.
+   *
+   * These are also assigned again in Part 4,
+   * but exposing them here makes the controls
+   * available immediately.
+   */
+
+  window.engineAction =
+    engineAction;
+
+  window.emergencyStop =
+    emergencyStop;
+
+  window.toggleOS =
+    toggleOS;
