@@ -2675,3 +2675,664 @@
 
   window.toggleOS =
     toggleOS;
+/* ==========================================================================
+ * GRIDV21 BRAIN ENTERPRISE — DASHBOARD APP
+ * VERSION: 6.3.7
+ *
+ * PART 4 / 4
+ * - Event binding
+ * - Navigation
+ * - Startup
+ * - Authentication
+ * - Automatic refresh
+ * - Global compatibility
+ * - Application boot
+ * ========================================================================== */
+
+
+  /* ========================================================================
+   * EVENT HANDLERS
+   * ====================================================================== */
+
+  function bindEvents() {
+
+    /*
+     * Sidebar navigation.
+     */
+
+    $$(".nav-item")
+      .forEach(
+        button => {
+
+          button.addEventListener(
+            "click",
+            () => {
+
+              navigate(
+                button.dataset.section
+              );
+
+            }
+          );
+
+        }
+      );
+
+
+    /*
+     * Global delegated click handler.
+     *
+     * This handles dynamically rendered buttons as well.
+     */
+
+    document.addEventListener(
+      "click",
+      event => {
+
+        /*
+         * Section target buttons.
+         */
+
+        const sectionButton =
+          event.target.closest(
+            "[data-section-target]"
+          );
+
+
+        if (sectionButton) {
+
+          navigate(
+            sectionButton.dataset.sectionTarget
+          );
+
+          return;
+        }
+
+
+        /*
+         * Engine/action buttons.
+         */
+
+        const actionButton =
+          event.target.closest(
+            "[data-action]"
+          );
+
+
+        if (actionButton) {
+
+          const action =
+            String(
+              actionButton.dataset.action ||
+              ""
+            ).trim();
+
+
+          switch (action) {
+
+            case "scan-start":
+
+              engineAction(
+                "scan/start"
+              );
+
+              break;
+
+
+            case "scan-stop":
+
+              engineAction(
+                "scan/stop"
+              );
+
+              break;
+
+
+            case "brain-pause":
+
+              engineAction(
+                "brain/pause"
+              );
+
+              break;
+
+
+            case "brain-resume":
+
+              engineAction(
+                "brain/resume"
+              );
+
+              break;
+
+
+            case "emergency-stop":
+
+              emergencyStop();
+
+              break;
+
+
+            case "refresh":
+
+              refreshDashboardData();
+
+              break;
+
+
+            case "clear-logs":
+
+              html(
+                "log-container",
+                `
+                  <div class="empty">
+                    Audit view cleared.
+                  </div>
+                `
+              );
+
+              break;
+
+
+            default:
+
+              console.warn(
+                "[GRIDV21] Unknown action:",
+                action
+              );
+
+              break;
+          }
+
+
+          return;
+        }
+
+
+        /*
+         * OS module toggle.
+         */
+
+        const osButton =
+          event.target.closest(
+            "[data-os-toggle]"
+          );
+
+
+        if (osButton) {
+
+          toggleOS(
+            osButton.dataset.osToggle
+          );
+
+        }
+
+      }
+    );
+
+
+    /*
+     * Topbar refresh button.
+     */
+
+    byId("refresh-btn")
+      ?.addEventListener(
+        "click",
+        () => {
+          refreshDashboardData();
+        }
+      );
+
+
+    /*
+     * Clear admin key.
+     */
+
+    byId("logout-btn")
+      ?.addEventListener(
+        "click",
+        () => {
+          clearAdminKey();
+        }
+      );
+
+
+    /*
+     * Mobile sidebar.
+     */
+
+    byId("open-sidebar")
+      ?.addEventListener(
+        "click",
+        openMobileSidebar
+      );
+
+
+    byId("close-sidebar")
+      ?.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+
+
+    byId("sidebar-overlay")
+      ?.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+
+
+    /*
+     * Keyboard shortcuts.
+     */
+
+    document.addEventListener(
+      "keydown",
+      event => {
+
+        /*
+         * Escape closes mobile navigation.
+         */
+
+        if (
+          event.key === "Escape"
+        ) {
+
+          closeMobileSidebar();
+
+        }
+
+
+        /*
+         * Ctrl+R / Cmd+R.
+         *
+         * We intentionally prevent a full browser reload
+         * and refresh GRIDV21 data instead.
+         */
+
+        if (
+          event.key.toLowerCase() === "r" &&
+          (
+            event.ctrlKey ||
+            event.metaKey
+          )
+        ) {
+
+          /*
+           * Do NOT interfere with browser reload
+           * if the user is typing inside an input.
+           */
+
+          const tag =
+            event.target?.tagName
+              ?.toLowerCase();
+
+
+          const typing =
+            tag === "input" ||
+            tag === "textarea" ||
+            tag === "select";
+
+
+          if (!typing) {
+
+            event.preventDefault();
+
+            refreshDashboardData();
+
+          }
+
+        }
+
+      }
+    );
+
+  }
+
+
+  /* ========================================================================
+   * STARTUP ERROR DISPLAY
+   * ====================================================================== */
+
+  function renderStartupError(
+    error
+  ) {
+
+    console.error(
+      "[GRIDV21] Startup failure:",
+      error
+    );
+
+
+    setGlobalStatus(
+      false,
+      "Startup error"
+    );
+
+
+    text(
+      "metric-engine",
+      "ERROR"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      error?.message ||
+      "Dashboard startup failed."
+    );
+
+
+    showToast(
+      error?.message ||
+      "GRIDV21 dashboard startup failed.",
+      "error"
+    );
+
+  }
+
+
+  /* ========================================================================
+   * INITIALISE APPLICATION
+   * ====================================================================== */
+
+  async function init() {
+
+    console.info(
+      `[GRIDV21] Starting Dashboard v${VERSION}`
+    );
+
+
+    /*
+     * Load stored/query-string admin key.
+     */
+
+    loadAdminKey();
+
+
+    /*
+     * Bind UI before making API calls.
+     *
+     * This is important:
+     * even if the backend is unavailable,
+     * the dashboard buttons remain responsive.
+     */
+
+    bindEvents();
+
+
+    /*
+     * Initial connection state.
+     */
+
+    setGlobalStatus(
+      false,
+      "Connecting"
+    );
+
+
+    /*
+     * Initialise navigation immediately.
+     */
+
+    navigate(
+      "dashboard"
+    );
+
+
+    /*
+     * Show canonical OS modules immediately.
+     *
+     * This prevents "Loading modules..."
+     * from remaining permanently visible.
+     */
+
+    state.osModules =
+      OS_MODULES.map(
+        module => ({
+          ...module,
+          enabled: true
+        })
+      );
+
+
+    renderOSOverview(
+      state.osModules
+    );
+
+
+    /*
+     * If an admin key exists, validate it.
+     *
+     * If there is no key, we still allow the dashboard
+     * interface to initialise so it does not look frozen.
+     */
+
+    if (state.adminKey) {
+
+      const valid =
+        await verifyAdminKey();
+
+
+      if (!valid) {
+
+        setControlsEnabled(
+          false
+        );
+
+        renderDashboardError(
+          new APIError(
+            "Authentication required",
+            401
+          )
+        );
+
+        return;
+
+      }
+
+    } else {
+
+      setGlobalStatus(
+        false,
+        "Admin key required"
+      );
+
+
+      /*
+       * Keep navigation and UI functional,
+       * but protect backend controls.
+       */
+
+      setControlsEnabled(
+        false
+      );
+
+      renderDashboardError(
+        new APIError(
+          "Enter the GRIDV21 admin key.",
+          401
+        )
+      );
+
+      return;
+    }
+
+
+    /*
+     * Authentication succeeded.
+     */
+
+    state.authenticated =
+      true;
+
+
+    setControlsEnabled(
+      true
+    );
+
+
+    /*
+     * Initial data load.
+     */
+
+    try {
+
+      await refreshDashboardData();
+
+    } catch (error) {
+
+      renderStartupError(
+        error
+      );
+
+    }
+
+
+    /*
+     * Automatic refresh every 30 seconds.
+     */
+
+    clearInterval(
+      state.refreshTimer
+    );
+
+
+    state.refreshTimer =
+      setInterval(
+        async () => {
+
+          if (
+            !state.authenticated
+          ) {
+            return;
+          }
+
+
+          try {
+
+            await refreshDashboardData();
+
+          } catch (error) {
+
+            console.warn(
+              "[GRIDV21] Automatic refresh failed:",
+              error
+            );
+
+          }
+
+        },
+        30000
+      );
+
+
+    /*
+     * Final status.
+     */
+
+    console.info(
+      `[GRIDV21] Dashboard v${VERSION} initialised`
+    );
+
+  }
+
+
+  /* ========================================================================
+   * GLOBAL COMPATIBILITY
+   * ====================================================================== */
+
+  window.engineAction =
+    engineAction;
+
+
+  window.emergencyStop =
+    emergencyStop;
+
+
+  window.verifyAdminKey =
+    verifyAdminKey;
+
+
+  window.refreshAll =
+    refreshDashboardData;
+
+
+  window.logout =
+    clearAdminKey;
+
+
+  window.toggleOS =
+    toggleOS;
+
+
+  window.navigate =
+    navigate;
+
+
+  /* ========================================================================
+   * EXTEND GRIDV21 PUBLIC API
+   * ====================================================================== */
+
+  window.GRIDV21 = {
+    ...(window.GRIDV21 || {}),
+
+    VERSION,
+
+    API,
+
+    state,
+
+    init,
+
+    bindEvents,
+
+    navigate,
+
+    engineAction,
+
+    emergencyStop,
+
+    toggleOS,
+
+    refreshDashboardData,
+
+    verifyAdminKey,
+
+    clearAdminKey
+  };
+
+
+  /* ========================================================================
+   * START APPLICATION
+   * ====================================================================== */
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      () => {
+
+        init().catch(
+          renderStartupError
+        );
+
+      },
+      {
+        once: true
+      }
+    );
+
+  } else {
+
+    init().catch(
+      renderStartupError
+    );
+
+  }
+
+
+})();
