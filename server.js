@@ -1463,41 +1463,47 @@ export async function scanAllCities(
 /* AUTH / ADMIN HELPERS                                                       */
 /* -------------------------------------------------------------------------- */
 
-function requireAdmin(req, res, next) {
-  const supplied =
-    req.headers["x-admin-key"] ||
+function getAdminKey(req) {
+  return (
+    req.get("X-Admin-Key") ||
+    req.get("x-admin-key") ||
+    req.get("Authorization")?.replace(/^Bearer\s+/i, "") ||
     req.query.admin_key ||
-    req.body?.admin_key;
+    req.query.key ||
+    req.query.adminKey ||
+    null
+  );
+}
 
-  if (
-    !supplied ||
-    supplied !== process.env.ADMIN_KEY
-  ) {
-    return res.status(401).json({
-      ok: false,
-      error: "Unauthorized"
-    });
+function requireAdmin(req, res, next) {
+  const supplied = getAdminKey(req);
+
+  if (!supplied || supplied !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ ok: false, error: "Authentication required" });
   }
 
   next();
 }
 
-function requireBrainAccess(req, res, next) {
-  if (
-    req.isAuthenticated?.() ||
-    req.headers["x-admin-key"] ===
-      process.env.ADMIN_KEY ||
-    req.query.admin_key ===
-      process.env.ADMIN_KEY
-  ) {
-    return next();
+function requireAdminOrSession(req, res, next) {
+  if (req.isAuthenticated?.()) return next();
+  return requireAdmin(req, res, next);
+}
+
+/* Verify endpoint used by the dashboard */
+app.get("/api/auth/verify", (req, res) => {
+  const supplied = getAdminKey(req);
+
+  if (!supplied || supplied !== process.env.ADMIN_KEY) {
+    return res.status(401).json({ ok: false, error: "Authentication required" });
   }
 
-  return res.status(401).json({
-    ok: false,
-    error: "Authentication required"
+  return res.json({
+    ok: true,
+    authenticated: true,
+    version: VERSION
   });
-}
+});
 
 /* -------------------------------------------------------------------------- */
 /* HEALTH                                                                     */
