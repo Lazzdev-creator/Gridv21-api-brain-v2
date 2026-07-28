@@ -1,1154 +1,1296 @@
-<script>
-  /* ============================================================
-     GRIDV21 BRAIN ADMIN OS
-     PART 2
-     ============================================================ */
-
-  const urlParams = new URLSearchParams(window.location.search);
-  let ADMIN_KEY = urlParams.get("key") || "";
-
-  const OS_MODULES = [
-    "Executive Intelligence OS",
-    "Revenue Intelligence OS",
-    "Sales & CRM OS",
-    "Marketing OS",
-    "Operations OS",
-    "Finance OS",
-    "Human Capital OS",
-    "Project Management OS",
-    "Knowledge OS",
-    "Legal & Compliance OS",
-    "Supply Chain OS",
-    "Acquisition Intelligence OS"
-  ];
-
-  /* ============================================================
-     AUTH
-     ============================================================ */
-
-  function setAuthState(authenticated, message = "") {
-    const badge = document.getElementById("auth-badge");
-
-    if (!badge) return;
-
-    if (authenticated) {
-      badge.textContent = "Authenticated";
-      badge.className =
-        "text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
-    } else {
-      badge.textContent = message || "Authentication Required";
-      badge.className =
-        "text-xs px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30";
-    }
-  }
-
-  function authHeaders() {
-    return {
-      "Content-Type": "application/json",
-      "x-admin-key": ADMIN_KEY,
-      "Authorization": ADMIN_KEY
-        ? `Bearer ${ADMIN_KEY}`
-        : ""
-    };
-  }
-
-  async function apiFetch(path, options = {}) {
-    const headers = {
-      ...authHeaders(),
-      ...(options.headers || {})
-    };
-
-    const response = await fetch(path, {
-      ...options,
-      headers
-    });
-
-    let data = {};
-
-    try {
-      data = await response.json();
-    } catch (_) {
-      data = {};
-    }
-
-    if (response.status === 401 || response.status === 403) {
-      setAuthState(false, "Invalid Admin Key");
-      throw new Error(data.error || "Invalid Admin Key");
-    }
-
-    if (!response.ok) {
-      throw new Error(
-        data.error ||
-        data.message ||
-        `Request failed (${response.status})`
-      );
-    }
-
-    return data;
-  }
-
-  async function verifyAdminKey() {
-    if (!ADMIN_KEY) {
-      setAuthState(false, "No Key");
-      return false;
-    }
-
-    try {
-      /*
-       * Try the backend health endpoint first.
-       * Health is normally public, so this does not prove admin
-       * authentication by itself.
-       */
-
-      const response = await fetch("/health", {
-        headers: authHeaders()
-      });
-
-      if (!response.ok) {
-        setAuthState(false, "Invalid Admin Key");
-        return false;
-      }
-
-      setAuthState(true);
-      return true;
-
-    } catch (err) {
-      setAuthState(false, "Offline");
-      addLog("Authentication check failed: " + err.message, "error");
-      return false;
-    }
-  }
-
-
-  /* ============================================================
-     NAVIGATION
-     ============================================================ */
-
-  function showSection(name, button = null) {
-
-    document
-      .querySelectorAll("main > section")
-      .forEach(section => section.classList.add("hidden"));
-
-    const target = document.getElementById("section-" + name);
-
-    if (target) {
-      target.classList.remove("hidden");
-    }
-
-    document
-      .querySelectorAll(".nav-item")
-      .forEach(item => item.classList.remove("active"));
-
-    if (button) {
-      button.classList.add("active");
-    }
-
-    /*
-     * Close mobile sidebar after selecting a page.
-     */
-    if (window.innerWidth < 768) {
-      document
-        .getElementById("sidebar")
-        ?.classList.add("hidden-mobile");
-    }
-
-    if (name === "dashboard") refreshAll();
-    if (name === "activities") loadActivity();
-    if (name === "leads") loadLeads();
-    if (name === "brain") loadBrainSuggestion();
-    if (name === "revenue") loadRevenue();
-    if (name === "affiliates") loadAffiliates();
-    if (name === "os") loadOSModules();
-  }
-
-
-  function toggleSidebar() {
-    document
-      .getElementById("sidebar")
-      ?.classList.toggle("hidden-mobile");
-  }
-
-
-  /* ============================================================
-     FORMATTERS
-     ============================================================ */
-
-  function formatUptime(ms) {
-
-    if (!ms || Number(ms) < 0) {
-      return "0h 0m 0s";
-    }
-
-    const totalSeconds = Math.floor(Number(ms) / 1000);
-
-    const hours = Math.floor(totalSeconds / 3600);
-
-    const minutes =
-      Math.floor((totalSeconds % 3600) / 60);
-
-    const seconds =
-      totalSeconds % 60;
-
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-
-  function formatDate(value) {
-
-    if (!value) {
-      return "Never";
-    }
-
-    try {
-      return new Date(value).toLocaleString();
-    } catch (_) {
-      return String(value);
-    }
-  }
-
-
-  function formatMoney(value) {
-
-    const number = Number(value || 0);
-
-    return "$" +
-      number.toLocaleString("en-US", {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2
-      });
-  }
-
-
-  function escapeHTML(value) {
-
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-  }
-
-
-  /* ============================================================
-     ACTIVITY LOG
-     ============================================================ */
-
-  function addLog(message, type = "info") {
-
-    const container =
-      document.getElementById("log-container");
-
-    if (!container) return;
-
-    const colors = {
-      info: "text-slate-300",
-      success: "text-emerald-400",
-      warn: "text-amber-400",
-      error: "text-rose-400"
-    };
-
-    const line = document.createElement("div");
-
-    line.className =
-      colors[type] || colors.info;
-
-    line.textContent =
-      `[${new Date().toLocaleTimeString()}] ${message}`;
-
-    container.appendChild(line);
-
-    container.scrollTop =
-      container.scrollHeight;
-  }
-
-
-  function clearLogs() {
-
-    const container =
-      document.getElementById("log-container");
-
-    if (!container) return;
-
-    container.innerHTML =
-      '<div class="text-slate-500">Logs cleared</div>';
-  }
-
-
-  /* ============================================================
-     ENGINE STATUS
-     ============================================================ */
-
-  async function refreshStatus() {
-
-    try {
-
-      const response =
-        await fetch("/health", {
-          headers: authHeaders()
-        });
-
-      const data =
-        await response.json();
-
-      const engine =
-        data.engine || {};
-
-      let status = "Idle";
-      let color = "bg-emerald-500";
-
-      if (engine.emergencyStopped) {
-
-        status = "EMERGENCY STOPPED";
-        color = "bg-rose-500";
-
-      } else if (engine.scanning) {
-
-        status = "Scanning...";
-        color = "bg-amber-400 animate-pulse";
-
-      } else if (!engine.running) {
-
-        status = "Paused";
-        color = "bg-slate-400";
-      }
-
-      const statusDot =
-        document.getElementById("status-dot");
-
-      const statusText =
-        document.getElementById("status-text");
-
-      if (statusDot) {
-        statusDot.className =
-          `status-dot ${color}`;
-      }
-
-      if (statusText) {
-        statusText.textContent = status;
-      }
-
-      const running =
-        document.getElementById("val-running");
-
-      const scanning =
-        document.getElementById("val-scanning");
-
-      const permits =
-        document.getElementById("val-permits");
-
-      const errors =
-        document.getElementById("val-errors");
-
-      const lastScan =
-        document.getElementById("val-lastscan");
-
-      const duration =
-        document.getElementById("val-duration");
-
-      const uptime =
-        document.getElementById("val-uptime");
-
-      const emergency =
-        document.getElementById("val-emergency");
-
-      if (running)
-        running.textContent =
-          engine.running ? "Yes" : "No";
-
-      if (scanning)
-        scanning.textContent =
-          engine.scanning ? "Yes" : "No";
-
-      if (permits)
-        permits.textContent =
-          engine.permitsFound ?? 0;
-
-      if (errors)
-        errors.textContent =
-          engine.errors ?? 0;
-
-      if (lastScan)
-        lastScan.textContent =
-          formatDate(engine.lastScan);
-
-      if (duration)
-        duration.textContent =
-          engine.lastScanDuration
-            ? `${(Number(engine.lastScanDuration) / 1000).toFixed(1)}s`
-            : "—";
-
-      if (uptime)
-        uptime.textContent =
-          formatUptime(data.uptime || 0);
-
-      if (emergency)
-        emergency.textContent =
-          engine.emergencyStopped
-            ? "YES"
-            : "No";
-
-    } catch (error) {
-
-      addLog(
-        "Health error: " + error.message,
-        "error"
-      );
-    }
-  }
-
-
-  /* ============================================================
-     ENGINE ACTIONS
-     ============================================================ */
-
-  async function action(endpoint) {
-
-    if (!ADMIN_KEY) {
-
-      alert(
-        "Admin key missing.\n\n" +
-        "Open the dashboard with:\n" +
-        "?key=YOUR_ADMIN_KEY"
-      );
-
-      return;
-    }
-
-    const resultEl =
-      document.getElementById("action-result");
-
-    if (resultEl) {
-
-      resultEl.classList.remove("hidden");
-
-      resultEl.textContent =
-        "Sending command...";
-
-      resultEl.className =
-        "mt-4 text-sm text-amber-400";
-    }
-
-    addLog(
-      `Command → ${endpoint}`,
-      "info"
+/**
+
+* GRIDV21 BRAIN ENTERPRISE v6.3.6
+* Dashboard Controller
+* 
+* Location:
+* public/dashboard/app.js
+* 
+* IMPORTANT:
+* This is a standalone JavaScript file.
+* Do NOT wrap this file in <script> tags.
+  */
+
+(() => {
+"use strict";
+
+const VERSION = "6.3.6";
+
+const API = {
+health: "/api/health",
+verify: "/api/auth/verify",
+dashboard: "/api/dashboard",
+leads: "/api/leads",
+permits: "/api/permits",
+forecast: "/api/forecast",
+osModules: "/api/os-modules",
+auditLogs: "/api/audit-logs",
+systemEvents: "/api/system-events",
+affiliates: "/api/affiliates",
+affiliateTracking: "/api/affiliate-tracking",
+integrations: "/api/integrations",
+scrapeNow: "/api/scrape-now",
+scanStop: "/api/brain/scan-stop",
+brainPause: "/api/brain/pause",
+brainResume: "/api/brain/resume",
+emergencyStop: "/api/brain/emergency-stop"
+};
+
+const OS_MODULES = [
+{
+id: 1,
+name: "Executive Intelligence OS",
+short: "Strategy",
+icon: "◆"
+},
+{
+id: 2,
+name: "Revenue Intelligence OS",
+short: "Revenue",
+icon: "£"
+},
+{
+id: 3,
+name: "Sales & CRM OS",
+short: "Sales",
+icon: "◎"
+},
+{
+id: 4,
+name: "Marketing OS",
+short: "Growth",
+icon: "◇"
+},
+{
+id: 5,
+name: "Operations OS",
+short: "Operations",
+icon: "⚙"
+},
+{
+id: 6,
+name: "Finance OS",
+short: "Finance",
+icon: "₤"
+},
+{
+id: 7,
+name: "Human Capital OS",
+short: "People",
+icon: "♙"
+},
+{
+id: 8,
+name: "Project Management OS",
+short: "Projects",
+icon: "▣"
+},
+{
+id: 9,
+name: "Knowledge Intelligence OS",
+short: "Knowledge",
+icon: "⌘"
+},
+{
+id: 10,
+name: "Legal & Compliance OS",
+short: "Compliance",
+icon: "§"
+},
+{
+id: 11,
+name: "Supply Chain OS",
+short: "Supply",
+icon: "⇄"
+},
+{
+id: 12,
+name: "Acquisition Intelligence OS",
+short: "Acquisition",
+icon: "⌁"
+},
+{
+id: 13,
+name: "Customer Success OS",
+short: "Customer Success",
+icon: "✓"
+},
+{
+id: 14,
+name: "IT & Security OS",
+short: "Security",
+icon: "⌘"
+},
+{
+id: 15,
+name: "Analytics & BI OS",
+short: "Analytics",
+icon: "▥"
+}
+];
+
+const state = {
+adminKey: "",
+authenticated: false,
+dashboard: null,
+health: null,
+osModules: [],
+leads: [],
+permits: [],
+forecast: null,
+auditLogs: [],
+systemEvents: [],
+integrations: [],
+currentSection: "dashboard",
+refreshTimer: null,
+requestInFlight: false
+};
+
+/* ============================================================
+DOM HELPERS
+============================================================ */
+
+const $ = (selector, root = document) =>
+root.querySelector(selector);
+
+const $$ = (selector, root = document) =>
+Array.from(root.querySelectorAll(selector));
+
+const byId = id => document.getElementById(id);
+
+function text(id, value) {
+const element = byId(id);
+if (element) element.textContent = value ?? "—";
+}
+
+function html(id, value) {
+const element = byId(id);
+if (element) element.innerHTML = value ?? "";
+}
+
+function escapeHTML(value) {
+return String(value ?? "")
+.replace(/&/g, "&")
+.replace(/</g, "<")
+.replace(/>/g, ">")
+.replace(/"/g, """)
+.replace(/'/g, "'");
+}
+
+function number(value) {
+const n = Number(value);
+return Number.isFinite(n)
+? n.toLocaleString("en-GB")
+: "0";
+}
+
+function money(value, currency = "USD") {
+const n = Number(value);
+
+if (!Number.isFinite(n)) {
+  return "—";
+}
+
+try {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0
+  }).format(n);
+} catch {
+  return `${currency} ${Math.round(n).toLocaleString("en-GB")}`;
+}
+
+}
+
+function dateTime(value) {
+if (!value) return "—";
+
+const date = new Date(value);
+
+if (Number.isNaN(date.getTime())) {
+  return String(value);
+}
+
+return date.toLocaleString("en-GB", {
+  dateStyle: "short",
+  timeStyle: "short"
+});
+
+}
+
+function bool(value) {
+if (value === true || value === "true" || value === 1) {
+return "YES";
+}
+
+return "NO";
+
+}
+
+function safeArray(value) {
+if (Array.isArray(value)) return value;
+
+if (Array.isArray(value?.data)) {
+  return value.data;
+}
+
+if (Array.isArray(value?.rows)) {
+  return value.rows;
+}
+
+if (Array.isArray(value?.items)) {
+  return value.items;
+}
+
+if (Array.isArray(value?.results)) {
+  return value.results;
+}
+
+return [];
+
+}
+
+/* ============================================================
+AUTHENTICATION
+============================================================ */
+
+function getQueryKey() {
+try {
+const params = new URLSearchParams(window.location.search);
+
+  return (
+    params.get("key") ||
+    params.get("admin_key") ||
+    params.get("adminKey") ||
+    ""
+  );
+} catch {
+  return "";
+}
+
+}
+
+function loadAdminKey() {
+const queryKey = getQueryKey();
+
+if (queryKey) {
+  state.adminKey = queryKey;
+
+  try {
+    sessionStorage.setItem(
+      "gridv21_admin_key",
+      queryKey
     );
+  } catch {}
 
-    try {
+  return queryKey;
+}
 
-      const data =
-        await apiFetch(`/api/${endpoint}`, {
-          method: "POST"
-        });
+try {
+  state.adminKey =
+    sessionStorage.getItem("gridv21_admin_key") || "";
+} catch {
+  state.adminKey = "";
+}
 
-      if (resultEl) {
+return state.adminKey;
 
-        resultEl.textContent =
-          "Success: " +
-          JSON.stringify(data);
+}
 
-        resultEl.className =
-          "mt-4 text-sm text-emerald-400";
-      }
+function clearAdminKey() {
+state.adminKey = "";
+state.authenticated = false;
 
-      addLog(
-        `Success: ${endpoint}`,
-        "success"
-      );
+try {
+  sessionStorage.removeItem("gridv21_admin_key");
+} catch {}
 
-      setTimeout(
-        refreshStatus,
-        500
-      );
+setGlobalStatus(
+  false,
+  "Key cleared"
+);
 
-    } catch (error) {
+showToast(
+  "Admin key cleared.",
+  "info"
+);
 
-      if (resultEl) {
+}
 
-        resultEl.textContent =
-          "Error: " +
-          error.message;
+function authHeaders(extra = {}) {
+const headers = {
+Accept: "application/json",
+...extra
+};
 
-        resultEl.className =
-          "mt-4 text-sm text-rose-400";
-      }
+if (state.adminKey) {
+  headers["x-admin-key"] = state.adminKey;
+  headers.Authorization = `Bearer ${state.adminKey}`;
+}
 
-      addLog(
-        `Error: ${error.message}`,
-        "error"
-      );
-    }
-  }
+return headers;
 
+}
 
-  /* ============================================================
-     ACTIVITY DATA
-     ============================================================ */
+async function verifyAdminKey() {
+if (!state.adminKey) {
+state.authenticated = false;
 
-  async function loadActivity() {
-
-    const container =
-      document.getElementById("log-container");
-
-    if (!container) return;
-
-    container.innerHTML =
-      '<div class="text-slate-500">Loading activity...</div>';
-
-    try {
-
-      /*
-       * Supports the common endpoint names used by
-       * GRIDV21 backend versions.
-       */
-
-      let data;
-
-      try {
-
-        data =
-          await apiFetch("/api/audit-logs");
-
-      } catch (_) {
-
-        data =
-          await apiFetch("/api/system-events");
-      }
-
-      const rows =
-        data.logs ||
-        data.events ||
-        data.data ||
-        [];
-
-      container.innerHTML = "";
-
-      if (!rows.length) {
-
-        container.innerHTML =
-          '<div class="text-slate-500">No activity recorded.</div>';
-
-        return;
-      }
-
-      rows.forEach(row => {
-
-        const level =
-          String(
-            row.level ||
-            row.severity ||
-            "info"
-          ).toLowerCase();
-
-        const message =
-          row.message ||
-          row.event_type ||
-          row.title ||
-          "System event";
-
-        addLog(
-          message,
-          level === "error"
-            ? "error"
-            : level === "warn"
-              ? "warn"
-              : "info"
-        );
-      });
-
-    } catch (error) {
-
-      container.innerHTML =
-        `<div class="text-rose-400">Unable to load activity: ${escapeHTML(error.message)}</div>`;
-    }
-  }
-
-
-  /* ============================================================
-     LEADS / PERMITS
-     ============================================================ */
-
-  async function loadLeads() {
-
-    const container =
-      document.getElementById("leads-container");
-
-    if (!container) return;
-
-    container.innerHTML =
-      '<div class="text-slate-500 text-sm">Loading leads...</div>';
-
-    try {
-
-      let data;
-
-      try {
-
-        data =
-          await apiFetch("/api/leads");
-
-      } catch (_) {
-
-        data =
-          await apiFetch("/api/permits");
-      }
-
-      const rows =
-        data.leads ||
-        data.permits ||
-        data.data ||
-        [];
-
-      if (!rows.length) {
-
-        container.innerHTML =
-          '<div class="text-slate-500 text-sm">No leads or permits found.</div>';
-
-        return;
-      }
-
-      container.innerHTML = "";
-
-      rows.forEach(item => {
-
-        const card =
-          document.createElement("div");
-
-        card.className =
-          "bg-slate-800/60 border border-slate-700 rounded-xl p-4";
-
-        const city =
-          item.city ||
-          item.region ||
-          "Unknown";
-
-        const type =
-          item.trade_type ||
-          item.permit_type ||
-          "Unknown";
-
-        const status =
-          item.status ||
-          "New";
-
-        const value =
-          item.value_estimate ??
-          item.estimated_value ??
-          0;
-
-        const score =
-          item.ai_score ??
-          "—";
-
-        card.innerHTML = `
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <p class="font-semibold">
-                ${escapeHTML(type)}
-              </p>
-
-              <p class="text-xs text-slate-400 mt-1">
-                ${escapeHTML(city)}
-              </p>
-            </div>
-
-            <span class="text-xs px-2 py-1 rounded-full
-              bg-emerald-500/10 text-emerald-400">
-              ${escapeHTML(status)}
-            </span>
-          </div>
-
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4">
-
-            <div>
-              <p class="text-[10px] text-slate-500">
-                Estimated Value
-              </p>
-
-              <p class="text-sm font-semibold">
-                ${formatMoney(value)}
-              </p>
-            </div>
-
-            <div>
-              <p class="text-[10px] text-slate-500">
-                AI Score
-              </p>
-
-              <p class="text-sm font-semibold text-brand-400">
-                ${escapeHTML(score)}
-              </p>
-            </div>
-
-            <div>
-              <p class="text-[10px] text-slate-500">
-                Permit ID
-              </p>
-
-              <p class="text-sm font-semibold">
-                ${escapeHTML(
-                  item.permit_id ||
-                  item.external_id ||
-                  item.id ||
-                  "—"
-                )}
-              </p>
-            </div>
-
-            <div>
-              <p class="text-[10px] text-slate-500">
-                Created
-              </p>
-
-              <p class="text-sm">
-                ${formatDate(item.created_at)}
-              </p>
-            </div>
-
-          </div>
-        `;
-
-        container.appendChild(card);
-      });
-
-    } catch (error) {
-
-      container.innerHTML =
-        `<div class="text-rose-400 text-sm">
-          Lead loading error:
-          ${escapeHTML(error.message)}
-        </div>`;
-    }
-  }
-
-
-  /* ============================================================
-     BRAIN RECOMMENDATION
-     ============================================================ */
-
-  async function loadBrainSuggestion() {
-
-    const element =
-      document.getElementById("brain-suggestion");
-
-    if (!element) return;
-
-    element.textContent =
-      "Analyzing recent activity...";
-
-    try {
-
-      let data;
-
-      try {
-
-        data =
-          await apiFetch("/api/forecast");
-
-      } catch (_) {
-
-        data = {};
-      }
-
-      const suggestion =
-        data.suggestion ||
-        data.recommendation ||
-        data.message ||
-        "GRIDV21 Brain is monitoring the operating environment.";
-
-      element.textContent =
-        suggestion;
-
-    } catch (error) {
-
-      element.textContent =
-        "Brain recommendation unavailable.";
-    }
-  }
-
-
-  function authorizeAction() {
-
-    addLog(
-      "Brain recommendation authorized by administrator.",
-      "success"
-    );
-
-    alert(
-      "Recommendation authorized."
-    );
-  }
-
-
-  function dismissSuggestion() {
-
-    const element =
-      document.getElementById("brain-suggestion");
-
-    if (element) {
-
-      element.textContent =
-        "Recommendation dismissed.";
-    }
-
-    addLog(
-      "Brain recommendation dismissed.",
-      "warn"
-    );
-  }
-
-
-  /* ============================================================
-     REVENUE
-     ============================================================ */
-
-  async function loadRevenue() {
-
-    try {
-
-      const data =
-        await apiFetch("/api/dashboard");
-
-      const revenue =
-        data.revenue ||
-        data.revenue_log ||
-        {};
-
-      const total =
-        revenue.total ||
-        revenue.total_revenue ||
-        data.est_revenue_month ||
-        0;
-
-      const cards =
-        document.querySelectorAll(
-          "#section-revenue .text-2xl"
-        );
-
-      if (cards[0])
-        cards[0].textContent =
-          formatMoney(
-            data.pipeline ||
-            data.total_pipeline ||
-            0
-          );
-
-      if (cards[1])
-        cards[1].textContent =
-          formatMoney(
-            data.closed_revenue ||
-            revenue.closed ||
-            total
-          );
-
-      if (cards[2])
-        cards[2].textContent =
-          formatMoney(
-            data.average_deal ||
-            0
-          );
-
-    } catch (error) {
-
-      addLog(
-        "Revenue load: " + error.message,
-        "warn"
-      );
-    }
-  }
-
-
-  /* ============================================================
-     AFFILIATE DATA
-     ============================================================ */
-
-  async function loadAffiliates() {
-
-    try {
-
-      let data;
-
-      try {
-
-        data =
-          await apiFetch("/api/affiliate-tracking");
-
-      } catch (_) {
-
-        data =
-          await apiFetch("/api/affiliates");
-      }
-
-      const rows =
-        data.affiliates ||
-        data.data ||
-        [];
-
-      const clicks =
-        rows.reduce(
-          (sum, row) =>
-            sum + Number(row.clicks || 0),
-          0
-        );
-
-      const conversions =
-        rows.reduce(
-          (sum, row) =>
-            sum + Number(row.conversions || 0),
-          0
-        );
-
-      const cards =
-        document.querySelectorAll(
-          "#section-affiliates .text-2xl"
-        );
-
-      if (cards[0])
-        cards[0].textContent =
-          rows.length;
-
-      if (cards[1])
-        cards[1].textContent =
-          clicks;
-
-      if (cards[2])
-        cards[2].textContent =
-          conversions;
-
-    } catch (error) {
-
-      addLog(
-        "Affiliate load: " + error.message,
-        "warn"
-      );
-    }
-  }
-
-
-  /* ============================================================
-     12 CANONICAL GRIDV21 OS MODULES
-     ============================================================ */
-
-  function renderOSModules(modules = []) {
-
-    const container =
-      document.getElementById("os-modules-container");
-
-    if (!container) return;
-
-    const source =
-      modules.length
-        ? modules
-        : OS_MODULES.map(
-            name => ({
-              name,
-              status: "active",
-              enabled: true
-            })
-          );
-
-    container.innerHTML = "";
-
-    source.forEach((module, index) => {
-
-      const canonicalName =
-        module.name ||
-        OS_MODULES[index] ||
-        `OS Module ${index + 1}`;
-
-      const enabled =
-        module.enabled !== false &&
-        module.status !== "disabled";
-
-      const card =
-        document.createElement("div");
-
-      card.className =
-        "bg-slate-800/60 border border-slat
-      card.innerHTML = `
-
-        <div class="flex items-start justify-between gap-3">
-
-          <div class="flex gap-3">
-
-            <div class="w-9 h-9 rounded-lg
-              bg-brand-600/20
-              text-brand-400
-              flex items-center justify-center
-              font-bold text-sm">
-              ${index + 1}
-            </div>
-
-            <div>
-              <p class="font-medium">
-                ${escapeHTML(canonicalName)}
-              </p>
-
-              <p class="text-xs text-slate-500 mt-1">
-                ${enabled ? "Operational" : "Disabled"}
-              </p>
-            </div>
-
-          </div>
-
-          <span class="text-xs px-2 py-1 rounded-full ${
-            enabled
-              ? "bg-emerald-500/10 text-emerald-400"
-              : "bg-slate-700 text-slate-400"
-          }">
-            ${enabled ? "ACTIVE" : "OFF"}
-          </span>
-
-        </div>
-
-      `;
-
-      container.appendChild(card);
-    });
-  }
-
-
-  /* ============================================================
-     LOAD 12 GRIDV21 OS MODULES
-     ============================================================ */
-
-  async function loadOSModules() {
-
-    try {
-
-      const data =
-        await apiFetch("/api/os-modules");
-
-      const modules =
-        data.modules ||
-        data.os_modules ||
-        data.data ||
-        [];
-
-      renderOSModules(modules);
-
-    } catch (error) {
-
-      /*
-       * Fallback:
-       * Always display the canonical 12-module
-       * GRIDV21 architecture if the backend
-       * route is unavailable.
-       */
-
-      renderOSModules([]);
-
-      addLog(
-        "OS API unavailable; displaying canonical modules.",
-        "warn"
-      );
-    }
-  }
-
-
-  /* ============================================================
-     REFRESH ALL
-     ============================================================ */
-
-  async function refreshAll() {
-
-    addLog(
-      "Refreshing GRIDV21 Brain dashboard...",
-      "info"
-    );
-
-    await Promise.allSettled([
-      refreshStatus(),
-      loadOSModules()
-    ]);
-
-    addLog(
-      "Dashboard refresh complete.",
-      "success"
-    );
-  }
-
-
-  /* ============================================================
-     INITIALIZE DASHBOARD
-     ============================================================ */
-
-  document.addEventListener(
-    "DOMContentLoaded",
-    async () => {
-
-      /*
-       * Dashboard opens by default.
-       */
-
-      document
-        .querySelectorAll("main > section")
-        .forEach(section => {
-
-          if (
-            section.id ===
-            "section-dashboard"
-          ) {
-            section.classList.remove("hidden");
-          } else {
-            section.classList.add("hidden");
-          }
-
-        });
-
-
-      /*
-       * Authentication badge.
-       */
-
-      if (ADMIN_KEY) {
-
-        setAuthState(
-          true,
-          "Authenticated"
-        );
-
-      } else {
-
-        setAuthState(
-          false,
-          "No Key"
-        );
-
-      }
-
-
-      /*
-       * Initial dashboard load.
-       */
-
-      await refreshAll();
-
-
-      /*
-       * Keep engine status current.
-       */
-
-      setInterval(
-        refreshStatus,
-        15000
-      );
-
-
-      /*
-       * Keep OS module state current.
-       */
-
-      setInterval(
-        loadOSModules,
-        30000
-      );
-
-    }
+  setGlobalStatus(
+    false,
+    "Authentication required"
   );
 
-</script>
+  return false;
+}
 
-</body>
-</html>
+try {
+  const response = await fetch(API.verify, {
+    method: "GET",
+    headers: authHeaders(),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      `Authentication failed (${response.status})`
+    );
+  }
+
+  state.authenticated = true;
+
+  setGlobalStatus(
+    true,
+    "Authenticated"
+  );
+
+  return true;
+} catch (error) {
+  state.authenticated = false;
+
+  setGlobalStatus(
+    false,
+    "Authentication failed"
+  );
+
+  showToast(
+    error.message || "Invalid admin key.",
+    "error"
+  );
+
+  return false;
+}
+
+}
+
+/* ============================================================
+API
+============================================================ */
+
+async function apiFetch(
+url,
+options = {},
+allowUnauthorized = false
+) {
+const config = {
+method: "GET",
+cache: "no-store",
+...options
+};
+
+config.headers = authHeaders(
+  config.headers || {}
+);
+
+const response = await fetch(
+  url,
+  config
+);
+
+const contentType =
+  response.headers.get("content-type") || "";
+
+let payload;
+
+if (contentType.includes("application/json")) {
+  payload = await response.json().catch(() => ({}));
+} else {
+  payload = await response.text().catch(() => "");
+}
+
+if (
+  response.status === 401 &&
+  !allowUnauthorized
+) {
+  state.authenticated = false;
+
+  setGlobalStatus(
+    false,
+    "Authentication required"
+  );
+
+  throw new Error(
+    "Authentication required."
+  );
+}
+
+if (!response.ok) {
+  const message =
+    typeof payload === "object"
+      ? payload.message ||
+        payload.error ||
+        payload.detail
+      : payload;
+
+  throw new Error(
+    message ||
+    `Request failed (${response.status})`
+  );
+}
+
+return payload;
+
+}
+
+async function apiPost(
+url,
+body = {}
+) {
+return apiFetch(url, {
+method: "POST",
+headers: {
+"Content-Type": "application/json"
+},
+body: JSON.stringify(body)
+});
+}
+
+/* ============================================================
+STATUS
+============================================================ */
+
+function setGlobalStatus(online, label) {
+const dot = byId("global-status-dot");
+const status = byId("global-status");
+const statusText = byId("global-status-text");
+
+const sidebarDot =
+  byId("sidebar-status-dot");
+
+const sidebarText =
+  byId("sidebar-status-text");
+
+if (dot) {
+  dot.classList.toggle(
+    "online",
+    Boolean(online)
+  );
+
+  dot.classList.toggle(
+    "offline",
+    !online
+  );
+}
+
+if (sidebarDot) {
+  sidebarDot.classList.toggle(
+    "online",
+    Boolean(online)
+  );
+
+  sidebarDot.classList.toggle(
+    "offline",
+    !online
+  );
+}
+
+if (statusText) {
+  statusText.textContent = label;
+}
+
+if (sidebarText) {
+  sidebarText.textContent = label;
+}
+
+if (status) {
+  status.classList.toggle(
+    "badge-success",
+    Boolean(online)
+  );
+
+  status.classList.toggle(
+    "badge-muted",
+    !online
+  );
+}
+
+}
+
+function setEngineBadge(running, scanning) {
+const badge = byId("engine-badge");
+
+if (!badge) return;
+
+badge.classList.remove(
+  "badge-success",
+  "badge-warning",
+  "badge-danger",
+  "badge-muted"
+);
+
+if (scanning) {
+  badge.textContent = "SCANNING";
+  badge.classList.add("badge-warning");
+  return;
+}
+
+if (running) {
+  badge.textContent = "RUNNING";
+  badge.classList.add("badge-success");
+  return;
+}
+
+badge.textContent = "IDLE";
+badge.classList.add("badge-muted");
+
+}
+
+/* ============================================================
+TOAST
+============================================================ */
+
+let toastTimer = null;
+
+function showToast(message, type = "info") {
+const toast = byId("toast");
+
+if (!toast) return;
+
+toast.className =
+  `toast toast-${type}`;
+
+toast.textContent = message;
+
+requestAnimationFrame(() => {
+  toast.classList.add("show");
+});
+
+clearTimeout(toastTimer);
+
+toastTimer = setTimeout(() => {
+  toast.classList.remove("show");
+}, 3500);
+
+}
+
+function setActionMessage(
+message,
+type = "info"
+) {
+const element =
+byId("action-message");
+
+if (!element) return;
+
+element.textContent = message;
+
+element.className =
+  `inline-message ${type}`;
+
+}
+
+/* ============================================================
+HEALTH
+============================================================ */
+
+async function loadHealth() {
+try {
+const payload = await apiFetch(
+API.health,
+{},
+true
+);
+
+  state.health = payload;
+
+  const health =
+    payload?.health ||
+    payload?.data ||
+    payload;
+
+  const healthy =
+    health?.status === "ok" ||
+    health?.status === "healthy" ||
+    health?.ok === true;
+
+  if (healthy) {
+    setGlobalStatus(
+      state.authenticated || !state.adminKey,
+      state.authenticated
+        ? "Authenticated"
+        : "System Online"
+    );
+  }
+
+  return payload;
+} catch (error) {
+  setGlobalStatus(
+    false,
+    "Offline"
+  );
+
+  return null;
+}
+
+}
+
+/* ============================================================
+DASHBOARD
+============================================================ */
+
+async function loadDashboard() {
+const payload =
+await apiFetch(API.dashboard);
+
+state.dashboard =
+  payload?.dashboard ||
+  payload?.data ||
+  payload;
+
+renderDashboard(
+  state.dashboard
+);
+
+return state.dashboard;
+
+}
+
+function extractEngine(data) {
+return (
+data?.engine ||
+data?.ENGINE ||
+data?.telemetry ||
+{}
+);
+}
+
+function renderDashboard(data) {
+if (!data) return;
+
+const engine =
+  extractEngine(data);
+
+const running =
+  Boolean(
+    engine.running ??
+    data.running
+  );
+
+const scanning =
+  Boolean(
+    engine.scanning ??
+    data.scanning
+  );
+
+const permitsFound =
+  engine.permitsFound ??
+  data.permitsFound ??
+  data.permits_found ??
+  data.metrics?.permits ??
+  0;
+
+const errors =
+  engine.errors ??
+  data.errors ??
+  0;
+
+const leads =
+  data.leadsCount ??
+  data.leads_count ??
+  data.metrics?.leads ??
+  safeArray(data.leads).length ??
+  0;
+
+const revenue =
+  data.revenue ??
+  data.metrics?.revenue ??
+  data.revenueTotal ??
+  0;
+
+text(
+  "metric-engine",
+  scanning
+    ? "SCANNING"
+    : running
+      ? "RUNNING"
+      : "IDLE"
+);
+
+text(
+  "metric-engine-sub",
+  scanning
+    ? "Acquisition engine active"
+    : "Engine ready"
+);
+
+text(
+  "metric-leads",
+  number(leads)
+);
+
+text(
+  "metric-revenue",
+  typeof revenue === "number"
+    ? money(revenue)
+    : String(revenue || "—")
+);
+
+text(
+  "telemetry-running",
+  bool(running)
+);
+
+text(
+  "telemetry-scanning",
+  bool(scanning)
+);
+
+text(
+  "telemetry-permits",
+  number(permitsFound)
+);
+
+text(
+  "telemetry-errors",
+  number(errors)
+);
+
+text(
+  "telemetry-last-scan",
+  dateTime(
+    engine.lastScan ??
+    data.lastScan
+  )
+);
+
+text(
+  "telemetry-duration",
+  formatDuration(
+    engine.lastScanDuration ??
+    data.lastScanDuration
+  )
+);
+
+text(
+  "telemetry-uptime",
+  formatUptime(
+    engine.uptime ??
+    data.uptime
+  )
+);
+
+text(
+  "telemetry-emergency",
+  bool(
+    engine.emergencyStop ??
+    data.emergencyStop
+  )
+);
+
+setEngineBadge(
+  running,
+  scanning
+);
+
+const activeOS =
+  data.activeOS ??
+  data.activeOs ??
+  data.osActive ??
+  safeArray(
+    data.osModules
+  ).filter(
+    item => item.enabled !== false
+  ).length;
+
+text(
+  "metric-os",
+  number(
+    activeOS ||
+    state.osModules.filter(
+      item => item.enabled !== false
+    ).length
+  )
+);
+
+renderRecommendation(
+  data.recommendation ||
+  data.aiRecommendation ||
+  data.brainRecommendation
+);
+
+renderTopLeads(
+  safeArray(data.topLeads)
+    .concat(
+      safeArray(data.leads)
+    )
+    .slice(0, 8)
+);
+
+renderActivity(
+  safeArray(data.activity)
+    .concat(
+      safeArray(data.events)
+    )
+    .slice(0, 12)
+);
+
+}
+
+/* ============================================================
+OS MODULES
+============================================================ */
+
+async function loadOSModules() {
+try {
+const payload =
+await apiFetch(
+API.osModules
+);
+
+  const modules =
+    safeArray(payload);
+
+  state.osModules =
+    modules.length
+      ? mergeCanonicalModules(modules)
+      : OS_MODULES.map(
+          item => ({
+            ...item,
+            enabled: true
+          })
+        );
+
+} catch {
+  state.osModules =
+    OS_MODULES.map(
+      item => ({
+        ...item,
+        enabled: true
+      })
+    );
+}
+
+renderOSModules();
+return state.osModules;
+
+}
+
+function mergeCanonicalModules(
+modules
+) {
+return OS_MODULES.map(
+canonical => {
+const found =
+modules.find(
+item =>
+Number(item.id) ===
+canonical.id
+) ||
+modules.find(
+item =>
+String(item.name)
+.toLowerCase() ===
+canonical.name.toLowerCase()
+);
+
+    return {
+      ...canonical,
+      ...(found || {}),
+      enabled:
+        found?.enabled ??
+        found?.active ??
+        true
+    };
+  }
+);
+
+}
+
+function renderOSModules() {
+const container =
+byId("os-overview-grid");
+
+if (!container) return;
+
+container.innerHTML =
+  state.osModules
+    .map(module => {
+      const enabled =
+        module.enabled !== false;
+
+      return `
+        <article
+          class="os-card ${enabled ? "enabled" : "disabled"}"
+          data-os-id="${escapeHTML(module.id)}"
+        >
+
+          <div class="os-card-top">
+
+            <div class="os-icon">
+              ${escapeHTML(module.icon || "◆")}
+            </div>
+
+            <button
+              class="os-toggle ${enabled ? "on" : "off"}"
+              data-os-toggle="${escapeHTML(module.id)}"
+              type="button"
+              aria-label="Toggle ${escapeHTML(module.name)}"
+              aria-pressed="${enabled}"
+            >
+              <span></span>
+            </button>
+
+          </div>
+
+          <h3>
+            ${escapeHTML(module.name)}
+          </h3>
+
+          <p>
+            ${escapeHTML(module.short || "Intelligence module")}
+          </p>
+
+          <span class="status-label">
+            ${enabled ? "ACTIVE" : "DISABLED"}
+          </span>
+
+        </article>
+      `;
+    })
+    .join("");
+
+}
+
+async function toggleOS(id) {
+const module =
+state.osModules.find(
+item => Number(item.id) === Number(id)
+);
+
+if (!module) return;
+
+const desired =
+  module.enabled === false;
+
+try {
+  setActionMessage(
+    `Updating ${module.name}…`
+  );
+
+  const payload =
+    await apiPost(
+      `/api/os-toggle/${encodeURIComponent(id)}`,
+      {
+        enabled: desired,
+        active: desired
+      }
+    );
+
+  module.enabled =
+    payload?.enabled ??
+    payload?.active ??
+    desired;
+
+  renderOSModules();
+
+  showToast(
+    `${module.name}: ${
+      module.enabled
+        ? "enabled"
+        : "disabled"
+    }`,
+    "success"
+  );
+
+  setActionMessage(
+    `${module.name} updated.`,
+    "success"
+  );
+
+} catch (error) {
+  showToast(
+    error.message,
+    "error"
+  );
+
+  setActionMessage(
+    error.message,
+    "error"
+  );
+}
+
+}
+
+/* ============================================================
+LEADS
+============================================================ */
+
+async function loadLeads() {
+try {
+const payload =
+await apiFetch(API.leads);
+
+  state.leads =
+    safeArray(payload);
+
+  renderLeads(
+    state.leads
+  );
+
+  return state.leads;
+
+} catch (error) {
+  renderLeads([]);
+  throw error;
+}
+
+}
+
+function renderLeads(leads) {
+const body =
+byId("leads-body");
+
+if (!body) return;
+
+if (!leads.length) {
+  body.innerHTML = `
+    <tr>
+      <td colspan="5" class="empty">
+        No leads available.
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+body.innerHTML =
+  leads
+    .slice(0, 100)
+    .map(lead => `
+      <tr>
+        <td>
+          ${escapeHTML(
+            lead.trade ||
+            lead.type ||
+            lead.category ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHTML(
+            lead.region ||
+            lead.city ||
+            lead.location ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          ${formatLeadValue(
+            lead.value ??
+            lead.estimatedValue ??
+            lead.estimated_value
+          )}
+        </td>
+
+        <td>
+          <span class="status-pill">
+            ${escapeHTML(
+              lead.status ||
+              "NEW"
+            )}
+          </span>
+        </td>
+
+        <td>
+          ${escapeHTML(
+            dateTime(
+              lead.created_at ||
+              lead.createdAt
+            )
+          )}
+        </td>
+      </tr>
+    `)
+    .join("");
+
+}
+
+function renderTopLeads(leads) {
+const body =
+byId("top-leads-body");
+
+if (!body) return;
+
+if (!leads.length) {
+  body.innerHTML = `
+    <tr>
+      <td colspan="4" class="empty">
+        No lead intelligence available.
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+body.innerHTML =
+  leads
+    .slice(0, 8)
+    .map(lead => `
+      <tr>
+
+        <td>
+          ${escapeHTML(
+            lead.city ||
+            lead.region ||
+            lead.location ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHTML(
+            lead.trade ||
+            lead.type ||
+            lead.category ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          <strong>
+            ${escapeHTML(
+              lead.score ??
+              lead.aiScore ??
+              lead.ai_score ??
+              "—"
+            )}
+          </strong>
+        </td>
+
+        <td>
+          ${formatLeadValue(
+            lead.value ??
+            lead.estimatedValue ??
+            lead.estimated_value
+          )}
+        </td>
+
+      </tr>
+    `)
+    .join("");
+
+}
+
+function formatLeadValue(value) {
+if (
+value === undefined ||
+value === null ||
+value === ""
+) {
+return "—";
+}
+
+if (typeof value === "number") {
+  return money(value);
+}
+
+return escapeHTML(value);
+
+}
+
+/* ============================================================
+PERMITS
+============================================================ */
+
+async function loadPermits() {
+try {
+const payload =
+await apiFetch(API.permits);
+
+  state.permits =
+    safeArray(payload);
+
+  renderPermits(
+    state.permits
+  );
+
+  return state.permits;
+
+} catch (error) {
+  renderPermits([]);
+  throw error;
+}
+
+}
+
+function renderPermits(permits) {
+const body =
+byId("permits-body");
+
+if (!body) return;
+
+if (!permits.length) {
+  body.innerHTML = `
+    <tr>
+      <td colspan="5" class="empty">
+        No permits available.
+      </td>
+    </tr>
+  `;
+
+  return;
+}
+
+body.innerHTML =
+  permits
+    .slice(0, 100)
+    .map(permit => `
+      <tr>
+
+        <td>
+          ${escapeHTML(
+            permit.city ||
+            permit.location ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          ${escapeHTML(
+            permit.permit_type ||
+            permit.permitType ||
+            permit.type ||
+            permit.description ||
+            "—"
+          )}
+        </td>
+
+        <td>
+          <span class="status-pill">
+            ${escapeHTML(
+              permit.status ||
+              "FOUND"
+            )}
+          </span>
+        </td>
+
+        <td>
+          ${escapeHTML(
+            permit.ai_score ??
+            permit.aiScore ??
+            
