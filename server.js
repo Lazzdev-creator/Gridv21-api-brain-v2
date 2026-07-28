@@ -1492,6 +1492,11 @@ function requireAdminOrSession(req, res, next) {
   return requireAdmin(req, res, next);
 }
 
+// Alias used by some routes
+function requireBrainAccess(req, res, next) {
+  return requireAdminOrSession(req, res, next);
+}
+
 app.get("/api/auth/verify", (req, res) => {
   const supplied = getAdminKey(req);
 
@@ -1504,7 +1509,6 @@ app.get("/api/auth/verify", (req, res) => {
 
   res.json({ ok: true, authenticated: true, version: VERSION });
 });
-
 /* -------------------------------------------------------------------------- */
 /* HEALTH                                                                     */
 /* -------------------------------------------------------------------------- */
