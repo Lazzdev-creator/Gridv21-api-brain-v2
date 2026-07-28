@@ -2415,4 +2415,417 @@ async function emergencyStop() {
 
 /* ============================================================
    COMPATIBILITY FUNCTIONS
-============  
+============================================================ */
+
+window.engineAction =
+  engineAction;
+
+window.emergencyStop =
+  emergencyStop;
+
+window.verifyAdminKey =
+  verifyAdminKey;
+
+window.refreshAll =
+  refreshDashboardData;
+
+window.logout =
+  clearAdminKey;
+
+window.toggleOS =
+  toggleOS;
+
+/* ============================================================
+   REFRESH
+============================================================ */
+
+async function refreshDashboardData() {
+  if (state.requestInFlight) {
+    return;
+  }
+
+  state.requestInFlight = true;
+
+  try {
+    await loadHealth();
+
+    if (
+      state.adminKey &&
+      !state.authenticated
+    ) {
+      const valid =
+        await verifyAdminKey();
+
+      if (!valid) {
+        return;
+      }
+    }
+
+    await Promise.allSettled([
+      loadDashboard(),
+      loadOSModules(),
+      loadLeads(),
+      loadPermits(),
+      loadForecast(),
+      loadSystemEvents()
+    ]);
+
+    if (
+      state.currentSection ===
+      "audit"
+    ) {
+      await loadAuditLogs();
+    }
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+
+  } finally {
+    state.requestInFlight = false;
+  }
+}
+
+/* ============================================================
+   DURATION HELPERS
+============================================================ */
+
+function formatDuration(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  const seconds = Number(value);
+
+  if (Number.isFinite(seconds)) {
+    if (seconds < 60) {
+      return `${seconds.toFixed(1)}s`;
+    }
+
+    const minutes = Math.floor(seconds / 60);
+    const remainder = Math.round(seconds % 60);
+
+    return `${minutes}m ${remainder}s`;
+  }
+
+  return String(value);
+}
+
+function formatUptime(value) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return "—";
+  }
+
+  const seconds = Number(value);
+
+  if (!Number.isFinite(seconds)) {
+    return String(value);
+  }
+
+  const days = Math.floor(seconds / 86400);
+
+  const hours = Math.floor(
+    (seconds % 86400) / 3600
+  );
+
+  const minutes = Math.floor(
+    (seconds % 3600) / 60
+  );
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
+/* ============================================================
+   MOBILE SIDEBAR
+============================================================ */
+
+function openMobileSidebar() {
+  const sidebar = byId("sidebar");
+  const overlay = byId("sidebar-overlay");
+
+  sidebar?.classList.add("open");
+  overlay?.classList.add("show");
+}
+
+function closeMobileSidebar() {
+  const sidebar = byId("sidebar");
+  const overlay = byId("sidebar-overlay");
+
+  sidebar?.classList.remove("open");
+  overlay?.classList.remove("show");
+}
+
+/* ============================================================
+   EVENT HANDLERS
+============================================================ */
+
+function bindEvents() {
+
+  $$(".nav-item").forEach(button => {
+
+    button.addEventListener(
+      "click",
+      () => {
+        navigate(
+          button.dataset.section
+        );
+      }
+    );
+
+  });
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      const sectionButton =
+        event.target.closest(
+          "[data-section-target]"
+        );
+
+      if (sectionButton) {
+
+        navigate(
+          sectionButton.dataset.sectionTarget
+        );
+
+        return;
+      }
+
+      const actionButton =
+        event.target.closest(
+          "[data-action]"
+        );
+
+      if (actionButton) {
+
+        const action =
+          actionButton.dataset.action;
+
+        switch (action) {
+
+          case "scan-start":
+            engineAction("scan/start");
+            break;
+
+          case "scan-stop":
+            engineAction("scan/stop");
+            break;
+
+          case "brain-pause":
+            engineAction("brain/pause");
+            break;
+
+          case "brain-resume":
+            engineAction("brain/resume");
+            break;
+
+          case "emergency-stop":
+            emergencyStop();
+            break;
+
+          case "refresh":
+            refreshDashboardData();
+            break;
+
+          case "clear-logs":
+
+            html(
+              "log-container",
+              `
+                <div class="empty">
+                  Audit view cleared.
+                </div>
+              `
+            );
+
+            break;
+
+          default:
+            break;
+        }
+
+        return;
+      }
+
+      const osButton =
+        event.target.closest(
+          "[data-os-toggle]"
+        );
+
+      if (osButton) {
+
+        toggleOS(
+          osButton.dataset.osToggle
+        );
+
+      }
+
+    }
+  );
+
+  byId("refresh-btn")
+    ?.addEventListener(
+      "click",
+      refreshDashboardData
+    );
+
+  byId("logout-btn")
+    ?.addEventListener(
+      "click",
+      clearAdminKey
+    );
+
+  byId("open-sidebar")
+    ?.addEventListener(
+      "click",
+      openMobileSidebar
+    );
+
+  byId("close-sidebar")
+    ?.addEventListener(
+      "click",
+      closeMobileSidebar
+    );
+
+  byId("sidebar-overlay")
+    ?.addEventListener(
+      "click",
+      closeMobileSidebar
+    );
+
+  document.addEventListener(
+    "keydown",
+    event => {
+
+      if (event.key === "Escape") {
+        closeMobileSidebar();
+      }
+
+      if (
+        event.key === "r" &&
+        (
+          event.ctrlKey ||
+          event.metaKey
+        )
+      ) {
+
+        event.preventDefault();
+
+        refreshDashboardData();
+      }
+
+    }
+  );
+
+}
+
+/* ============================================================
+   INITIALISATION
+============================================================ */
+
+async function init() {
+
+  loadAdminKey();
+
+  bindEvents();
+
+  setGlobalStatus(
+    false,
+    "Connecting"
+  );
+
+  navigate("dashboard");
+
+  const valid =
+    state.adminKey
+      ? await verifyAdminKey()
+      : true;
+
+  if (
+    state.adminKey &&
+    !valid
+  ) {
+    return;
+  }
+
+  await refreshDashboardData();
+
+  clearInterval(
+    state.refreshTimer
+  );
+
+  state.refreshTimer =
+    setInterval(
+      refreshDashboardData,
+      30000
+    );
+
+  console.info(
+    `GRIDV21 BRAIN Dashboard v${VERSION} initialised`
+  );
+
+}
+
+/* ============================================================
+   GLOBAL COMPATIBILITY
+============================================================ */
+
+window.engineAction =
+  engineAction;
+
+window.emergencyStop =
+  emergencyStop;
+
+window.verifyAdminKey =
+  verifyAdminKey;
+
+window.refreshAll =
+  refreshDashboardData;
+
+window.logout =
+  clearAdminKey;
+
+window.toggleOS =
+  toggleOS;
+
+/* ============================================================
+   START APPLICATION
+============================================================ */
+
+if (
+  document.readyState ===
+  "loading"
+) {
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    init,
+    { once: true }
+  );
+
+} else {
+
+  init();
+
+}
+
+})();
