@@ -1292,5 +1292,1141 @@ body.innerHTML =
         <td>
           ${escapeHTML(
             permit.ai_score ??
-            permit.aiScore ??
+            permit.score ??
+"—"
+)}
+</td>
+
+<td>
+  ${formatLeadValue(
+    permit.estimated_value ??
+    permit.estimatedValue ??
+    permit.value
+  )}
+</td>
+
+</tr>
+`)
+.join("");
+}
+
+/* ============================================================
+   REVENUE / FORECAST
+============================================================ */
+
+async function loadForecast() {
+  try {
+    const payload =
+      await apiFetch(API.forecast);
+
+    state.forecast =
+      payload?.forecast ||
+      payload?.data ||
+      payload;
+
+    renderForecast(
+      state.forecast
+    );
+
+    return state.forecast;
+
+  } catch {
+    renderForecast(null);
+    return null;
+  }
+}
+
+function renderForecast(data) {
+  const container =
+    byId("revenue-content");
+
+  if (!container) return;
+
+  if (!data) {
+    container.innerHTML = `
+      <div class="empty-panel">
+        Revenue forecast unavailable.
+      </div>
+    `;
+
+    return;
+  }
+
+  const projected =
+    data.projectedRevenue ??
+    data.projected_revenue ??
+    data.revenue ??
+    0;
+
+  const confidence =
+    data.confidence ??
+    data.confidenceScore ??
+    "—";
+
+  const leads =
+    data.leads ??
+    data.leadCount ??
+    state.leads.length;
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="metric-card">
+        <span>Projected Revenue</span>
+        <strong>
+          ${formatLeadValue(projected)}
+        </strong>
+        <small>AI forecast</small>
+      </article>
+
+      <article class="metric-card">
+        <span>Forecast Confidence</span>
+        <strong>
+          ${escapeHTML(confidence)}
+        </strong>
+        <small>Decision engine</small>
+      </article>
+
+      <article class="metric-card">
+        <span>Pipeline Leads</span>
+        <strong>
+          ${number(leads)}
+        </strong>
+        <small>Current pipeline</small>
+      </article>
+
+    </div>
+  `;
+}
+
+/* ============================================================
+   ACTIVITY / AUDIT
+============================================================ */
+
+async function loadAuditLogs() {
+  try {
+    const payload =
+      await apiFetch(API.auditLogs);
+
+    state.auditLogs =
+      safeArray(payload);
+
+    renderLogs(
+      state.auditLogs
+    );
+
+    return state.auditLogs;
+
+  } catch {
+    renderLogs([]);
+    return [];
+  }
+}
+
+async function loadSystemEvents() {
+  try {
+    const payload =
+      await apiFetch(API.systemEvents);
+
+    state.systemEvents =
+      safeArray(payload);
+
+    renderActivity(
+      state.systemEvents
+    );
+
+    return state.systemEvents;
+
+  } catch {
+    return [];
+  }
+}
+
+function renderActivity(events) {
+  const container =
+    byId("dashboard-activity");
+
+  if (!container) return;
+
+  if (!events.length) {
+    container.innerHTML = `
+      <div class="empty">
+        No recent activity.
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    events
+      .slice(0, 12)
+      .map(event => `
+        <div class="activity-item">
+
+          <div class="activity-dot"></div>
+
+          <div class="activity-main">
+
+            <strong>
+              ${escapeHTML(
+                event.action ||
+                event.event ||
+                event.type ||
+                "System event"
+              )}
+            </strong>
+
+            <span>
+              ${escapeHTML(
+                event.message ||
+                event.description ||
+                event.detail ||
+                ""
+              )}
+            </span>
+
+          </div>
+
+          <time>
+            ${escapeHTML(
+              dateTime(
+                event.created_at ||
+                event.createdAt ||
+                event.timestamp
+              )
+            )}
+          </time>
+
+        </div>
+      `)
+      .join("");
+}
+
+function renderLogs(logs) {
+  const container =
+    byId("log-container");
+
+  if (!container) return;
+
+  if (!logs.length) {
+    container.innerHTML = `
+      <div class="empty">
+        No audit events available.
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    logs
+      .slice(0, 200)
+      .map(log => `
+        <div class="log-row">
+
+          <time>
+            ${escapeHTML(
+              dateTime(
+                log.created_at ||
+                log.createdAt ||
+                log.timestamp
+              )
+            )}
+          </time>
+
+          <strong>
+            ${escapeHTML(
+              log.action ||
+              log.event ||
+              log.type ||
+              "EVENT"
+            )}
+          </strong>
+
+          <span>
+            ${escapeHTML(
+              log.message ||
+              log.description ||
+              log.detail ||
+              ""
+            )}
+          </span>
+
+        </div>
+      `)
+      .join("");
+}
+
+/* ============================================================
+   RECOMMENDATION
+============================================================ */
+
+function renderRecommendation(
+  recommendation
+) {
+  const container =
+    byId("brain-recommendation");
+
+  if (!container) return;
+
+  if (!recommendation) {
+    container.innerHTML = `
+      <div class="recommendation-empty">
+        No new AI recommendation.
+      </div>
+    `;
+
+    return;
+  }
+
+  const title =
+    recommendation.title ||
+    recommendation.name ||
+    "AI Recommendation";
+
+  const message =
+    recommendation.message ||
+    recommendation.description ||
+    recommendation.reason ||
+    recommendation.text ||
+    "Decision engine recommendation available.";
+
+  const action =
+    recommendation.action ||
+    recommendation.nextAction ||
+    "";
+
+  container.innerHTML = `
+    <div class="recommendation-title">
+      ${escapeHTML(title)}
+    </div>
+
+    <div class="recommendation-message">
+      ${escapeHTML(message)}
+    </div>
+
+    ${
+      action
+        ? `
+          <div class="recommendation-action">
+            ${escapeHTML(action)}
+          </div>
+        `
+        : ""
+    }
+  `;
+}
+
+/* ============================================================
+   INTEGRATIONS
+============================================================ */
+
+async function loadIntegrations() {
+  try {
+    const payload =
+      await apiFetch(
+        API.integrations
+      );
+
+    state.integrations =
+      safeArray(payload);
+
+    renderIntegrations(
+      state.integrations
+    );
+
+    return state.integrations;
+
+  } catch {
+    renderIntegrations([]);
+    return [];
+  }
+}
+
+function renderIntegrations(
+  integrations
+) {
+  const container =
+    byId("integrations-grid");
+
+  if (!container) return;
+
+  if (!integrations.length) {
+    container.innerHTML = `
+      <article class="integration-card">
+        <strong>GRIDV21 Core</strong>
+        <span>Backend API</span>
+        <em class="status-label">
+          CONNECTED
+        </em>
+      </article>
+
+      <article class="integration-card">
+        <strong>Supabase</strong>
+        <span>Data layer</span>
+        <em class="status-label">
+          CONFIGURED
+        </em>
+      </article>
+
+      <article class="integration-card">
+        <strong>AI Engine</strong>
+        <span>Decision layer</span>
+        <em class="status-label">
+          READY
+        </em>
+      </article>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    integrations
+      .map(item => `
+        <article class="integration-card">
+
+          <strong>
+            ${escapeHTML(
+              item.name ||
+              item.provider ||
+              "Integration"
+            )}
+          </strong>
+
+          <span>
+            ${escapeHTML(
+              item.description ||
+              item.type ||
+              "Connected service"
+            )}
+          </span>
+
+          <em class="status-label">
+            ${escapeHTML(
+              String(
+                item.status ||
+                item.state ||
+                "CONNECTED"
+              ).toUpperCase()
+            )}
+          </em>
+
+        </article>
+      `)
+      .join("");
+}
+
+/* ============================================================
+   SECTION RENDERING
+============================================================ */
+
+const SECTION_TITLES = {
+  dashboard: [
+    "COMMAND CENTRE",
+    "Executive Dashboard"
+  ],
+
+  executive: [
+    "STRATEGY",
+    "Executive Intelligence"
+  ],
+
+  revenue: [
+    "REVENUE",
+    "Revenue Intelligence"
+  ],
+
+  sales: [
+    "SALES",
+    "Sales & CRM"
+  ],
+
+  marketing: [
+    "GROWTH",
+    "Marketing"
+  ],
+
+  operations: [
+    "OPERATIONS",
+    "Operations"
+  ],
+
+  finance: [
+    "FINANCE",
+    "Finance"
+  ],
+
+  "human-capital": [
+    "PEOPLE",
+    "Human Capital"
+  ],
+
+  projects: [
+    "PROJECTS",
+    "Project Management"
+  ],
+
+  knowledge: [
+    "KNOWLEDGE",
+    "Knowledge Intelligence"
+  ],
+
+  legal: [
+    "COMPLIANCE",
+    "Legal & Compliance"
+  ],
+
+  supply: [
+    "SUPPLY",
+    "Supply Chain"
+  ],
+
+  acquisition: [
+    "ACQUISITION",
+    "Acquisition Intelligence"
+  ],
+
+  "customer-success": [
+    "CUSTOMER SUCCESS",
+    "Customer Success"
+  ],
+
+  "it-security": [
+    "SECURITY",
+    "IT & Security"
+  ],
+
+  analytics: [
+    "BI",
+    "Analytics & BI"
+  ],
+
+  leads: [
+    "ACQUISITION DATA",
+    "Leads"
+  ],
+
+  permits: [
+    "SOURCE DATA",
+    "Permits"
+  ],
+
+  integrations: [
+    "CONNECTIVITY",
+    "Integrations"
+  ],
+
+  audit: [
+    "GOVERNANCE",
+    "Audit & Activity"
+  ],
+
+  settings: [
+    "ADMINISTRATION",
+    "Settings"
+  ]
+};
+
+function navigate(
+  sectionName
+) {
+  const section =
+    SECTION_TITLES[
+      sectionName
+    ]
+      ? sectionName
+      : "dashboard";
+
+  state.currentSection =
+    section;
+
+  $$(".section").forEach(
+    element => {
+      element.classList.remove(
+        "active-section"
+      );
+    }
+  );
+
+  const target =
+    byId(
+      `section-${section}`
+    );
+
+  if (target) {
+    target.classList.add(
+      "active-section"
+    );
+  }
+
+  $$(".nav-item").forEach(
+    item => {
+      item.classList.toggle(
+        "active",
+        item.dataset.section === section
+      );
+    }
+  );
+
+  const title =
+    SECTION_TITLES[section];
+
+  if (title) {
+    text(
+      "page-kicker",
+      title[0]
+    );
+
+    text(
+      "page-title",
+      title[1]
+    );
+  }
+
+  closeMobileSidebar();
+
+  loadSectionData(section);
+}
+
+async function loadSectionData(
+  section
+) {
+  try {
+    switch (section) {
+      case "dashboard":
+        await loadDashboard();
+        break;
+
+      case "revenue":
+        await loadForecast();
+        break;
+
+      case "leads":
+        await loadLeads();
+        break;
+
+      case "permits":
+        await loadPermits();
+        break;
+
+      case "integrations":
+        await loadIntegrations();
+        break;
+
+      case "audit":
+        await loadAuditLogs();
+        break;
+
+      case "analytics":
+        await loadDashboard();
+        renderAnalytics();
+        break;
+
+      case "executive":
+        await loadDashboard();
+        renderExecutive();
+        break;
+
+      case "operations":
+        await loadDashboard();
+        renderOperations();
+        break;
+
+      case "finance":
+        await loadForecast();
+        renderFinance();
+        break;
+
+      case "projects":
+        await loadDashboard();
+        renderProjects();
+        break;
+
+      case "acquisition":
+        await loadLeads();
+        renderAcquisition();
+        break;
+
+      case "it-security":
+        await loadHealth();
+        renderSecurity();
+        break;
+
+      case "settings":
+        renderSettings();
+        break;
+
+      default:
+        break;
+    }
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+  }
+}
+
+/* ============================================================
+   ADDITIONAL OS VIEWS
+============================================================ */
+
+function renderExecutive() {
+  const container =
+    byId("executive-signals");
+
+  if (!container) return;
+
+  const engine =
+    extractEngine(
+      state.dashboard || {}
+    );
+
+  container.innerHTML = `
+    <article class="info-card">
+      <span>Engine State</span>
+      <strong>
+        ${escapeHTML(
+          engine.scanning
+            ? "SCANNING"
+            : engine.running
+              ? "RUNNING"
+              : "IDLE"
+        )}
+      </strong>
+    </article>
+
+    <article class="info-card">
+      <span>Lead Pipeline</span>
+      <strong>
+        ${number(state.leads.length)}
+      </strong>
+    </article>
+
+    <article class="info-card">
+      <span>Permit Intelligence</span>
+      <strong>
+        ${number(state.permits.length)}
+      </strong>
+    </article>
+  `;
+}
+
+function renderOperations() {
+  const container =
+    byId("operations-content");
+
+  if (!container) return;
+
+  const engine =
+    extractEngine(
+      state.dashboard || {}
+    );
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="info-card">
+        <span>Running</span>
+        <strong>
+          ${bool(engine.running)}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Scanning</span>
+        <strong>
+          ${bool(engine.scanning)}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Errors</span>
+        <strong>
+          ${number(engine.errors || 0)}
+        </strong>
+      </article>
+
+    </div>
+  `;
+}
+
+function renderFinance() {
+  const container =
+    byId("finance-content");
+
+  if (!container) return;
+
+  const forecast =
+    state.forecast || {};
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="info-card">
+        <span>Projected Revenue</span>
+        <strong>
+          ${formatLeadValue(
+            forecast.projectedRevenue ??
+            forecast.projected_revenue ??
+            forecast.revenue ??
+            0
+          )}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Revenue Engine</span>
+        <strong>
+          ACTIVE
+        </strong>
+      </article>
+
+    </div>
+  `;
+}
+
+function renderProjects() {
+  const container =
+    byId("projects-content");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="empty-panel">
+      Project intelligence is connected to the GRIDV21
+      command layer. Project-specific records can be
+      displayed here when the project API is enabled.
+    </div>
+  `;
+}
+
+function renderAcquisition() {
+  const container =
+    byId("acquisition-content");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="info-card">
+        <span>Lead Records</span>
+        <strong>
+          ${number(state.leads.length)}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Permit Records</span>
+        <strong>
+          ${number(state.permits.length)}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Acquisition Engine</span>
+        <strong>
+          READY
+        </strong>
+      </article>
+
+    </div>
+  `;
+}
+
+function renderSecurity() {
+  const container =
+    byId("security-content");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="info-card">
+        <span>Authentication</span>
+        <strong>
+          ${state.authenticated ? "VALID" : "REQUIRED"}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>API Health</span>
+        <strong>
+          ${state.health ? "ONLINE" : "UNKNOWN"}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Dashboard</span>
+        <strong>
+          v${VERSION}
+        </strong>
+      </article>
+
+    </div>
+  `;
+}
+
+function renderAnalytics() {
+  const container =
+    byId("analytics-content");
+
+  if (!container) return;
+
+  const engine =
+    extractEngine(
+      state.dashboard || {}
+    );
+
+  container.innerHTML = `
+    <div class="card-grid">
+
+      <article class="info-card">
+        <span>15 OS Modules</span>
+        <strong>
+          ${state.osModules.filter(
+            item => item.enabled !== false
+          ).length}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Permits</span>
+        <strong>
+          ${number(
+            engine.permitsFound ||
+            state.permits.length
+          )}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Leads</span>
+        <strong>
+          ${number(
+            state.leads.length
+          )}
+        </strong>
+      </article>
+
+      <article class="info-card">
+        <span>Errors</span>
+        <strong>
+          ${number(
+            engine.errors || 0
+          )}
+        </strong>
+      </article>
+
+    </div>
+  `;
+}
+
+function renderSettings() {
+  const container =
+    byId("settings-content");
+
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="settings-card">
+
+      <div class="setting-row">
+        <div>
+          <strong>GRIDV21 Version</strong>
+          <span>Dashboard controller</span>
+        </div>
+
+        <b>v${VERSION}</b>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Authentication</strong>
+          <span>Admin API key</span>
+        </div>
+
+        <b>
+          ${
+            state.authenticated
+              ? "AUTHENTICATED"
+              : "NOT VERIFIED"
+          }
+        </b>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <strong>Canonical OS Architecture</strong>
+          <span>Enterprise intelligence modules</span>
+        </div>
+
+        <b>15 OS</b>
+      </div>
+
+    </div>
+  `;
+}
+
+/* ============================================================
+   ENGINE ACTIONS
+============================================================ */
+
+async function engineAction(
+  action
+) {
+  const routes = {
+    "scan/start": API.scrapeNow,
+    "scan/stop": API.scanStop,
+    "engine/pause": API.brainPause,
+    "engine/resume": API.brainResume,
+    "brain/pause": API.brainPause,
+    "brain/resume": API.brainResume,
+    "brain/emergency-stop": API.emergencyStop
+  };
+
+  const url =
+    routes[action] || action;
+
+  if (!url) {
+    showToast(
+      "Unknown engine action.",
+      "error"
+    );
+
+    return;
+  }
+
+  try {
+    setActionMessage(
+      `Executing ${action}…`
+    );
+
+    const payload =
+      await apiPost(url, {});
+
+    const message =
+      payload?.message ||
+      payload?.status ||
+      `${action} completed.`;
+
+    showToast(
+      message,
+      "success"
+    );
+
+    setActionMessage(
+      message,
+      "success"
+    );
+
+    await refreshDashboardData();
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+
+    setActionMessage(
+      error.message,
+      "error"
+    );
+  }
+}
+
+async function emergencyStop() {
+  const confirmed =
+    window.confirm(
+      "Emergency Stop will request the GRIDV21 engine to stop. Continue?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  await engineAction(
+    "brain/emergency-stop"
+  );
+}
+
+/* ============================================================
+   COMPATIBILITY FUNCTIONS
+============================================================ */
+
+window.engineAction =
+  engineAction;
+
+window.emergencyStop =
+  emergencyStop;
+
+window.verifyAdminKey =
+  verifyAdminKey;
+
+window.refreshAll =
+  refreshDashboardData;
+
+window.logout =
+  clearAdminKey;
+
+window.toggleOS =
+  toggleOS;
+
+/* ============================================================
+   REFRESH
+============================================================ */
+
+async function refreshDashboardData() {
+  if (state.requestInFlight) {
+    return;
+  }
+
+  state.requestInFlight = true;
+
+  try {
+    await loadHealth();
+
+    if (
+      state.adminKey &&
+      !state.authenticated
+    ) {
+      const valid =
+        await verifyAdminKey();
+
+      if (!valid) {
+        return;
+      }
+    }
+
+    await Promise.allSettled([
+      loadDashboard(),
+      loadOSModules(),
+      loadLeads(),
+      loadPermits(),
+      loadForecast(),
+      loadSystemEvents()
+    ]);
+
+    if (
+      state.currentSection ===
+      "audit"
+    ) {
+      await loadAuditLogs();
+    }
+
+  } catch (error) {
+    showToast(
+      error.message,
+      "error"
+    );
+
+  } finally {
+    state.requestInFlight = false;
+  }
+}
             
