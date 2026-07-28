@@ -919,3 +919,1044 @@
 
     showToast
   };
+/* ==========================================================================
+ * GRIDV21 BRAIN ENTERPRISE — DASHBOARD APP
+ * VERSION: 6.3.7
+ *
+ * PART 2 / 4
+ * - Dashboard API loading
+ * - OS module loading
+ * - Permit / lead loading
+ * - Runtime telemetry
+ * - Metrics rendering
+ * - AI recommendation rendering
+ * - OS overview rendering
+ * ========================================================================== */
+
+
+  /* ========================================================================
+   * NORMALISE DASHBOARD RESPONSE
+   * ====================================================================== */
+
+  function normaliseDashboard(payload) {
+    const data =
+      safeObject(payload);
+
+    /*
+     * The backend may return the dashboard directly,
+     * or wrap it inside { data: ... }.
+     */
+
+    const source =
+      safeObject(
+        data.data || data.dashboard || data
+      );
+
+    return {
+      engine:
+        safeObject(
+          source.engine ||
+          source.runtime ||
+          source.telemetry
+        ),
+
+      metrics:
+        safeObject(
+          source.metrics
+        ),
+
+      revenue:
+        safeObject(
+          source.revenue
+        ),
+
+      leads:
+        safeArray(
+          source.leads ||
+          source.topLeads
+        ),
+
+      permits:
+        safeArray(
+          source.permits
+        ),
+
+      osModules:
+        safeArray(
+          source.osModules ||
+          source.modules ||
+          source.os
+        ),
+
+      activity:
+        safeArray(
+          source.activity ||
+          source.events ||
+          source.latestEvents
+        ),
+
+      recommendation:
+        source.recommendation ||
+        source.aiRecommendation ||
+        source.brainSignal ||
+        null
+    };
+  }
+
+
+  /* ========================================================================
+   * LOAD DASHBOARD
+   * ====================================================================== */
+
+  async function loadDashboard() {
+    try {
+      const payload =
+        await apiFetch(
+          API.dashboard
+        );
+
+      const dashboard =
+        normaliseDashboard(
+          payload
+        );
+
+      state.dashboard =
+        dashboard;
+
+      if (
+        dashboard.leads.length
+      ) {
+        state.leads =
+          dashboard.leads;
+      }
+
+      if (
+        dashboard.permits.length
+      ) {
+        state.permits =
+          dashboard.permits;
+      }
+
+      if (
+        dashboard.osModules.length
+      ) {
+        state.osModules =
+          dashboard.osModules;
+      }
+
+      renderDashboard(
+        dashboard
+      );
+
+      return dashboard;
+
+    } catch (error) {
+      handleAuthFailure(
+        error
+      );
+
+      console.error(
+        "[GRIDV21] Dashboard load failed:",
+        error
+      );
+
+      renderDashboardError(
+        error
+      );
+
+      throw error;
+    }
+  }
+
+
+  /* ========================================================================
+   * LOAD OS MODULES
+   * ====================================================================== */
+
+  async function loadOSModules() {
+    try {
+      const payload =
+        await apiFetch(
+          API.osModules
+        );
+
+      const data =
+        safeObject(payload);
+
+      const modules =
+        safeArray(
+          data.modules ||
+          data.data ||
+          data.osModules ||
+          payload
+        );
+
+      if (
+        modules.length
+      ) {
+        state.osModules =
+          modules;
+      }
+
+      renderOSOverview(
+        state.osModules.length
+          ? state.osModules
+          : OS_MODULES
+      );
+
+      return state.osModules;
+
+    } catch (error) {
+      handleAuthFailure(
+        error
+      );
+
+      console.warn(
+        "[GRIDV21] OS module API failed:",
+        error
+      );
+
+      /*
+       * Keep the dashboard usable even if
+       * the optional OS endpoint is unavailable.
+       */
+
+      renderOSOverview(
+        state.osModules.length
+          ? state.osModules
+          : OS_MODULES
+      );
+
+      return state.osModules;
+    }
+  }
+
+
+  /* ========================================================================
+   * LOAD PERMITS
+   * ====================================================================== */
+
+  async function loadPermits() {
+    try {
+      const payload =
+        await apiFetch(
+          API.permits
+        );
+
+      const data =
+        safeObject(payload);
+
+      const permits =
+        safeArray(
+          data.permits ||
+          data.data ||
+          payload
+        );
+
+      state.permits =
+        permits;
+
+      return permits;
+
+    } catch (error) {
+      /*
+       * Some backend versions do not expose
+       * /api/permits. Do not break dashboard.
+       */
+
+      if (
+        error.status !== 404
+      ) {
+        console.warn(
+          "[GRIDV21] Permit API failed:",
+          error
+        );
+      }
+
+      return state.permits;
+    }
+  }
+
+
+  /* ========================================================================
+   * REFRESH DASHBOARD
+   * ====================================================================== */
+
+  async function refreshDashboardData() {
+    if (
+      state.requestInFlight
+    ) {
+      return;
+    }
+
+    state.requestInFlight =
+      true;
+
+    setRefreshState(
+      true
+    );
+
+    try {
+      /*
+       * First verify the backend is alive.
+       */
+
+      try {
+        await apiFetch(
+          API.health
+        );
+      } catch (healthError) {
+        console.warn(
+          "[GRIDV21] Health check failed:",
+          healthError
+        );
+      }
+
+
+      /*
+       * Dashboard data is the primary request.
+       */
+
+      await loadDashboard();
+
+
+      /*
+       * These are secondary requests.
+       * Promise.allSettled prevents one optional
+       * endpoint from blocking the entire dashboard.
+       */
+
+      await Promise.allSettled([
+        loadOSModules(),
+        loadPermits()
+      ]);
+
+
+      setGlobalStatus(
+        true,
+        "Connected"
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[GRIDV21] Refresh failed:",
+        error
+      );
+
+      if (
+        error.status === 401
+      ) {
+        setGlobalStatus(
+          false,
+          "Authentication required"
+        );
+      } else {
+        setGlobalStatus(
+          false,
+          "API unavailable"
+        );
+      }
+
+    } finally {
+      state.requestInFlight =
+        false;
+
+      setRefreshState(
+        false
+      );
+    }
+  }
+
+
+  /* ========================================================================
+   * REFRESH BUTTON STATE
+   * ====================================================================== */
+
+  function setRefreshState(
+    loading
+  ) {
+    const button =
+      byId("refresh-btn");
+
+    if (!button) {
+      return;
+    }
+
+    button.disabled =
+      Boolean(loading);
+
+    if (loading) {
+      button.dataset.originalText =
+        button.textContent;
+
+      button.textContent =
+        "Refreshing...";
+    } else {
+      button.textContent =
+        button.dataset.originalText ||
+        "Refresh";
+    }
+  }
+
+
+  /* ========================================================================
+   * DASHBOARD RENDERER
+   * ====================================================================== */
+
+  function renderDashboard(
+    dashboard
+  ) {
+    const engine =
+      safeObject(
+        dashboard.engine
+      );
+
+    const metrics =
+      safeObject(
+        dashboard.metrics
+      );
+
+    const revenue =
+      safeObject(
+        dashboard.revenue
+      );
+
+
+    /* ----------------------------------------------------------------------
+     * ENGINE
+     * -------------------------------------------------------------------- */
+
+    const running =
+      engine.running ??
+      engine.isRunning ??
+      metrics.running ??
+      false;
+
+    const scanning =
+      engine.scanning ??
+      engine.isScanning ??
+      metrics.scanning ??
+      false;
+
+
+    text(
+      "metric-engine",
+      running
+        ? "Running"
+        : "Stopped"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      scanning
+        ? "Scanning"
+        : running
+          ? "Operational"
+          : "Idle"
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * ACTIVE OS
+     * -------------------------------------------------------------------- */
+
+    const activeOS =
+      safeNumber(
+        metrics.activeOS ??
+        metrics.activeOs ??
+        metrics.active_modules ??
+        dashboard.osModules.length,
+        dashboard.osModules.length
+      );
+
+    text(
+      "metric-os",
+      activeOS
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * LEADS
+     * -------------------------------------------------------------------- */
+
+    const leadCount =
+      safeNumber(
+        metrics.leads ??
+        metrics.leadCount ??
+        metrics.totalLeads ??
+        dashboard.leads.length,
+        dashboard.leads.length
+      );
+
+    text(
+      "metric-leads",
+      number(leadCount)
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * REVENUE
+     * -------------------------------------------------------------------- */
+
+    const revenueValue =
+      revenue.total ??
+      revenue.amount ??
+      metrics.revenue ??
+      metrics.totalRevenue ??
+      0;
+
+    text(
+      "metric-revenue",
+      money(revenueValue)
+    );
+
+
+    renderTelemetry(
+      engine
+    );
+
+    renderRecommendation(
+      dashboard.recommendation
+    );
+
+    renderTopLeads(
+      dashboard.leads.length
+        ? dashboard.leads
+        : state.leads
+    );
+
+    renderLatestEvents(
+      dashboard.activity
+    );
+
+    renderOSOverview(
+      dashboard.osModules.length
+        ? dashboard.osModules
+        : (
+            state.osModules.length
+              ? state.osModules
+              : OS_MODULES
+          )
+    );
+  }
+
+
+  /* ========================================================================
+   * TELEMETRY
+   * ====================================================================== */
+
+  function renderTelemetry(
+    engine
+  ) {
+    const data =
+      safeObject(engine);
+
+
+    text(
+      "telemetry-running",
+      bool(
+        data.running ??
+        data.isRunning
+      )
+    );
+
+
+    text(
+      "telemetry-scanning",
+      bool(
+        data.scanning ??
+        data.isScanning
+      )
+    );
+
+
+    text(
+      "telemetry-permits",
+      number(
+        data.permitsFound ??
+        data.permits_found ??
+        data.totalPermits ??
+        0
+      )
+    );
+
+
+    text(
+      "telemetry-errors",
+      number(
+        data.errors ??
+        data.errorCount ??
+        0
+      )
+    );
+
+
+    text(
+      "telemetry-last-scan",
+      dateTime(
+        data.lastScan ??
+        data.last_scan
+      )
+    );
+
+
+    text(
+      "telemetry-duration",
+      formatDuration(
+        data.lastScanDuration ??
+        data.last_scan_duration ??
+        data.duration
+      )
+    );
+
+
+    text(
+      "telemetry-uptime",
+      formatUptime(
+        data.uptime
+      )
+    );
+
+
+    text(
+      "telemetry-emergency",
+      bool(
+        data.emergency ??
+        data.emergencyStop ??
+        data.emergency_stop
+      )
+    );
+
+
+    const status =
+      data.running
+        ? (
+            data.scanning
+              ? "Scanning"
+              : "Running"
+          )
+        : "Ready";
+
+
+    const statusElement =
+      document.querySelector(
+        "#engine-runtime-status"
+      );
+
+
+    if (statusElement) {
+      statusElement.textContent =
+        status;
+    }
+  }
+
+
+  /* ========================================================================
+   * DASHBOARD ERROR STATE
+   * ====================================================================== */
+
+  function renderDashboardError(
+    error
+  ) {
+    const message =
+      error?.status === 401
+        ? "Authentication required"
+        : "Unable to load dashboard data";
+
+
+    text(
+      "metric-engine",
+      "Offline"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      message
+    );
+
+
+    text(
+      "metric-os",
+      "—"
+    );
+
+
+    text(
+      "metric-leads",
+      "—"
+    );
+
+
+    text(
+      "metric-revenue",
+      "—"
+    );
+
+
+    const telemetryIds = [
+      "telemetry-running",
+      "telemetry-scanning",
+      "telemetry-permits",
+      "telemetry-errors",
+      "telemetry-last-scan",
+      "telemetry-duration",
+      "telemetry-uptime",
+      "telemetry-emergency"
+    ];
+
+
+    telemetryIds.forEach(
+      id => text(id, "—")
+    );
+
+
+    renderRecommendation(
+      null,
+      message
+    );
+
+
+    renderTopLeads(
+      []
+    );
+
+
+    renderLatestEvents(
+      []
+    );
+
+
+    renderOSOverview(
+      OS_MODULES
+    );
+  }
+
+
+  /* ========================================================================
+   * AI RECOMMENDATION
+   * ====================================================================== */
+
+  function renderRecommendation(
+    recommendation,
+    fallback = ""
+  ) {
+    const element =
+      byId("ai-recommendation") ||
+      byId("recommendation-text") ||
+      document.querySelector(
+        "[data-ai-recommendation]"
+      );
+
+
+    if (!element) {
+      return;
+    }
+
+
+    let message = "";
+
+
+    if (
+      typeof recommendation ===
+      "string"
+    ) {
+      message =
+        recommendation;
+    } else if (
+      recommendation &&
+      typeof recommendation ===
+      "object"
+    ) {
+      message =
+        recommendation.message ||
+        recommendation.text ||
+        recommendation.recommendation ||
+        recommendation.action ||
+        "";
+    }
+
+
+    if (!message) {
+      message =
+        fallback ||
+        "No AI recommendation available.";
+    }
+
+
+    element.textContent =
+      message;
+  }
+
+
+  /* ========================================================================
+   * TOP LEADS
+   * ====================================================================== */
+
+  function renderTopLeads(
+    leads
+  ) {
+    const container =
+      byId("top-leads-body") ||
+      byId("leads-container") ||
+      document.querySelector(
+        "[data-top-leads]"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(leads)
+        .slice(0, 10);
+
+
+    if (!rows.length) {
+      container.innerHTML = `
+        <div class="empty">
+          No lead data available.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows.map(
+        lead => {
+          const item =
+            safeObject(lead);
+
+
+          const city =
+            item.city ||
+            item.location ||
+            "—";
+
+
+          const type =
+            item.type ||
+            item.project_type ||
+            item.permit_type ||
+            "—";
+
+
+          const score =
+            item.score ??
+            item.lead_score ??
+            item.ai_score ??
+            "—";
+
+
+          return `
+            <div class="lead-row">
+              <span>${escapeHTML(city)}</span>
+              <span>${escapeHTML(type)}</span>
+              <span>${escapeHTML(score)}</span>
+            </div>
+          `;
+        }
+      ).join("");
+  }
+
+
+  /* ========================================================================
+   * LATEST EVENTS
+   * ====================================================================== */
+
+  function renderLatestEvents(
+    events
+  ) {
+    const container =
+      byId("latest-events") ||
+      byId("events-container") ||
+      document.querySelector(
+        "[data-latest-events]"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(events)
+        .slice(0, 10);
+
+
+    if (!rows.length) {
+      container.innerHTML = `
+        <div class="empty">
+          No recent activity.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows.map(
+        event => {
+          const item =
+            safeObject(event);
+
+
+          const message =
+            item.message ||
+            item.action ||
+            item.event_type ||
+            item.eventType ||
+            "System event";
+
+
+          const created =
+            item.created_at ||
+            item.createdAt ||
+            item.timestamp;
+
+
+          return `
+            <div class="event-row">
+              <strong>
+                ${escapeHTML(message)}
+              </strong>
+
+              <small>
+                ${escapeHTML(dateTime(created))}
+              </small>
+            </div>
+          `;
+        }
+      ).join("");
+  }
+
+
+  /* ========================================================================
+   * OS OVERVIEW
+   * ====================================================================== */
+
+  function renderOSOverview(
+    modules
+  ) {
+    const container =
+      byId("os-overview") ||
+      byId("os-modules") ||
+      document.querySelector(
+        "[data-os-overview]"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(modules);
+
+
+    if (!rows.length) {
+      container.innerHTML = `
+        <div class="empty">
+          No operating-system modules available.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows.map(
+        module => {
+          const item =
+            safeObject(module);
+
+
+          const id =
+            item.id ??
+            "";
+
+
+          const name =
+            item.name ||
+            `OS Module ${id}`;
+
+
+          const enabled =
+            item.enabled ??
+            item.active ??
+            item.status === "active";
+
+
+          const layer =
+            item.layer ||
+            "Enterprise OS";
+
+
+          return `
+            <div
+              class="os-module-row"
+              data-os-module="${escapeHTML(id)}"
+            >
+
+              <div class="os-module-info">
+
+                <strong>
+                  ${escapeHTML(name)}
+                </strong>
+
+                <small>
+                  ${escapeHTML(layer)}
+                </small>
+
+              </div>
+
+              <button
+                type="button"
+                class="os-toggle ${enabled ? "active" : ""}"
+                data-os-toggle="${escapeHTML(id)}"
+                aria-pressed="${enabled ? "true" : "false"}"
+              >
+                ${enabled ? "Active" : "Off"}
+              </button>
+
+            </div>
+          `;
+        }
+      ).join("");
+  }
+
+
+  /* ========================================================================
+   * EXPORT PART 2 FUNCTIONS
+   * ====================================================================== */
+
+  window.GRIDV21 = {
+    ...(window.GRIDV21 || {}),
+
+    normaliseDashboard,
+
+    loadDashboard,
+    loadOSModules,
+    loadPermits,
+
+    refreshDashboardData,
+
+    renderDashboard,
+    renderTelemetry,
+    renderDashboardError,
+
+    renderRecommendation,
+    renderTopLeads,
+    renderLatestEvents,
+    renderOSOverview
+  };
