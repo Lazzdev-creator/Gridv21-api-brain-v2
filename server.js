@@ -3402,7 +3402,21 @@ try {
     error.message
   );
 }
+} // end of catch
 
+// ADMIN KEY MIDDLEWARE - ADD THIS HERE
+const ADMIN_KEY = process.env.ADMIN_KEY || 'YOUR_T578ij74de34vgh9km65vcds32sa9kb5';
+
+function requireAdminKey(req, res, next) {
+  const key = req.query.key || req.headers['x-admin-key'];
+  if (key !== ADMIN_KEY) {
+    return res.status(401).json({error: 'Invalid admin key'});
+  }
+  next();
+}
+
+// BRAIN STATE - MEMORY
+let brainState = {
 // BRAIN STATE - MEMORY
 let brainState = {
   running: true,
@@ -3548,3 +3562,7 @@ process.on(
   "SIGINT",
   () => shutdown("SIGINT")
 );
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, () => {
+  console.log(`GRIDV21 Brain running on port ${PORT}`);
+});
