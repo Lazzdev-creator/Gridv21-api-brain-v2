@@ -3402,7 +3402,6 @@ try {
     error.message
   );
 }
-} // end of catch
 
 // ADMIN KEY MIDDLEWARE - ADD THIS HERE
 const ADMIN_KEY = process.env.ADMIN_KEY || 'YOUR_T578ij74de34vgh9km65vcds32sa9kb5';
@@ -3560,8 +3559,3 @@ process.on(
   "SIGINT",
   () => shutdown("SIGINT")
 );
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`GRIDV21 Brain running on port ${PORT}`);
-});
