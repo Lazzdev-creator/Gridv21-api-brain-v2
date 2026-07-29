@@ -695,7 +695,21 @@
     );
   }
 
+/* =================================================
+ * HELPERS
+ * ================================================= */
 
+function setGlobalStatus(ok, message) {
+  const statusEl = document.querySelector('.badge') || document.getElementById('engineStatus');
+  if(statusEl) {
+    statusEl.innerText = message;
+    statusEl.style.color = ok ? '#10b981' : '#ef4444';
+  }
+}
+
+async function apiFetch(url, opts = {}) {
+  // your existing apiFetch code...
+      }
   /* ========================================================================
    * API FETCH
    * ====================================================================== */
