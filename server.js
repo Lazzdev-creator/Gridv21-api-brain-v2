@@ -3463,6 +3463,15 @@ app.get('/api/auth/verify', requireAdminKey, (req, res) => {
 ----------------------------------------------- */
 /* SERVER                                                                     */
 /* -------------------------------------------------------------------------- */
+// CRON JOB ROUTE
+app.get('/internal/run-cycle', requireAdminKey, async (req, res) => {
+  console.log('Cron: Running cycle');
+  brainState.scanning = true;
+  brainState.lastScan = new Date().toISOString();
+  // TODO: trigger actual scrape here
+  brainState.scanning = false;
+  res.json({ok: true});
+});
 
 const server = app.listen(
   PORT,
