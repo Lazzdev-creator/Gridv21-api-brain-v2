@@ -1155,6 +1155,7 @@ async function verifyAdminKey() {
           payload
         );
 
+      const status = await apiFetch(`${API}/brain/status`);
       state.dashboard =
         dashboard;
 
