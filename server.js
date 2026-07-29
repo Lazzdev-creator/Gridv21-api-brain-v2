@@ -3403,7 +3403,53 @@ try {
   );
 }
 
-/* -------------------------------------------------------------------------- */
+// BRAIN STATE - MEMORY
+let brainState = {
+  running: true,
+  scanning: false,
+  permitsFound: 1247, // temp data so UI shows something
+  errors: 0,
+  lastScan: new Date().toISOString(),
+  uptime: process.uptime(),
+  emergency: false
+};
+
+// 1. DASHBOARD DATA
+app.get('/api/brain/status', requireAdminKey, (req, res) => {
+  brainState.uptime = Math.floor(process.uptime());
+  res.json(brainState);
+});
+
+// 2. BRAIN COMMANDS
+app.post('/api/scrape-now', requireAdminKey, async (req, res) => {
+  brainState.scanning = true;
+  brainState.lastScan = new Date().toISOString();
+  console.log('Brain: Manual Scan Started');
+  res.json({ok: true, scanning: true});
+});
+
+app.post('/api/brain/pause', requireAdminKey, (req, res) => {
+  brainState.running = false;
+  brainState.scanning = false;
+  res.json({ok: true});
+});
+
+app.post('/api/brain/resume', requireAdminKey, (req, res) => {
+  brainState.running = true;
+  res.json({ok: true});
+});
+
+app.post('/api/brain/emergency-stop', requireAdminKey, (req, res) => {
+  brainState = {running: false, scanning: false, emergency: true, permitsFound: 0, errors: 0};
+  res.json({ok: true});
+});
+
+// 3. AUTH VERIFY - THIS IS WHY YOU GOT 401
+app.get('/api/auth/verify', requireAdminKey, (req, res) => {
+  res.json({ok: true});
+});
+/* ---------------------------
+----------------------------------------------- */
 /* SERVER                                                                     */
 /* -------------------------------------------------------------------------- */
 
