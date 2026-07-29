@@ -808,69 +808,190 @@
     return payload;
   }
 
+ /* ============================================================
+ * AUTHENTICATION
+ * ============================================================ */
 
-  /* ========================================================================
-   * AUTHENTICATION
-   * ====================================================================== */
+async function verifyAdminKey() {
+  const key = String(state.adminKey || "").trim();
 
-  async function verifyAdminKey() {
-    if (!state.adminKey) {
-      state.authenticated =
-        false;
+  if (!key) {
+    state.authenticated = false;
 
-      setGlobalStatus(
-        false,
-        "Admin key required"
-      );
+    setGlobalStatus(
+      false,
+      "Admin key required"
+    );
 
-      return false;
+    return false;
+  }
+
+  /*
+   * Keep the key normalized in application state.
+   */
+  state.adminKey = key;
+
+  try {
+    /*
+     * Call the verification endpoint directly.
+     *
+     * IMPORTANT:
+     * Do not use apiFetch() here because apiFetch()
+     * itself handles 401 authentication failures.
+     */
+    const response = await fetch(
+      API.authVerify,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "x-admin-key": key,
+          Authorization: `Bearer ${key}`
+        },
+        cache: "no-store",
+        credentials: "same-origin"
+      }
+    );
+
+    let payload = {};
+
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    if (contentType.includes("application/json")) {
+      payload = await response.json().catch(() => ({}));
+    } else {
+      const text = await response.text().catch(() => "");
+
+      payload = {
+        raw: text
+      };
     }
 
-    try {
-      const payload =
-        await apiFetch(
-          API.authVerify
-        );
-
-      state.authenticated =
-        Boolean(
-          payload?.authenticated ??
-          payload?.ok
-        );
-
-      if (
-        state.authenticated
-      ) {
-        setGlobalStatus(
-          true,
-          "Connected"
-        );
+    console.info(
+      "[GRIDV21 AUTH]",
+      {
+        status: response.status,
+        httpOk: response.ok,
+        serverOk: payload?.ok,
+        authenticated: payload?.authenticated,
+        version: payload?.version
       }
+    );
 
-      return state.authenticated;
-
-    } catch (error) {
-      state.authenticated =
-        false;
+    /*
+     * Server rejected the request.
+     */
+    if (!response.ok) {
+      state.authenticated = false;
 
       setGlobalStatus(
         false,
-        error.status === 401
+        response.status === 401
           ? "Invalid admin key"
-          : "Authentication failed"
+          : `Authentication failed (${response.status})`
       );
 
+      const message =
+        payload?.message ||
+        payload?.error ||
+        payload?.detail ||
+        payload?.raw ||
+        (
+          response.status === 401
+            ? "GRIDV21 rejected the admin key."
+            : `Authentication request failed (${response.status}).`
+        );
+
       showToast(
-        error.status === 401
-          ? "Invalid GRIDV21 admin key."
-          : error.message,
+        message,
         "error"
       );
 
       return false;
     }
-  }
 
+    /*
+     * Require explicit confirmation from GRIDV21.
+     */
+    if (
+      payload?.ok !== true ||
+      payload?.authenticated !== true
+    ) {
+      state.authenticated = false;
+
+      setGlobalStatus(
+        false,
+        "Authentication rejected"
+      );
+
+      console.error(
+        "[GRIDV21 AUTH] Unexpected verification response:",
+        payload
+      );
+
+      showToast(
+        "GRIDV21 did not confirm authentication.",
+        "error"
+      );
+
+      return false;
+    }
+
+    /*
+     * AUTHENTICATION SUCCESS
+     */
+    state.authenticated = true;
+
+    try {
+      sessionStorage.setItem(
+        "gridv21_admin_key",
+        key
+      );
+    } catch (_) {}
+
+    try {
+      localStorage.setItem(
+        "gridv21_admin_key",
+        key
+      );
+    } catch (_) {}
+
+    setGlobalStatus(
+      true,
+      "Connected"
+    );
+
+    console.info(
+      "[GRIDV21 AUTH] Authentication successful.",
+      payload?.version
+        ? `Backend v${payload.version}`
+        : ""
+    );
+
+    return true;
+
+  } catch (error) {
+    state.authenticated = false;
+
+    setGlobalStatus(
+      false,
+      "Connection error"
+    );
+
+    console.error(
+      "[GRIDV21 AUTH] Verification request failed:",
+      error
+    );
+
+    showToast(
+      "Unable to reach the GRIDV21 authentication endpoint.",
+      "error"
+    );
+
+    return false;
+  }
+}
 
   /* ========================================================================
    * AUTH FAILURE HANDLER
