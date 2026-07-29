@@ -3468,6 +3468,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
+
 // BRAIN COMMAND BUTTONS
 function bindBrainCommands() {
   document.querySelectorAll('button').forEach(btn => {
@@ -3514,8 +3515,8 @@ function bindBrainCommands() {
       }
     }
   });
-}
-
+      }
+  
 bindBrainCommands(); // THIS CALL IS MISSING
 
 // AUTO REFRESH DASHBOARD
