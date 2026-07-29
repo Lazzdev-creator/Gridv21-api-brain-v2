@@ -3417,8 +3417,6 @@ function requireAdminKey(req, res, next) {
 
 // BRAIN STATE - MEMORY
 let brainState = {
-// BRAIN STATE - MEMORY
-let brainState = {
   running: true,
   scanning: false,
   permitsFound: 1247, // temp data so UI shows something
@@ -3562,6 +3560,7 @@ process.on(
   "SIGINT",
   () => shutdown("SIGINT")
 );
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`GRIDV21 Brain running on port ${PORT}`);
