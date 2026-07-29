@@ -3423,58 +3423,41 @@ async function verifyAdminKey() {
     clearAdminKey
   };
 
+  /* =================================================
+ * START APPLICATION
+ * ================================================= */
 
-  /* ========================================================================
-   * START APPLICATION
-   * ====================================================================== */
-// ADMIN KEY LOGIC
-const adminInput = document.getElementById('adminKeyInput');
-const saveKeyBtn = document.getElementById('saveKeyBtn');
-const keyStatus = document.getElementById('keyStatus');
+// WRAP EVERYTHING INSIDE DOMContentLoaded
+document.addEventListener("DOMContentLoaded", () => {
 
-// Load saved key on boot
-if(state.adminKey) {
-  adminInput.value = state.adminKey;
-  keyStatus.innerText = 'Key loaded';
-  keyStatus.className = 'text-success';
-}
+  // ADMIN KEY LOGIC - NOW INSIDE
+  const adminInput = document.getElementById('adminKeyInput');
+  const saveKeyBtn = document.getElementById('saveKeyBtn');
+  const keyStatus = document.getElementById('keyStatus');
 
-saveKeyBtn.onclick = () => {
-  const key = adminInput.value.trim();
-  if(key) {
-    state.adminKey = key;
-    localStorage.setItem('gv21_admin_key', key);
-    keyStatus.innerText = 'Key saved. Refreshing...';
+  // Load saved key on boot
+  if(state.adminKey && adminInput) {
+    adminInput.value = state.adminKey;
+    keyStatus.innerText = 'Key loaded';
     keyStatus.className = 'text-success';
-    setTimeout(loadDashboard, 500);
   }
-}
-  if (
-    document.readyState ===
-    "loading"
-  ) {
 
-    document.addEventListener(
-      "DOMContentLoaded",
-      () => {
-
-        init().catch(
-          renderStartupError
-        );
-
-      },
-      {
-        once: true
+  if(saveKeyBtn) {
+    saveKeyBtn.onclick = () => {
+      const key = adminInput.value.trim();
+      if(key) {
+        state.adminKey = key;
+        localStorage.setItem('gv21_admin_key', key);
+        keyStatus.innerText = 'Key saved. Refreshing...';
+        keyStatus.className = 'text-success';
+        setTimeout(loadDashboard, 500);
       }
-    );
-
-  } else {
-
-    init().catch(
-      renderStartupError
-    );
-
+    }
   }
 
+  // START THE APP
+  init().catch(renderStartupError);
+  
+}, { once: true });
 
 })();
