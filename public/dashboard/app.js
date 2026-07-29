@@ -3468,7 +3468,55 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
+// BRAIN COMMAND BUTTONS
+function bindBrainCommands() {
+  document.querySelectorAll('button').forEach(btn => {
+    const txt = btn.innerText.trim();
+    
+    if(txt === 'Start Scan') {
+      btn.onclick = async () => {
+        setGlobalStatus(true, "Starting Scan...");
+        try {
+          await apiFetch(`${API}/scrape-now`, {method: 'POST'});
+          setGlobalStatus(true, "Scan Started");
+          loadDashboard();
+        } catch(e) { setGlobalStatus(false, e.message); }
+      }
+    }
+    
+    if(txt === 'Stop Scan') {
+      btn.onclick = async () => {
+        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
+        loadDashboard();
+      }
+    }
+    
+    if(txt === 'Pause Engine') {
+      btn.onclick = async () => {
+        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
+        loadDashboard();
+      }
+    }
+    
+    if(txt === 'Resume Engine') {
+      btn.onclick = async () => {
+        await apiFetch(`${API}/brain/resume`, {method: 'POST'});
+        loadDashboard();
+      }
+    }
+    
+    if(txt === 'Emergency Stop') {
+      btn.onclick = async () => {
+        if(confirm('EMERGENCY STOP ALL OPERATIONS?')) {
+          await apiFetch(`${API}/brain/emergency-stop`, {method: 'POST'});
+          loadDashboard();
+        }
+      }
+    }
+  });
+}
 
+bindBrainCommands(); // ADD THIS CALL
   // START THE APP
   init().catch(renderStartupError);
   
