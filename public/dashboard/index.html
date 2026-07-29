@@ -84,6 +84,24 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <div class="content">
+
+  <!-- ADMIN KEY INPUT - ADD THIS -->
+  <section class="card">
+    <div class="card-header">
+      <h3>Administration</h3>
+      <p class="muted">Administrative controls require the configured admin key.</p>
+    </div>
+    <div class="card-body">
+      <div class="form-row">
+        <input id="adminKeyInput" type="password" placeholder="Enter ADMIN_KEY" class="input">
+        <button id="saveKeyBtn" class="btn btn-primary">Save Key</button>
+      </div>
+      <div id="keyStatus" class="muted" style="margin-top:8px;"></div>
+    </div>
+  </section>
+  <!-- END ADMIN KEY INPUT -->
+
+  <!-- YOUR EXISTING DASHBOARD SECTIONS GO HERE -->
       <section id="section-dashboard" class="section active-section">
         <div class="hero">
           <div>
