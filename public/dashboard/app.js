@@ -3472,15 +3472,15 @@ document.addEventListener("DOMContentLoaded", () => {
 function bindBrainCommands() {
   document.querySelectorAll('button').forEach(btn => {
     const txt = btn.innerText.trim();
-    
+
     if(txt === 'Start Scan') {
       btn.onclick = async () => {
         setGlobalStatus(true, "Starting Scan...");
         try {
           await apiFetch(`${API}/scrape-now`, {method: 'POST'});
           setGlobalStatus(true, "Scan Started");
-          loadDashboard();
         } catch(e) { setGlobalStatus(false, e.message); }
+        loadDashboard();
       }
     }
     
@@ -3490,6 +3490,36 @@ function bindBrainCommands() {
         loadDashboard();
       }
     }
+
+    if(txt === 'Pause Engine') {
+      btn.onclick = async () => {
+        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
+        loadDashboard();
+      }
+    }
+
+    if(txt === 'Resume Engine') {
+      btn.onclick = async () => {
+        await apiFetch(`${API}/brain/resume`, {method: 'POST'});
+        loadDashboard();
+      }
+    }
+
+    if(txt === 'Emergency Stop') {
+      btn.onclick = async () => {
+        if(confirm('EMERGENCY STOP ALL OPERATIONS?')) {
+          await apiFetch(`${API}/brain/emergency-stop`, {method: 'POST'});
+          loadDashboard();
+        }
+      }
+    }
+  });
+}
+
+bindBrainCommands(); // THIS CALL IS MISSING
+
+// AUTO REFRESH DASHBOARD
+setInterval(loadDashboard, 5000); // THIS IS MISSING TOO
     
     if(txt === 'Pause Engine') {
       btn.onclick = async () => {
