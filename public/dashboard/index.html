@@ -102,21 +102,22 @@
   <!-- END ADMIN KEY INPUT -->
 
   <!-- YOUR EXISTING DASHBOARD SECTIONS GO HERE -->
-      <section id="section-dashboard" class="section active-section">
-        <div class="hero">
-          <div>
-            <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
-            <h2>GRIDV21 BRAIN Command Centre</h2>
-            <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
-          </div>
-          <div class="hero-actions">
-            <button class="btn btn-primary" data-action="scan-start">Start Scan</button>
-            <button class="btn btn-secondary" data-action="scan-stop">Stop Scan</button>
-            <button class="btn btn-secondary" data-action="brain-pause">Pause Engine</button>
-            <button class="btn btn-secondary" data-action="brain-resume">Resume Engine</button>
-            <button class="btn btn-danger" data-action="emergency-stop">Emergency Stop</button>
-          </div>
-        </div>
+      <section id="section-dashboard" class="...">
+  <div class="hero">
+    <div>
+      <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
+      <h2>GRIDV21 BRAIN Command Centre</h2>
+      <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
+    </div>
+    <div class="hero-actions">
+      <button id="btnStartScan" class="btn btn-primary">Start Scan</button>
+      <button id="btnStopScan" class="btn btn-secondary">Stop Scan</button>
+      <button id="btnPauseEngine" class="btn btn-secondary">Pause Engine</button>
+      <button id="btnResumeEngine" class="btn btn-secondary">Resume Engine</button>
+      <button id="btnEmergencyStop" class="btn btn-danger">Emergency Stop</button>
+    </div>
+  </div>
+      </section>
 
         <div class="metric-grid">
           <article class="metric-card"><span>Engine</span><strong id="metric-engine">—</strong><small id="metric-engine-sub">Loading</small></article>
