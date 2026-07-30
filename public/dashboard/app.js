@@ -50,7 +50,28 @@
     auditLogs: "/api/audit-logs",
     systemEvents: "/api/system-events"
   };
+// ADMIN KEY + API FETCHER
+const ADMIN_KEY = localStorage.getItem('admin_key') || '';
 
+async function apiFetch(url, opts = {}) {
+  const sep = url.includes('?') ? '&' : '?';
+  opts.headers = {
+    ...(opts.headers || {}),
+    'x-admin-key': ADMIN_KEY
+  };
+  const res = await fetch(url + sep + 'key=' + ADMIN_KEY, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+// SAVE KEY FUNCTION
+function saveKey() {
+  const input = document.querySelector('input[type="password"]');
+  if(input) {
+    localStorage.setItem('admin_key', input.value);
+    location.reload();
+  }
+}
 
   /* ========================================================================
    * STATE
