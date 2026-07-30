@@ -1159,73 +1159,42 @@ async function verifyAdminKey() {
     };
   }
 
+/* ========================================================================
+* LOAD DASHBOARD
+* ====================================================================== */
+async function loadDashboard() {
+  try {
+    const payload = await apiFetch(API.dashboard);
+    const dashboard = normaliseDashboard(payload);
 
-  /* ========================================================================
-   * LOAD DASHBOARD
-   * ====================================================================== */
+    const status = await apiFetch(API.scanStatus); // FIXED THIS LINE
+    const osData = await apiFetch(API.osModules); // ADD THIS
+    const permitData = await apiFetch(API.permits); // ADD THIS
 
-  async function loadDashboard() {
-    try {
-      const payload =
-        await apiFetch(
-          API.dashboard
-        );
+    state.dashboard = dashboard;
+    state.status = status; // ADD THIS so "RUNNING: YES" works
+    state.osModules = osData.osModules || osData.data || []; // ADD THIS
+    state.permits = permitData.permits || permitData.data || []; // ADD THIS
 
-      const dashboard =
-        normaliseDashboard(
-          payload
-        );
-
-      const status = await apiFetch(`${API}/brain/status`);
-      state.dashboard =
-        dashboard;
-
-      if (
-        dashboard.leads.length
-      ) {
-        state.leads =
-          dashboard.leads;
-      }
-
-      if (
-        dashboard.permits.length
-      ) {
-        state.permits =
-          dashboard.permits;
-      }
-
-      if (
-        dashboard.osModules.length
-      ) {
-        state.osModules =
-          dashboard.osModules;
-      }
-
-      renderDashboard(
-        dashboard
-      );
-
-      return dashboard;
-
-    } catch (error) {
-      handleAuthFailure(
-        error
-      );
-
-      console.error(
-        "[GRIDV21] Dashboard load failed:",
-        error
-      );
-
-      renderDashboardError(
-        error
-      );
-
-      throw error;
+    if (dashboard.leads.length) {
+      state.leads = dashboard.leads;
     }
+    if (dashboard.permits.length) {
+      state.permits = dashboard.permits;
+    }
+    if (dashboard.osModules.length) {
+      state.osModules = dashboard.osModules;
+    }
+
+    renderDashboard(dashboard);
+    return dashboard;
+  } catch (error) {
+    handleAuthFailure(error);
+    console.error("[GRIDV21] Dashboard load failed:", error);
+    renderDashboardError(error);
+    throw error;
   }
-
-
+      }
   /* ========================================================================
    * LOAD OS MODULES
    * ====================================================================== */
