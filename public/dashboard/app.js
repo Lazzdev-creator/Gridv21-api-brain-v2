@@ -3576,3 +3576,10 @@ bindBrainCommands(); // ADD THIS CALL
 }, { once: true });
 
 })();
+document.addEventListener('DOMContentLoaded', () => {
+  const saveBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Save Key'));
+  if(saveBtn) saveBtn.onclick = saveKey;
+  
+  loadDashboard();
+  setInterval(loadDashboard, 5000);
+});
