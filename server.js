@@ -28,7 +28,15 @@ import { RedisStore } from "connect-redis";
 import fs from 'fs';
 
 dotenv.config();
+const ADMIN_KEY = process.env.ADMIN_KEY;
 
+function requireAuth(req, res, next) {
+  const key = req.query.key || req.headers['x-admin-key'] || req.headers['x-ADMIN_KEY'];
+  if (!key || key !== ADMIN_KEY) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
+  next();
+}
 // Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
