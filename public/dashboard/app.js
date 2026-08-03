@@ -752,7 +752,7 @@ async function apiFetch(url, opts = {}) {
     ...(opts.headers || {})
   }
 };
-
+state.adminKey = loadAdminKey();
     let response;
 
     try {
