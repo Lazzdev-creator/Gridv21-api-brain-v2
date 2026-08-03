@@ -3441,13 +3441,16 @@ document.addEventListener("DOMContentLoaded", () => {
     saveKeyBtn.onclick = () => {
       const key = adminInput.value.trim();
       if(key) {
-        state.adminKey = key;
-        localStorage.setItem('gridv21_admin_key', key);
-        keyStatus.innerText = 'Key saved. Refreshing...';
-        keyStatus.className = 'text-success';
-        setTimeout(loadDashboard, 500);
-      }
-    }
+        saveAdminKey(key);
+
+const ok = await verifyAdminKey();
+
+if (ok) {
+    keyStatus.innerText = "Authenticated";
+    loadDashboard();
+} else {
+    keyStatus.innerText = "Invalid admin key";
+   }
   }
 
 // BRAIN COMMAND BUTTONS
