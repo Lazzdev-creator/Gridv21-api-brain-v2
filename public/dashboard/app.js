@@ -3442,7 +3442,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const key = adminInput.value.trim();
       if(key) {
         state.adminKey = key;
-        localStorage.setItem('gv21_admin_key', key);
+        localStorage.setItem('gridv21_admin_key', key);
         keyStatus.innerText = 'Key saved. Refreshing...';
         keyStatus.className = 'text-success';
         setTimeout(loadDashboard, 500);
@@ -3535,10 +3535,4 @@ bindBrainCommands(); // ADD THIS CALL
 }, { once: true });
 
 })();
-document.addEventListener('DOMContentLoaded', () => {
-  const saveBtn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Save Key'));
-  if(saveBtn) saveBtn.onclick = saveKey;
-  
-  loadDashboard();
-  setInterval(loadDashboard, 5000);
-});
+
