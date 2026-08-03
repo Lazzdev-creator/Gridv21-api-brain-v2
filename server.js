@@ -3412,8 +3412,6 @@ try {
 }
 
 // ADMIN KEY MIDDLEWARE - ADD THIS HERE
-const ADMIN_KEY = process.env.ADMIN_KEY || 'YOUR_T578ij74de34vgh9km65vcds32sa9kb5';
-
 function requireAdminKey(req, res, next) {
   const key = req.query.key || req.headers['x-admin-key'];
   if (key !== ADMIN_KEY) {
