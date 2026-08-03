@@ -732,26 +732,26 @@ async function apiFetch(url, opts = {}) {
    * API FETCH
    * ====================================================================== */
     const requestOptions = {
+  ...opts,
+  headers: {
+    Accept: "application/json",
 
-          "application/json",
+    ...(opts.body
+      ? {
+          "Content-Type": "application/json"
+        }
+      : {}),
 
-        ...(options.body
-          ? {
-              "Content-Type":
-                "application/json"
-            }
-          : {}),
+    ...(state.adminKey
+      ? {
+          "x-admin-key": state.adminKey,
+          Authorization: `Bearer ${state.adminKey}`
+        }
+      : {}),
 
-        ...(state.adminKey
-          ? {
-              "x-admin-key":
-                state.adminKey
-            }
-          : {}),
-
-        ...(options.headers || {})
-      }
-    };
+    ...(opts.headers || {})
+  }
+};
 
     let response;
 
