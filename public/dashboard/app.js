@@ -52,18 +52,6 @@
   };
 // ADMIN KEY + API FETCHER
 const ADMIN_KEY = localStorage.getItem('admin_key') || '';
-
-async function apiFetch(url, opts = {}) { 
-  const sep = url.includes('?') ? '&' : '?'; 
-  const key = localStorage.getItem('admin_key') || ''; 
-  opts.headers = { 
-    ...(opts.headers || {}), 
-    'x-admin-key': key,
-    'x-ADMIN_KEY': key 
-  }; 
-  const res = await fetch(url + sep + 'key=' + key, opts); 
-  if (!res.ok) throw new Error(await res.text()); 
-  return res.json(); 
 }
 
 // SAVE KEY FUNCTION
@@ -742,9 +730,7 @@ async function apiFetch(url, opts = {}) {
     options = {}
   ) {
     const requestOptions = {
-      ...options,
-      headers: {
-        Accept:
+      
           "application/json",
 
         ...(options.body
