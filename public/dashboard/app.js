@@ -724,13 +724,8 @@ async function apiFetch(url, opts = {}) {
   /* ========================================================================
    * API FETCH
    * ====================================================================== */
-
-  async function apiFetch(
-    url,
-    options = {}
-  ) {
     const requestOptions = {
-      
+
           "application/json",
 
         ...(options.body
