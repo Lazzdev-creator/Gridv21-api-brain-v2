@@ -3437,20 +3437,23 @@ document.addEventListener("DOMContentLoaded", () => {
     keyStatus.className = 'text-success';
   }
 
-  if(saveKeyBtn) {
-    saveKeyBtn.onclick = () => {
-      const key = adminInput.value.trim();
-      if(key) {
+  if (saveKeyBtn) {
+    saveKeyBtn.onclick = async () => {
+        const key = adminInput.value.trim();
+
+        if (!key) return;
+
         saveAdminKey(key);
 
-const ok = await verifyAdminKey();
+        const ok = await verifyAdminKey();
 
-if (ok) {
-    keyStatus.innerText = "Authenticated";
-    loadDashboard();
-} else {
-    keyStatus.innerText = "Invalid admin key";
-   }
+        if (ok) {
+            keyStatus.innerText = "Authenticated";
+            await loadDashboard();
+        } else {
+            keyStatus.innerText = "Invalid admin key";
+        }
+    };
   }
 
 // BRAIN COMMAND BUTTONS
