@@ -1830,10 +1830,10 @@ async function loadDashboard() {
     events
   ) {
     const container =
-      byId("latest-events") ||
-      byId("events-container") ||
-      document.querySelector(
-        "[data-latest-events]"
+  byId("dashboard-activity") ||
+  byId("latest-events") ||
+  byId("events-container") ||
+  document.querySelector("[data-latest-events]");
       );
 
 
