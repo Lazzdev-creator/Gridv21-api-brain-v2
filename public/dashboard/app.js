@@ -47,7 +47,7 @@
     forecast: "/api/forecast",
 
     integrations: "/api/integrations",
-    auditLogs: "/api/audit-logs",
+      auditLogs: "/api/system-events",
     systemEvents: "/api/system-events"
   };
   /* ========================================================================
