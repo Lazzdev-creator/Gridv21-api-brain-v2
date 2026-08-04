@@ -1173,22 +1173,7 @@ async function loadDashboard() {
       return state.osModules;
     }
   }
-      /*
-       * Keep the dashboard usable even if
-       * the optional OS endpoint is unavailable.
-       */
-
-      renderOSOverview(
-        const activeCount = safeArray(state.osModules)
-  .filter(m => m.enabled || m.active || m.status === "active")
-  .length;
-text("metric-os", activeCount || state.osModules.length || OS_MODULES.length);
-      );
-
-      return state.osModules;
-    }
-  }
-
+  
 
   /* ========================================================================
    * LOAD PERMITS
