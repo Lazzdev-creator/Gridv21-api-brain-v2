@@ -3358,127 +3358,76 @@ async function loadDashboard() {
     clearAdminKey
   };
 
-  /* =================================================
- * START APPLICATION
- * ================================================= */
+   /* ========================================================================
+   * START APPLICATION
+   * ====================================================================== */
 
-// WRAP EVERYTHING INSIDE DOMContentLoaded
-document.addEventListener("DOMContentLoaded", () => {
+  document.addEventListener("DOMContentLoaded", () => {
+    // Admin key UI
+    const adminInput = document.getElementById("adminKeyInput");
+    const saveKeyBtn = document.getElementById("saveKeyBtn");
+    const keyStatus = document.getElementById("keyStatus");
 
-  // ADMIN KEY LOGIC - NOW INSIDE
-  const adminInput = document.getElementById('adminKeyInput');
-  const saveKeyBtn = document.getElementById('saveKeyBtn');
-  const keyStatus = document.getElementById('keyStatus');
+    if (state.adminKey && adminInput) {
+      adminInput.value = state.adminKey;
+      if (keyStatus) {
+        keyStatus.textContent = "Key loaded";
+        keyStatus.className = "muted text-success";
+      }
+    }
 
-  // Load saved key on boot
-  if(state.adminKey && adminInput) {
-    adminInput.value = state.adminKey;
-    keyStatus.innerText = 'Key loaded';
-    keyStatus.className = 'text-success';
-  }
-
-  if (saveKeyBtn) {
-    saveKeyBtn.onclick = async () => {
+    if (saveKeyBtn && adminInput) {
+      saveKeyBtn.addEventListener("click", async () => {
         const key = adminInput.value.trim();
-
-        if (!key) return;
+        if (!key) {
+          showToast("Enter an admin key", "warning");
+          return;
+        }
 
         saveAdminKey(key);
 
         const ok = await verifyAdminKey();
-
         if (ok) {
-            keyStatus.innerText = "Authenticated";
-            await loadDashboard();
+          if (keyStatus) keyStatus.textContent = "Authenticated";
+          showToast("Authenticated", "success");
+          await loadDashboard();
         } else {
-            keyStatus.innerText = "Invalid admin key";
+          if (keyStatus) keyStatus.textContent = "Invalid admin key";
         }
+      });
+    }
+
+    // Brain command buttons (use the proper API paths)
+    const brainActions = {
+      "Start Scan":     { url: API.scrapeNow,      method: "POST" },
+      "Stop Scan":      { url: API.scanStop,       method: "POST" },
+      "Pause Engine":   { url: API.brainPause,     method: "POST" },
+      "Resume Engine":  { url: API.brainResume,    method: "POST" },
+      "Emergency Stop": { url: API.emergencyStop,  method: "POST", confirm: true }
     };
-  }
 
-// BRAIN COMMAND BUTTONS
-function bindBrainCommands() {
-  document.querySelectorAll('button').forEach(btn => {
-    const txt = btn.innerText.trim();
+    document.querySelectorAll("button").forEach(btn => {
+      const label = (btn.textContent || "").trim();
+      const action = brainActions[label];
+      if (!action) return;
 
-    if(txt === 'Start Scan') {
-      btn.onclick = async () => {
-        setGlobalStatus(true, "Starting Scan...");
+      btn.addEventListener("click", async () => {
+        if (action.confirm && !confirm("EMERGENCY STOP ALL OPERATIONS?")) return;
+
         try {
-          await apiFetch(`${API}/scrape-now`, {method: 'POST'});
-          setGlobalStatus(true, "Scan Started");
-        } catch(e) { setGlobalStatus(false, e.message); }
-        loadDashboard();
-      }
-    }
-    
-    if(txt === 'Stop Scan') {
-      btn.onclick = async () => {
-        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
-        loadDashboard();
-      }
-    }
-
-    if(txt === 'Pause Engine') {
-      btn.onclick = async () => {
-        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
-        loadDashboard();
-      }
-    }
-
-    if(txt === 'Resume Engine') {
-      btn.onclick = async () => {
-        await apiFetch(`${API}/brain/resume`, {method: 'POST'});
-        loadDashboard();
-      }
-    }
-
-    if(txt === 'Emergency Stop') {
-      btn.onclick = async () => {
-        if(confirm('EMERGENCY STOP ALL OPERATIONS?')) {
-          await apiFetch(`${API}/brain/emergency-stop`, {method: 'POST'});
-          loadDashboard();
+          setGlobalStatus(true, `${label}…`);
+          await apiFetch(action.url, { method: action.method });
+          showToast(`${label} OK`, "success");
+          await loadDashboard();
+        } catch (err) {
+          setGlobalStatus(false, err.message);
+          showToast(err.message, "error");
         }
-      }
-    }
-  });
-      }
-  
-bindBrainCommands(); // THIS CALL IS MISSING
+      });
+    });
 
-// AUTO REFRESH DASHBOARD
-setInterval(loadDashboard, 5000); // THIS IS MISSING TOO
-    
-    if(txt === 'Pause Engine') {
-      btn.onclick = async () => {
-        await apiFetch(`${API}/brain/pause`, {method: 'POST'});
-        loadDashboard();
-      }
-    }
-    
-    if(txt === 'Resume Engine') {
-      btn.onclick = async () => {
-        await apiFetch(`${API}/brain/resume`, {method: 'POST'});
-        loadDashboard();
-      }
-    }
-    
-    if(txt === 'Emergency Stop') {
-      btn.onclick = async () => {
-        if(confirm('EMERGENCY STOP ALL OPERATIONS?')) {
-          await apiFetch(`${API}/brain/emergency-stop`, {method: 'POST'});
-          loadDashboard();
-        }
-      }
-    }
-  });
-}
-
-bindBrainCommands(); // ADD THIS CALL
-  // START THE APP
-  init().catch(renderStartupError);
-  
-}, { once: true });
+    // Boot the app
+    init().catch(renderStartupError);
+  }, { once: true });
 
 })();
-
