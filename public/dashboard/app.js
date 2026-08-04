@@ -1191,7 +1191,29 @@ async function loadDashboard() {
   /* ========================================================================
    * LOAD PERMITS
    * ====================================================================== */
+function renderPermitsTable(permits) {
+  const body = byId("permits-body");
+  if (!body) return;
 
+  const rows = safeArray(permits).slice(0, 100);
+
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="5" class="empty">No permits found.</td></tr>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(p => {
+    const r = safeObject(p);
+    return `
+      <tr>
+        <td>${escapeHTML(r.city || "—")}</td>
+        <td>${escapeHTML(r.permit_type || r.permit_id || "—")}</td>
+        <td>${escapeHTML(r.status || "—")}</td>
+        <td>${escapeHTML(r.ai_score ?? "—")}</td>
+        <td>${r.estimated_value != null && r.estimated_value !== "" ? money(r.estimated_value) : "—"}</td>
+      </tr>`;
+  }).join("");
+}
   async function loadPermits() {
     try {
       const payload =
