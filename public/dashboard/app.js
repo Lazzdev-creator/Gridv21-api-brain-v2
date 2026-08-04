@@ -1162,16 +1162,17 @@ async function loadDashboard() {
 
       return state.osModules;
 
-    } catch (error) {
-      handleAuthFailure(
-        error
+        } catch (error) {
+      handleAuthFailure(error);
+      console.warn("[GRIDV21] OS module API failed:", error);
+
+      renderOSOverview(
+        state.osModules.length ? state.osModules : OS_MODULES
       );
 
-      console.warn(
-        "[GRIDV21] OS module API failed:",
-        error
-      );
-
+      return state.osModules;
+    }
+  }
       /*
        * Keep the dashboard usable even if
        * the optional OS endpoint is unavailable.
