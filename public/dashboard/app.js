@@ -3425,7 +3425,27 @@ async function loadDashboard() {
         }
       });
     });
-
+    
+document.getElementById("btnExportPermits")?.addEventListener("click", async () => {
+  try {
+    const res = await fetch("/api/export/permits.csv", {
+      headers: {
+        "x-admin-key": state.adminKey,
+        Authorization: `Bearer ${state.adminKey}`
+      }
+    });
+    if (!res.ok) throw new Error("Export failed");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "permits.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showToast(err.message || "Export failed", "error");
+  }
+});
     // Boot the app
     init().catch(renderStartupError);
   }, { once: true });
