@@ -1751,75 +1751,39 @@ async function loadDashboard() {
    * TOP LEADS
    * ====================================================================== */
 
-  function renderTopLeads(
-    leads
-  ) {
-    const container =
-      byId("top-leads-body") ||
-      byId("leads-container") ||
-      document.querySelector(
-        "[data-top-leads]"
-      );
+  function renderTopLeads(leads) {
+  const container = byId("top-leads-body");
+  if (!container) return;
 
-
-    if (!container) {
-      return;
-    }
-
-
-    const rows =
-      safeArray(leads)
-        .slice(0, 10);
-
-
-    if (!rows.length) {
-      container.innerHTML = `
-        <div class="empty">
-          No lead data available.
-        </div>
-      `;
-
-      return;
-    }
-
-
-    container.innerHTML =
-      rows.map(
-        lead => {
-          const item =
-            safeObject(lead);
-
-
-          const city =
-            item.city ||
-            item.location ||
-            "—";
-
-
-          const type =
-            item.type ||
-            item.project_type ||
-            item.permit_type ||
-            "—";
-
-
-          const score =
-            item.score ??
-            item.lead_score ??
-            item.ai_score ??
-            "—";
-
-
-          return `
-            <div class="lead-row">
-              <span>${escapeHTML(city)}</span>
-              <span>${escapeHTML(type)}</span>
-              <span>${escapeHTML(score)}</span>
-            </div>
-          `;
-        }
-      ).join("");
+  // If no leads, use highest-value permits as pipeline
+  let rows = safeArray(leads).slice(0, 10);
+  if (!rows.length) {
+    rows = safeArray(state.permits)
+      .slice()
+      .sort((a, b) => Number(b.estimated_value || b.ai_score || 0) - Number(a.estimated_value || a.ai_score || 0))
+      .slice(0, 10);
   }
+
+  if (!rows.length) {
+    container.innerHTML = `<tr><td colspan="4" class="empty">No lead data available.</td></tr>`;
+    return;
+  }
+
+  container.innerHTML = rows.map(item => {
+    const r = safeObject(item);
+    const city = r.city || r.location || "—";
+    const type = r.type || r.permit_type || r.project_type || "—";
+    const score = r.score ?? r.ai_score ?? r.lead_score ?? "—";
+    const value = r.estimated_value ?? r.value ?? r.predicted_revenue ?? "";
+    return `
+      <tr>
+        <td>${escapeHTML(city)}</td>
+        <td>${escapeHTML(type)}</td>
+        <td>${escapeHTML(score)}</td>
+        <td>${value !== "" ? money(value) : "—"}</td>
+      </tr>`;
+  }).join("");
+      }
 
 
   /* ========================================================================
