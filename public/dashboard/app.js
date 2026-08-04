@@ -1156,10 +1156,8 @@ async function loadDashboard() {
           modules;
       }
 
-      renderOSOverview(
-        state.osModules.length
-          ? state.osModules
-          : OS_MODULES
+            renderOSOverview(
+        state.osModules.length ? state.osModules : OS_MODULES
       );
 
       return state.osModules;
