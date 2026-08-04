@@ -50,30 +50,9 @@
     auditLogs: "/api/audit-logs",
     systemEvents: "/api/system-events"
   };
-// ADMIN KEY + API FETCHER
-const ADMIN_KEY = localStorage.getItem('admin_key') || '';
-}
-
-// SAVE KEY FUNCTION
-function saveKey() {
-  const input = document.querySelector('input[type="password"]');
-  if(input) {
-    const key = input.value.trim();
-
-localStorage.setItem("admin_key", key);
-state.adminKey = key;
-
-await verifyAdminKey();
-
-if (state.authenticated) {
-    await loadDashboard();
-  }
-}
-
   /* ========================================================================
    * STATE
    * ====================================================================== */
-state.adminKey = localStorage.getItem("admin_key") || "";
   const state = {
     adminKey: "",
 
