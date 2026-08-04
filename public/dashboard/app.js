@@ -1233,10 +1233,9 @@ function renderPermitsTable(permits) {
           payload
         );
 
-      state.permits =
-        permits;
-
-      return permits;
+      state.permits = permits;
+    renderPermitsTable(permits);   // ← ADD this line
+    return permits;
 
     } catch (error) {
       /*
