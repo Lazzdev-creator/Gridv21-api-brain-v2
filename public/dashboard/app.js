@@ -1180,9 +1180,10 @@ async function loadDashboard() {
        */
 
       renderOSOverview(
-        state.osModules.length
-          ? state.osModules
-          : OS_MODULES
+        const activeCount = safeArray(state.osModules)
+  .filter(m => m.enabled || m.active || m.status === "active")
+  .length;
+text("metric-os", activeCount || state.osModules.length || OS_MODULES.length);
       );
 
       return state.osModules;
