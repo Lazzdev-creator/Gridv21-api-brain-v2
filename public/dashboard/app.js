@@ -707,78 +707,50 @@ function setGlobalStatus(ok, message) {
 async function apiFetch(url, opts = {}) {
   // your existing apiFetch code...
       }
-  /* ========================================================================
+    /* ========================================================================
    * API FETCH
    * ====================================================================== */
+
+  async function apiFetch(url, opts = {}) {
     const requestOptions = {
-  ...opts,
-  headers: {
-    Accept: "application/json",
+      ...opts,
+      headers: {
+        Accept: "application/json",
+        ...(opts.body ? { "Content-Type": "application/json" } : {}),
+        ...(state.adminKey
+          ? {
+              "x-admin-key": state.adminKey,
+              Authorization: `Bearer ${state.adminKey}`
+            }
+          : {}),
+        ...(opts.headers || {})
+      }
+    };
 
-    ...(opts.body
-      ? {
-          "Content-Type": "application/json"
-        }
-      : {}),
-
-    ...(state.adminKey
-      ? {
-          "x-admin-key": state.adminKey,
-          Authorization: `Bearer ${state.adminKey}`
-        }
-      : {}),
-
-    ...(opts.headers || {})
-  }
-};
-state.adminKey = loadAdminKey();
     let response;
 
     try {
-      response =
-        await fetch(
-          url,
-          requestOptions
-        );
+      response = await fetch(url, requestOptions);
     } catch (error) {
       throw new APIError(
-        `Network error: ${
-          error.message ||
-          "Unable to connect to GRIDV21."
-        }`,
+        `Network error: ${error.message || "Unable to connect to GRIDV21."}`,
         0
       );
     }
 
     let payload = null;
+    const contentType = response.headers.get("content-type") || "";
 
-    const contentType =
-      response.headers.get(
-        "content-type"
-      ) || "";
-
-    if (
-      contentType.includes(
-        "application/json"
-      )
-    ) {
+    if (contentType.includes("application/json")) {
       try {
-        payload =
-          await response.json();
+        payload = await response.json();
       } catch (_) {
         payload = null;
       }
     } else {
       try {
-        const textResponse =
-          await response.text();
-
-        payload =
-          textResponse
-            ? {
-                raw: textResponse
-              }
-            : null;
+        const textResponse = await response.text();
+        payload = textResponse ? { raw: textResponse } : null;
       } catch (_) {
         payload = null;
       }
@@ -790,27 +762,16 @@ state.adminKey = loadAdminKey();
         payload?.message ||
         `Request failed (${response.status})`;
 
-      if (
-        response.status === 401
-      ) {
-        state.authenticated =
-          false;
-
-        setGlobalStatus(
-          false,
-          "Authentication required"
-        );
+      if (response.status === 401) {
+        state.authenticated = false;
+        setGlobalStatus(false, "Authentication required");
       }
 
-      throw new APIError(
-        message,
-        response.status,
-        payload
-      );
+      throw new APIError(message, response.status, payload);
     }
 
     return payload;
-  }
+            }
 
  /* ============================================================
  * AUTHENTICATION
