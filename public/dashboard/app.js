@@ -1903,10 +1903,10 @@ async function loadDashboard() {
     modules
   ) {
     const container =
-      byId("os-overview") ||
-      byId("os-modules") ||
-      document.querySelector(
-        "[data-os-overview]"
+  byId("os-overview-grid") ||
+  byId("os-overview") ||
+  byId("os-modules") ||
+  document.querySelector("[data-os-overview]");
       );
 
 
