@@ -85,50 +85,71 @@
 
     <div class="content">
 
-  <!-- ADMIN KEY INPUT - ADD THIS -->
-  <section class="card">
-    <div class="card-header">
-      <h3>Administration</h3>
-      <p class="muted">Administrative controls require the configured admin key.</p>
-    </div>
-    <div class="card-body">
-      <div class="form-row">
-        <input id="adminKeyInput" type="password" placeholder="Enter ADMIN_KEY" class="input">
-        <button id="saveKeyBtn" class="btn btn-primary">Save Key</button>
-      </div>
-      <div id="keyStatus" class="muted" style="margin-top:8px;"></div>
-    </div>
-  </section>
-  <!-- END ADMIN KEY INPUT -->
-
-  <!-- YOUR EXISTING DASHBOARD SECTIONS GO HERE -->
-      <section id="section-dashboard" class="...">
-  <div class="hero">
-    <div>
-      <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
-      <h2>GRIDV21 BRAIN Command Centre</h2>
-      <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
-    </div>
-    <div class="hero-actions">
-      <button id="btnStartScan" class="btn btn-primary">Start Scan</button>
-      <button id="btnStopScan" class="btn btn-secondary">Stop Scan</button>
-      <button id="btnPauseEngine" class="btn btn-secondary">Pause Engine</button>
-      <button id="btnResumeEngine" class="btn btn-secondary">Resume Engine</button>
-      <button id="btnEmergencyStop" class="btn btn-danger">Emergency Stop</button>
-    </div>
-  </div>
+      <!-- Admin key always visible -->
+      <section class="card" id="admin-key-card">
+        <div class="card-header">
+          <h3>Administration</h3>
+          <p class="muted">Administrative controls require the configured admin key.</p>
+        </div>
+        <div class="card-body">
+          <div class="form-row">
+            <input id="adminKeyInput" type="password" placeholder="Enter ADMIN_KEY" class="input" autocomplete="off">
+            <button id="saveKeyBtn" class="btn btn-primary" type="button">Save Key</button>
+          </div>
+          <div id="keyStatus" class="muted" style="margin-top:8px;"></div>
+        </div>
       </section>
 
+      <!-- ===================== EXECUTIVE DASHBOARD ===================== -->
+      <section id="section-dashboard" class="section active-section">
+
+        <div class="hero">
+          <div>
+            <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
+            <h2>GRIDV21 BRAIN Command Centre</h2>
+            <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
+          </div>
+          <div class="hero-actions">
+            <button id="btnStartScan" class="btn btn-primary" type="button">Start Scan</button>
+            <button id="btnStopScan" class="btn btn-secondary" type="button">Stop Scan</button>
+            <button id="btnPauseEngine" class="btn btn-secondary" type="button">Pause Engine</button>
+            <button id="btnResumeEngine" class="btn btn-secondary" type="button">Resume Engine</button>
+            <button id="btnEmergencyStop" class="btn btn-danger" type="button">Emergency Stop</button>
+          </div>
+        </div>
+
         <div class="metric-grid">
-          <article class="metric-card"><span>Engine</span><strong id="metric-engine">—</strong><small id="metric-engine-sub">Loading</small></article>
-          <article class="metric-card"><span>Active OS</span><strong id="metric-os">—</strong><small>Canonical modules</small></article>
-          <article class="metric-card"><span>Leads</span><strong id="metric-leads">—</strong><small>Current data set</small></article>
-          <article class="metric-card"><span>Revenue</span><strong id="metric-revenue">—</strong><small>Logged revenue</small></article>
+          <article class="metric-card">
+            <span>Engine</span>
+            <strong id="metric-engine">—</strong>
+            <small id="metric-engine-sub">Loading</small>
+          </article>
+          <article class="metric-card">
+            <span>Active OS</span>
+            <strong id="metric-os">—</strong>
+            <small>Canonical modules</small>
+          </article>
+          <article class="metric-card">
+            <span>Leads</span>
+            <strong id="metric-leads">—</strong>
+            <small>Current data set</small>
+          </article>
+          <article class="metric-card">
+            <span>Revenue</span>
+            <strong id="metric-revenue">—</strong>
+            <small>Logged revenue</small>
+          </article>
         </div>
 
         <div class="two-col">
           <article class="panel">
-            <div class="panel-head"><div><span class="eyebrow">ENGINE TELEMETRY</span><h3>Runtime Status</h3></div><span id="engine-badge" class="badge badge-muted">Loading</span></div>
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">ENGINE TELEMETRY</span>
+                <h3>Runtime Status</h3>
+              </div>
+              <span id="engine-badge" class="badge badge-muted">Loading</span>
+            </div>
             <div class="telemetry-grid">
               <div><span>Running</span><strong id="telemetry-running">—</strong></div>
               <div><span>Scanning</span><strong id="telemetry-scanning">—</strong></div>
@@ -143,57 +164,309 @@
           </article>
 
           <article class="panel">
-            <div class="panel-head"><div><span class="eyebrow">BRAIN SIGNAL</span><h3>AI Recommendation</h3></div></div>
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">BRAIN SIGNAL</span>
+                <h3>AI Recommendation</h3>
+              </div>
+            </div>
             <div id="brain-recommendation" class="recommendation">Loading recommendation…</div>
           </article>
         </div>
 
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">OPERATING SYSTEM</span><h3>OS Overview</h3></div><button class="btn btn-secondary" data-section-target="analytics">Analytics</button></div>
-          <div id="os-overview-grid" class="os-grid"><div class="loading">Loading modules…</div></div>
+          <div class="panel-head">
+            <div>
+              <span class="eyebrow">OPERATING SYSTEM</span>
+              <h3>OS Overview</h3>
+            </div>
+            <button class="btn btn-secondary" type="button" data-section-target="analytics">Analytics</button>
+          </div>
+          <div id="os-overview-grid" class="os-grid">
+            <div class="loading">Loading modules…</div>
+          </div>
         </article>
 
         <div class="two-col">
           <article class="panel">
-            <div class="panel-head"><div><span class="eyebrow">HIGH-VALUE PIPELINE</span><h3>Top Leads</h3></div></div>
-            <div class="table-wrap"><table><thead><tr><th>City</th><th>Type</th><th>Score</th><th>Value</th></tr></thead><tbody id="top-leads-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody></table></div>
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">HIGH-VALUE PIPELINE</span>
+                <h3>Top Leads</h3>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>City</th>
+                    <th>Type</th>
+                    <th>Score</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody id="top-leads-body">
+                  <tr><td colspan="4" class="empty">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </article>
+
           <article class="panel">
-            <div class="panel-head"><div><span class="eyebrow">ACTIVITY</span><h3>Latest Events</h3></div></div>
-            <div id="dashboard-activity" class="activity-list"><div class="loading">Loading…</div></div>
+            <div class="panel-head">
+              <div>
+                <span class="eyebrow">ACTIVITY</span>
+                <h3>Latest Events</h3>
+              </div>
+            </div>
+            <div id="dashboard-activity" class="activity-list">
+              <div class="loading">Loading…</div>
+            </div>
           </article>
+        </div>
+
+      </section>
+      <!-- ===================== END DASHBOARD ===================== -->
+
+      <section id="section-executive" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">STRATEGY</span>
+            <h2>Executive Intelligence</h2>
+            <p>Enterprise-level signals derived from current operating data.</p>
+          </div>
+        </div>
+        <div id="executive-signals" class="card-grid"></div>
+      </section>
+
+      <section id="section-revenue" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">REVENUE</span>
+            <h2>Revenue Intelligence</h2>
+            <p>Pipeline, projected revenue and logged monetisation.</p>
+          </div>
+        </div>
+        <div id="revenue-content"></div>
+      </section>
+
+      <section id="section-sales" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">SALES</span>
+            <h2>Sales & CRM</h2>
+          </div>
+        </div>
+        <div id="sales-content"></div>
+      </section>
+
+      <section id="section-marketing" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">GROWTH</span>
+            <h2>Marketing</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Marketing intelligence endpoints can be connected here without changing the dashboard shell.</div>
+      </section>
+
+      <section id="section-operations" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">OPERATIONS</span>
+            <h2>Operations</h2>
+          </div>
+        </div>
+        <div id="operations-content"></div>
+      </section>
+
+      <section id="section-finance" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">FINANCE</span>
+            <h2>Finance</h2>
+          </div>
+        </div>
+        <div id="finance-content"></div>
+      </section>
+
+      <section id="section-human-capital" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">PEOPLE</span>
+            <h2>Human Capital</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Human Capital OS shell online.</div>
+      </section>
+
+      <section id="section-projects" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">PROJECTS</span>
+            <h2>Project Management</h2>
+          </div>
+        </div>
+        <div id="projects-content"></div>
+      </section>
+
+      <section id="section-knowledge" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">KNOWLEDGE</span>
+            <h2>Knowledge Intelligence</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Knowledge graph interface ready.</div>
+      </section>
+
+      <section id="section-legal" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">COMPLIANCE</span>
+            <h2>Legal & Compliance</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Compliance OS shell online.</div>
+      </section>
+
+      <section id="section-supply" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">SUPPLY</span>
+            <h2>Supply Chain</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Supply Chain OS shell online.</div>
+      </section>
+
+      <section id="section-acquisition" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">ACQUISITION</span>
+            <h2>Acquisition Intelligence</h2>
+          </div>
+        </div>
+        <div id="acquisition-content"></div>
+      </section>
+
+      <section id="section-customer-success" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">CUSTOMER SUCCESS</span>
+            <h2>Customer Success</h2>
+          </div>
+        </div>
+        <div class="empty-panel">Customer Success OS shell online.</div>
+      </section>
+
+      <section id="section-it-security" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">SECURITY</span>
+            <h2>IT & Security</h2>
+          </div>
+        </div>
+        <div id="security-content"></div>
+      </section>
+
+      <section id="section-analytics" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">BI</span>
+            <h2>Analytics & BI</h2>
+          </div>
+        </div>
+        <div id="analytics-content"></div>
+      </section>
+
+      <section id="section-leads" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">ACQUISITION DATA</span>
+            <h2>Leads</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-action="refresh">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Trade</th>
+                <th>Region</th>
+                <th>Value</th>
+                <th>Status</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody id="leads-body">
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
-      <section id="section-executive" class="section"><div class="section-head"><div><span class="eyebrow">STRATEGY</span><h2>Executive Intelligence</h2><p>Enterprise-level signals derived from current operating data.</p></div></div><div id="executive-signals" class="card-grid"></div></section>
-      <section id="section-revenue" class="section"><div class="section-head"><div><span class="eyebrow">REVENUE</span><h2>Revenue Intelligence</h2><p>Pipeline, projected revenue and logged monetisation.</p></div></div><div id="revenue-content"></div></section>
-      <section id="section-sales" class="section"><div class="section-head"><div><span class="eyebrow">SALES</span><h2>Sales & CRM</h2></div></div><div id="sales-content"></div></section>
-      <section id="section-marketing" class="section"><div class="section-head"><div><span class="eyebrow">GROWTH</span><h2>Marketing</h2></div></div><div class="empty-panel">Marketing intelligence endpoints can be connected here without changing the dashboard shell.</div></section>
-      <section id="section-operations" class="section"><div class="section-head"><div><span class="eyebrow">OPERATIONS</span><h2>Operations</h2></div></div><div id="operations-content"></div></section>
-      <section id="section-finance" class="section"><div class="section-head"><div><span class="eyebrow">FINANCE</span><h2>Finance</h2></div></div><div id="finance-content"></div></section>
-      <section id="section-human-capital" class="section"><div class="section-head"><div><span class="eyebrow">PEOPLE</span><h2>Human Capital</h2></div></div><div class="empty-panel">Human Capital OS shell online.</div></section>
-      <section id="section-projects" class="section"><div class="section-head"><div><span class="eyebrow">PROJECTS</span><h2>Project Management</h2></div></div><div id="projects-content"></div></section>
-      <section id="section-knowledge" class="section"><div class="section-head"><div><span class="eyebrow">KNOWLEDGE</span><h2>Knowledge Intelligence</h2></div></div><div class="empty-panel">Knowledge graph interface ready.</div></section>
-      <section id="section-legal" class="section"><div class="section-head"><div><span class="eyebrow">COMPLIANCE</span><h2>Legal & Compliance</h2></div></div><div class="empty-panel">Compliance OS shell online.</div></section>
-      <section id="section-supply" class="section"><div class="section-head"><div><span class="eyebrow">SUPPLY</span><h2>Supply Chain</h2></div></div><div class="empty-panel">Supply Chain OS shell online.</div></section>
-      <section id="section-acquisition" class="section"><div class="section-head"><div><span class="eyebrow">ACQUISITION</span><h2>Acquisition Intelligence</h2></div></div><div id="acquisition-content"></div></section>
-      <section id="section-customer-success" class="section"><div class="section-head"><div><span class="eyebrow">CUSTOMER SUCCESS</span><h2>Customer Success</h2></div></div><div class="empty-panel">Customer Success OS shell online.</div></section>
-      <section id="section-it-security" class="section"><div class="section-head"><div><span class="eyebrow">SECURITY</span><h2>IT & Security</h2></div></div><div id="security-content"></div></section>
-      <section id="section-analytics" class="section"><div class="section-head"><div><span class="eyebrow">BI</span><h2>Analytics & BI</h2></div></div><div id="analytics-content"></div></section>
+      <section id="section-permits" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">SOURCE DATA</span>
+            <h2>Permits</h2>
+          </div>
+          <button id="btnExportPermits" class="btn btn-secondary" type="button">Export CSV</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>City</th>
+                <th>Permit</th>
+                <th>Status</th>
+                <th>AI Score</th>
+                <th>Estimated Value</th>
+              </tr>
+            </thead>
+            <tbody id="permits-body">
+              <tr><td colspan="5" class="empty">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-      <section id="section-leads" class="section"><div class="section-head"><div><span class="eyebrow">ACQUISITION DATA</span><h2>Leads</h2></div><button class="btn btn-secondary" data-action="refresh">Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Trade</th><th>Region</th><th>Value</th><th>Status</th><th>Created</th></tr></thead><tbody id="leads-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody></table></div></section>
+      <section id="section-integrations" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">CONNECTIVITY</span>
+            <h2>Integrations</h2>
+          </div>
+        </div>
+        <div id="integrations-grid" class="card-grid"></div>
+      </section>
 
-      <section id="section-permits" class="section"><div class="section-head"><div><span class="eyebrow">SOURCE DATA</span><h2>Permits</h2></div><a class="btn btn-secondary" href="/api/export/permits.csv" target="_blank" rel="noopener">Export CSV</a></div><div class="table-wrap"><table><thead><tr><th>City</th><th>Permit</th><th>Status</th><th>AI Score</th><th>Estimated Value</th></tr></thead><tbody id="permits-body"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody></table></div></section>
+      <section id="section-audit" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">GOVERNANCE</span>
+            <h2>Audit & Activity</h2>
+          </div>
+          <button class="btn btn-secondary" type="button" data-action="clear-logs">Clear View</button>
+        </div>
+        <div id="log-container" class="log-container"></div>
+      </section>
 
-      <section id="section-integrations" class="section"><div class="section-head"><div><span class="eyebrow">CONNECTIVITY</span><h2>Integrations</h2></div></div><div id="integrations-grid" class="card-grid"></div></section>
+      <section id="section-settings" class="section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">ADMINISTRATION</span>
+            <h2>Settings</h2>
+            <p>Administrative controls require the configured admin key.</p>
+          </div>
+        </div>
+        <div id="settings-content"></div>
+      </section>
 
-      <section id="section-audit" class="section"><div class="section-head"><div><span class="eyebrow">GOVERNANCE</span><h2>Audit & Activity</h2></div><button class="btn btn-secondary" data-action="clear-logs">Clear View</button></div><div id="log-container" class="log-container"></div></section>
-
-      <section id="section-settings" class="section"><div class="section-head"><div><span class="eyebrow">ADMINISTRATION</span><h2>Settings</h2><p>Administrative controls require the configured admin key.</p></div></div><div id="settings-content"></div></section>
     </div>
   </main>
 </div>
 <script src="app.js" defer></script>
 </body>
-                                             </html>
-        
+        </html>
