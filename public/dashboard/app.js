@@ -1116,7 +1116,9 @@ async function loadDashboard() {
       state.osModules = dashboard.osModules;
     }
 
-    renderDashboard(dashboard);
+        renderDashboard(dashboard);
+    renderPermitsTable(state.permits);   // ← ADD
+    renderTopLeads(state.leads);         // ← ADD
     return dashboard;
   } catch (error) {
     handleAuthFailure(error);
