@@ -1834,7 +1834,6 @@ async function loadDashboard() {
   byId("latest-events") ||
   byId("events-container") ||
   document.querySelector("[data-latest-events]");
-      );
 
 
     if (!container) {
@@ -1907,7 +1906,6 @@ async function loadDashboard() {
   byId("os-overview") ||
   byId("os-modules") ||
   document.querySelector("[data-os-overview]");
-      );
 
 
     if (!container) {
