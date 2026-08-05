@@ -637,29 +637,27 @@
    * SAVE ADMIN KEY
    * ====================================================================== */
 
-  function saveAdminKey(key) {
-    state.adminKey =
-      String(key || "").trim();
-
-    if (!state.adminKey) {
-      return;
-    }
-
-    try {
-      sessionStorage.setItem(
-        "gridv21_admin_key",
-        state.adminKey
-      );
-    } catch (_) {}
-
-    try {
-      localStorage.setItem(
-        "gridv21_admin_key",
-        state.adminKey
-      );
-    } catch (_) {}
+  saveKeyBtn.addEventListener("click", async () => {
+  const key = adminInput.value.trim();
+  if (!key) {
+    showToast("Enter an admin key", "warning");
+    return;
   }
 
+  saveAdminKey(key);
+
+  const ok = await verifyAdminKey();
+  setAuthUI(ok);   // ← lock or unlock
+
+  if (ok) {
+    if (keyStatus) keyStatus.textContent = "Authenticated";
+    showToast("Authenticated", "success");
+    await loadDashboard();
+  } else {
+    if (keyStatus) keyStatus.textContent = "Invalid admin key";
+    showToast("Invalid admin key", "error");
+  }
+});
 
   /* ========================================================================
    * CLEAR ADMIN KEY
