@@ -664,7 +664,15 @@
   /* ========================================================================
    * CLEAR ADMIN KEY
    * ====================================================================== */
+function setAuthUI(authenticated) {
+  document.body.classList.toggle("is-authenticated", !!authenticated);
+  document.body.classList.toggle("is-locked", !authenticated);
 
+  const status = byId("keyStatus");
+  if (status) {
+    status.textContent = authenticated ? "Authenticated" : "";
+  }
+      }
   function clearAdminKey() {
     state.adminKey = "";
     state.authenticated = false;
