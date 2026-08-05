@@ -691,7 +691,7 @@ function setAuthUI(authenticated) {
       false,
       "Authentication required"
     );
-
+setAuthUI(false);
     showToast(
       "Admin key cleared.",
       "warning"
