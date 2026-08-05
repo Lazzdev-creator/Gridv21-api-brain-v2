@@ -3071,18 +3071,10 @@ function renderPermitsTable(permits) {
    * ====================================================================== */
 
   async function init() {
+  console.info(`[GRIDV21] Starting Dashboard v${VERSION}`);
 
-    console.info(
-      `[GRIDV21] Starting Dashboard v${VERSION}`
-    );
-
-
-    /*
-     * Load stored/query-string admin key.
-     */
-
-    loadAdminKey();
-
+  loadAdminKey();
+  setAuthUI(false);   // ← ADD THIS
 
     /*
      * Bind UI before making API calls.
