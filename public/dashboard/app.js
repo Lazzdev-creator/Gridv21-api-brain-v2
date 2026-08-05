@@ -637,27 +637,7 @@
    * SAVE ADMIN KEY
    * ====================================================================== */
 
-  saveKeyBtn.addEventListener("click", async () => {
-  const key = adminInput.value.trim();
-  if (!key) {
-    showToast("Enter an admin key", "warning");
-    return;
-  }
-
-  saveAdminKey(key);
-
-  const ok = await verifyAdminKey();
-  setAuthUI(ok);   // ← lock or unlock
-
-  if (ok) {
-    if (keyStatus) keyStatus.textContent = "Authenticated";
-    showToast("Authenticated", "success");
-    await loadDashboard();
-  } else {
-    if (keyStatus) keyStatus.textContent = "Invalid admin key";
-    showToast("Invalid admin key", "error");
-  }
-});
+  
 
   /* ========================================================================
    * CLEAR ADMIN KEY
@@ -3309,12 +3289,11 @@ function renderPermitsTable(permits) {
     clearAdminKey
   };
 
-   /* ========================================================================
+    /* ========================================================================
    * START APPLICATION
    * ====================================================================== */
 
   document.addEventListener("DOMContentLoaded", () => {
-    // Admin key UI
     const adminInput = document.getElementById("adminKeyInput");
     const saveKeyBtn = document.getElementById("saveKeyBtn");
     const keyStatus = document.getElementById("keyStatus");
@@ -3323,7 +3302,6 @@ function renderPermitsTable(permits) {
       adminInput.value = state.adminKey;
       if (keyStatus) {
         keyStatus.textContent = "Key loaded";
-        keyStatus.className = "muted text-success";
       }
     }
 
@@ -3338,66 +3316,19 @@ function renderPermitsTable(permits) {
         saveAdminKey(key);
 
         const ok = await verifyAdminKey();
+        setAuthUI(ok);
+
         if (ok) {
           if (keyStatus) keyStatus.textContent = "Authenticated";
           showToast("Authenticated", "success");
           await loadDashboard();
         } else {
           if (keyStatus) keyStatus.textContent = "Invalid admin key";
+          showToast("Invalid admin key", "error");
         }
       });
     }
 
-    // Brain command buttons (use the proper API paths)
-    const brainActions = {
-      "Start Scan":     { url: API.scrapeNow,      method: "POST" },
-      "Stop Scan":      { url: API.scanStop,       method: "POST" },
-      "Pause Engine":   { url: API.brainPause,     method: "POST" },
-      "Resume Engine":  { url: API.brainResume,    method: "POST" },
-      "Emergency Stop": { url: API.emergencyStop,  method: "POST", confirm: true }
-    };
-
-    document.querySelectorAll("button").forEach(btn => {
-      const label = (btn.textContent || "").trim();
-      const action = brainActions[label];
-      if (!action) return;
-
-      btn.addEventListener("click", async () => {
-        if (action.confirm && !confirm("EMERGENCY STOP ALL OPERATIONS?")) return;
-
-        try {
-          setGlobalStatus(true, `${label}…`);
-          await apiFetch(action.url, { method: action.method });
-          showToast(`${label} OK`, "success");
-          await loadDashboard();
-        } catch (err) {
-          setGlobalStatus(false, err.message);
-          showToast(err.message, "error");
-        }
-      });
-    });
-    
-document.getElementById("btnExportPermits")?.addEventListener("click", async () => {
-  try {
-    const res = await fetch("/api/export/permits.csv", {
-      headers: {
-        "x-admin-key": state.adminKey,
-        Authorization: `Bearer ${state.adminKey}`
-      }
-    });
-    if (!res.ok) throw new Error("Export failed");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "permits.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  } catch (err) {
-    showToast(err.message || "Export failed", "error");
-  }
-});
-    // Boot the app
     init().catch(renderStartupError);
   }, { once: true });
 
