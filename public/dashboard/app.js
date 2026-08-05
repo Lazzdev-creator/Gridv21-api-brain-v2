@@ -3135,27 +3135,18 @@ function renderPermitsTable(permits) {
      */
 
     if (state.adminKey) {
+  const valid = await verifyAdminKey();
 
-      const valid =
-        await verifyAdminKey();
-
-
-      if (!valid) {
-
-        setControlsEnabled(
-          false
+  if (!valid) 
+  {
+  setAuthUI(true);   // ← ADD THIS (success path)
+} else {
+  setAuthUI(false);
+  setControlsEnabled(false);
+  renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
+  return;
+    }
         );
-
-        renderDashboardError(
-          new APIError(
-            "Authentication required",
-            401
-          )
-        );
-
-        return;
-
-      }
 
     } else {
 
@@ -3169,21 +3160,7 @@ function renderPermitsTable(permits) {
        * Keep navigation and UI functional,
        * but protect backend controls.
        */
-
-      setControlsEnabled(
-        false
-      );
-
-      renderDashboardError(
-        new APIError(
-          "Enter the GRIDV21 admin key.",
-          401
-        )
-      );
-
-      return;
-    }
-
+  
 
     /*
      * Authentication succeeded.
