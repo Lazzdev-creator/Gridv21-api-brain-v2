@@ -1099,6 +1099,12 @@ async function verifyAdminKey() {
 * LOAD DASHBOARD
 * ====================================================================== */
 async function loadDashboard() {
+  if (!state.authenticated) {
+    setAuthUI(false);
+    return;
+  }
+  // ... existing code
+  async function loadDashboard() {
   try {
     const payload = await apiFetch(API.dashboard);
     const dashboard = normaliseDashboard(payload);
