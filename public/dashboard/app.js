@@ -636,7 +636,24 @@
   /* ========================================================================
    * SAVE ADMIN KEY
    * ====================================================================== */
+    if (state.adminKey) {
+      const valid = await verifyAdminKey();
 
+      if (!valid) {
+        setAuthUI(false);
+        setControlsEnabled(false);
+        renderDashboardError(new APIError("Authentication required", 401));
+        return;
+      }
+
+      setAuthUI(true);
+    } else {
+      setAuthUI(false);
+      setGlobalStatus(false, "Admin key required");
+      setControlsEnabled(false);
+      renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
+      return;
+      }
   
 
   /* ========================================================================
