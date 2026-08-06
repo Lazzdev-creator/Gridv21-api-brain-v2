@@ -633,67 +633,62 @@
   }
 
 
-  /* ========================================================================
+    /* ========================================================================
    * SAVE ADMIN KEY
    * ====================================================================== */
-    if (state.adminKey) {
-      const valid = await verifyAdminKey();
 
-      if (!valid) {
-        setAuthUI(false);
-        setControlsEnabled(false);
-        renderDashboardError(new APIError("Authentication required", 401));
-        return;
-      }
+  function saveAdminKey(key) {
+    state.adminKey = String(key || "").trim();
 
-      setAuthUI(true);
-    } else {
-      setAuthUI(false);
-      setGlobalStatus(false, "Admin key required");
-      setControlsEnabled(false);
-      renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
+    if (!state.adminKey) {
       return;
-      }
-  
+    }
+
+    try {
+      sessionStorage.setItem("gridv21_admin_key", state.adminKey);
+    } catch (_) {}
+
+    try {
+      localStorage.setItem("gridv21_admin_key", state.adminKey);
+    } catch (_) {}
+  }
+
+
+  /* ========================================================================
+   * AUTH UI (lock / unlock dashboard)
+   * ====================================================================== */
+
+  function setAuthUI(authenticated) {
+    document.body.classList.toggle("is-authenticated", !!authenticated);
+    document.body.classList.toggle("is-locked", !authenticated);
+
+    const status = byId("keyStatus");
+    if (status) {
+      status.textContent = authenticated ? "Authenticated" : "";
+    }
+  }
+
 
   /* ========================================================================
    * CLEAR ADMIN KEY
    * ====================================================================== */
-function setAuthUI(authenticated) {
-  document.body.classList.toggle("is-authenticated", !!authenticated);
-  document.body.classList.toggle("is-locked", !authenticated);
 
-  const status = byId("keyStatus");
-  if (status) {
-    status.textContent = authenticated ? "Authenticated" : "";
-  }
-      }
   function clearAdminKey() {
     state.adminKey = "";
     state.authenticated = false;
 
     try {
-      sessionStorage.removeItem(
-        "gridv21_admin_key"
-      );
+      sessionStorage.removeItem("gridv21_admin_key");
     } catch (_) {}
 
     try {
-      localStorage.removeItem(
-        "gridv21_admin_key"
-      );
+      localStorage.removeItem("gridv21_admin_key");
     } catch (_) {}
 
-    setGlobalStatus(
-      false,
-      "Authentication required"
-    );
-setAuthUI(false);
-    showToast(
-      "Admin key cleared.",
-      "warning"
-    );
-  }
+    setGlobalStatus(false, "Authentication required");
+    setAuthUI(false);
+    showToast("Admin key cleared.", "warning");
+        }
 
 /* =================================================
  * HELPERS
