@@ -3108,120 +3108,33 @@ function renderPermitsTable(permits) {
       state.osModules
     );
 
-
     /*
      * If an admin key exists, validate it.
-     *
-     * If there is no key, we still allow the dashboard
-     * interface to initialise so it does not look frozen.
+     * If there is no key, keep the UI locked.
      */
 
     if (state.adminKey) {
-  const valid = await verifyAdminKey();
+      const valid = await verifyAdminKey();
 
-  if (!valid) 
-  {
-  setAuthUI(true);   // ← ADD THIS (success path)
-} else {
-  setAuthUI(false);
-  setControlsEnabled(false);
-  renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
-  return;
-    }
-        );
+      if (!valid) {
+        setAuthUI(false);
+        setControlsEnabled(false);
+        renderDashboardError(new APIError("Authentication required", 401));
+        return;
+      }
 
+      setAuthUI(true);
     } else {
-
-      setGlobalStatus(
-        false,
-        "Admin key required"
-      );
-
-
-      /*
-       * Keep navigation and UI functional,
-       * but protect backend controls.
-       */
-  
+      setAuthUI(false);
+      setGlobalStatus(false, "Admin key required");
+      setControlsEnabled(false);
+      renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
+      return;
+    }
 
     /*
      * Authentication succeeded.
      */
-
-    state.authenticated =
-      true;
-
-
-    setControlsEnabled(
-      true
-    );
-
-
-    /*
-     * Initial data load.
-     */
-
-    try {
-
-      await refreshDashboardData();
-
-    } catch (error) {
-
-      renderStartupError(
-        error
-      );
-
-    }
-
-
-    /*
-     * Automatic refresh every 30 seconds.
-     */
-
-    clearInterval(
-      state.refreshTimer
-    );
-
-
-    state.refreshTimer =
-      setInterval(
-        async () => {
-
-          if (
-            !state.authenticated
-          ) {
-            return;
-          }
-
-
-          try {
-
-            await refreshDashboardData();
-
-          } catch (error) {
-
-            console.warn(
-              "[GRIDV21] Automatic refresh failed:",
-              error
-            );
-
-          }
-
-        },
-        30000
-      );
-
-
-    /*
-     * Final status.
-     */
-
-    console.info(
-      `[GRIDV21] Dashboard v${VERSION} initialised`
-    );
-
-  }
-
 
   /* ========================================================================
    * GLOBAL COMPATIBILITY
