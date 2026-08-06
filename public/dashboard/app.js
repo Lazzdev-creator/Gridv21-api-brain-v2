@@ -688,10 +688,6 @@ function setGlobalStatus(ok, message) {
     statusEl.innerText = message;
     statusEl.style.color = ok ? '#10b981' : '#ef4444';
   }
-}
-
-async function apiFetch(url, opts = {}) {
-  // your existing apiFetch code...
       }
     /* ========================================================================
    * API FETCH
