@@ -2769,7 +2769,15 @@ function renderPermitsTable(permits) {
       "click",
       event => {
 
-        /*
+      // CSV Export
+byId("btnExportPermits")?.addEventListener("click", () => {
+  if (!state.adminKey) {
+    showToast("Admin key required for export", "warning");
+    return;
+  }
+  const url = `/api/export/permits.csv?key=${encodeURIComponent(state.adminKey)}`;
+  window.open(url, "_blank");
+});  /*
          * Section target buttons.
          */
 
