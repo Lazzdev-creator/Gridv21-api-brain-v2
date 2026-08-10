@@ -1074,41 +1074,65 @@ async function verifyAdminKey() {
   }
 
 /* ========================================================================
-* LOAD DASHBOARD
-* ====================================================================== */
+ * LOAD DASHBOARD
+ * ====================================================================== */
 async function loadDashboard() {
   if (!state.authenticated) {
     setAuthUI(false);
     return;
   }
-  // ... existing code
-  async function loadDashboard() {
+
   try {
     const payload = await apiFetch(API.dashboard);
     const dashboard = normaliseDashboard(payload);
 
-    const status = await apiFetch(API.scanStatus); // FIXED THIS LINE
-    const osData = await apiFetch(API.osModules); // ADD THIS
-    const permitData = await apiFetch(API.permits); // ADD THIS
+    // Optional secondary calls — fail soft so the main dashboard still renders
+    let status = null;
+    let osData = {};
+    let permitData = {};
+
+    try {
+      status = await apiFetch(API.scanStatus);
+    } catch (e) {
+      console.warn("[GRIDV21] scanStatus unavailable:", e.message);
+    }
+
+    try {
+      osData = await apiFetch(API.osModules);
+    } catch (e) {
+      console.warn("[GRIDV21] osModules unavailable:", e.message);
+    }
+
+    try {
+      permitData = await apiFetch(API.permits);
+    } catch (e) {
+      console.warn("[GRIDV21] permits unavailable:", e.message);
+    }
 
     state.dashboard = dashboard;
-    state.status = status; // ADD THIS so "RUNNING: YES" works
-    state.osModules = osData.osModules || osData.data || []; // ADD THIS
-    state.permits = permitData.permits || permitData.data || []; // ADD THIS
+    state.status = status;
+    state.osModules = osData.osModules || osData.data || osData.modules || [];
+    state.permits = permitData.permits || permitData.data || [];
 
-    if (dashboard.leads.length) {
+    if (dashboard.leads && dashboard.leads.length) {
       state.leads = dashboard.leads;
     }
-    if (dashboard.permits.length) {
+    if (dashboard.permits && dashboard.permits.length) {
       state.permits = dashboard.permits;
     }
-    if (dashboard.osModules.length) {
+    if (dashboard.osModules && dashboard.osModules.length) {
       state.osModules = dashboard.osModules;
     }
 
-        renderDashboard(dashboard);
-    renderPermitsTable(state.permits);   // ← ADD
-    renderTopLeads(state.leads);         // ← ADD
+    renderDashboard(dashboard);
+
+    if (typeof renderPermitsTable === "function") {
+      renderPermitsTable(state.permits);
+    }
+    if (typeof renderTopLeads === "function") {
+      renderTopLeads(state.leads);
+    }
+
     return dashboard;
   } catch (error) {
     handleAuthFailure(error);
@@ -1116,7 +1140,7 @@ async function loadDashboard() {
     renderDashboardError(error);
     throw error;
   }
-      }
+ }
   /* ========================================================================
    * LOAD OS MODULES
    * ====================================================================== */
