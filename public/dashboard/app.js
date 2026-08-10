@@ -1777,12 +1777,32 @@ function renderPermitsTable(permits) {
   const container = byId("top-leads-body");
   if (!container) return;
 
-  // If no leads, use highest-value permits as pipeline
   let rows = safeArray(leads).slice(0, 10);
+
+  // Fallback 1: state.leads
+  if (!rows.length) {
+    rows = safeArray(state.leads).slice(0, 10);
+  }
+
+  // Fallback 2: highest-value permits
   if (!rows.length) {
     rows = safeArray(state.permits)
       .slice()
-      .sort((a, b) => Number(b.estimated_value || b.ai_score || 0) - Number(a.estimated_value || a.ai_score || 0))
+      .sort((a, b) =>
+        Number(b.estimated_value || b.ai_score || 0) -
+        Number(a.estimated_value || a.ai_score || 0)
+      )
+      .slice(0, 10);
+  }
+
+  // Fallback 3: dashboard permits
+  if (!rows.length && state.dashboard?.permits) {
+    rows = safeArray(state.dashboard.permits)
+      .slice()
+      .sort((a, b) =>
+        Number(b.estimated_value || b.ai_score || 0) -
+        Number(a.estimated_value || a.ai_score || 0)
+      )
       .slice(0, 10);
   }
 
@@ -1793,20 +1813,20 @@ function renderPermitsTable(permits) {
 
   container.innerHTML = rows.map(item => {
     const r = safeObject(item);
-    const city = r.city || r.location || "—";
-    const type = r.type || r.permit_type || r.project_type || "—";
+    const city = r.city || r.region || r.location || "—";
+    const type = r.type || r.permit_type || r.trade_type || r.project_type || "—";
     const score = r.score ?? r.ai_score ?? r.lead_score ?? "—";
-    const value = r.estimated_value ?? r.value ?? r.predicted_revenue ?? "";
+    const value = r.estimated_value ?? r.value_estimate ?? r.value ?? r.predicted_revenue ?? "";
+
     return `
       <tr>
         <td>${escapeHTML(city)}</td>
         <td>${escapeHTML(type)}</td>
         <td>${escapeHTML(score)}</td>
-        <td>${value !== "" ? money(value) : "—"}</td>
+        <td>${value !== "" && value != null ? money(value) : "—"}</td>
       </tr>`;
   }).join("");
-      }
-
+ }
 
   /* ========================================================================
    * LATEST EVENTS
