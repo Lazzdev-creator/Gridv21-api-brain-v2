@@ -3136,7 +3136,6 @@ function renderPermitsTable(permits) {
      * If an admin key exists, validate it.
      * If there is no key, keep the UI locked.
      */
-
     if (state.adminKey) {
       const valid = await verifyAdminKey();
 
@@ -3148,6 +3147,17 @@ function renderPermitsTable(permits) {
       }
 
       setAuthUI(true);
+      setControlsEnabled(true);
+
+      // Load live data after successful authentication
+      try {
+        await loadDashboard();
+        if (typeof refreshDashboardData === "function") {
+          await refreshDashboardData();
+        }
+      } catch (err) {
+        console.error("[GRIDV21] Post-auth data load failed:", err);
+      }
     } else {
       setAuthUI(false);
       setGlobalStatus(false, "Admin key required");
@@ -3155,41 +3165,20 @@ function renderPermitsTable(permits) {
       renderDashboardError(new APIError("Enter the GRIDV21 admin key.", 401));
       return;
     }
+  } // end init()
 
-    /*
-     * Authentication succeeded.
-     */
 
   /* ========================================================================
    * GLOBAL COMPATIBILITY
    * ====================================================================== */
 
-  window.engineAction =
-    engineAction;
-
-
-  window.emergencyStop =
-    emergencyStop;
-
-
-  window.verifyAdminKey =
-    verifyAdminKey;
-
-
-  window.refreshAll =
-    refreshDashboardData;
-
-
-  window.logout =
-    clearAdminKey;
-
-
-  window.toggleOS =
-    toggleOS;
-
-
-  window.navigate =
-    navigate;
+  window.engineAction = engineAction;
+  window.emergencyStop = emergencyStop;
+  window.verifyAdminKey = verifyAdminKey;
+  window.refreshAll = refreshDashboardData;
+  window.logout = clearAdminKey;
+  window.toggleOS = toggleOS;
+  window.navigate = navigate;
 
 
   /* ========================================================================
@@ -3198,33 +3187,22 @@ function renderPermitsTable(permits) {
 
   window.GRIDV21 = {
     ...(window.GRIDV21 || {}),
-
     VERSION,
-
     API,
-
     state,
-
     init,
-
     bindEvents,
-
     navigate,
-
     engineAction,
-
     emergencyStop,
-
     toggleOS,
-
     refreshDashboardData,
-
     verifyAdminKey,
-
     clearAdminKey
   };
 
-    /* ========================================================================
+
+  /* ========================================================================
    * START APPLICATION
    * ====================================================================== */
 
@@ -3256,6 +3234,7 @@ function renderPermitsTable(permits) {
         if (ok) {
           if (keyStatus) keyStatus.textContent = "Authenticated";
           showToast("Authenticated", "success");
+          setControlsEnabled(true);
           await loadDashboard();
         } else {
           if (keyStatus) keyStatus.textContent = "Invalid admin key";
