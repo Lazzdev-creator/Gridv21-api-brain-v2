@@ -103,19 +103,12 @@
       <!-- ===================== EXECUTIVE DASHBOARD ===================== -->
       <section id="section-dashboard" class="section active-section">
 
-        <div class="hero">
-          <div>
-            <span class="eyebrow">ENTERPRISE INTELLIGENCE OPERATING SYSTEM</span>
-            <h2>GRIDV21 BRAIN Command Centre</h2>
-            <p>Live operational telemetry, lead intelligence, revenue pipeline and autonomous engine controls.</p>
-          </div>
-          <div class="hero-actions">
-            <button id="btnStartScan" class="btn btn-primary" type="button">Start Scan</button>
-            <button id="btnStopScan" class="btn btn-secondary" type="button">Stop Scan</button>
-            <button id="btnPauseEngine" class="btn btn-secondary" type="button">Pause Engine</button>
-            <button id="btnResumeEngine" class="btn btn-secondary" type="button">Resume Engine</button>
-            <button id="btnEmergencyStop" class="btn btn-danger" type="button">Emergency Stop</button>
-          </div>
+        <div class="hero-actions">
+  <button class="btn btn-primary" data-action="scan-start" type="button">Start Scan</button>
+  <button class="btn btn-secondary" data-action="scan-stop" type="button">Stop Scan</button>
+  <button class="btn btn-secondary" data-action="brain-pause" type="button">Pause Engine</button>
+  <button class="btn btn-secondary" data-action="brain-resume" type="button">Resume Engine</button>
+  <button class="btn btn-danger" data-action="emergency-stop" type="button">Emergency Stop</button>
         </div>
 
         <div class="metric-grid">
