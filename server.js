@@ -3545,12 +3545,6 @@ try {
   );
 }
 
-// ADMIN KEY MIDDLEWARE - ADD THIS HERE
-function requireAdminKey(req, res, next) {
-  const key = req.query.key || req.headers['x-admin-key'];
-  if (key !== ADMIN_KEY) {
-    return res.status(401).json({error: 'Invalid admin key'});
-  }
   next();
 }
 
