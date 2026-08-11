@@ -96,7 +96,18 @@ const requireBrainAccess = requireAdmin;
 // Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// Auto-detect dashboard folder
+const possibleDashboardPaths = [
+  path.join(__dirname, "dashboard"),
+  path.join(__dirname, "Dashboard"),
+  path.join(__dirname, "public"),
+  __dirname
+];
 
+const DASHBOARD_DIR =
+  possibleDashboardPaths.find(p => fs.existsSync(p)) || __dirname;
+
+const PUBLIC_DIR = path.join(__dirname, "public");
 const app = express();
 export const VERSION = "6.3.6";
 const PORT = Number(process.env.PORT || 3000);
