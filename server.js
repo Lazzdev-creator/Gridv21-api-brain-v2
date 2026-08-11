@@ -3462,8 +3462,26 @@ app.post('/api/brain/emergency-stop', requireAdminKey, (req, res) => {
 });
 
 // 3. AUTH VERIFY - THIS IS WHY YOU GOT 401
-app.get('/api/auth/verify', requireAdminKey, (req, res) => {
-  res.json({ok: true});
+app.get("/api/auth/verify", (req, res) => {
+  const supplied =
+    req.get("x-admin-key") ||
+    req.query.key ||
+    req.headers["x-admin-key"] ||
+    "";
+
+  if (!supplied || supplied !== process.env.ADMIN_KEY) {
+    return res.status(401).json({
+      ok: false,
+      authenticated: false,
+      error: "Authentication required"
+    });
+  }
+
+  res.json({
+    ok: true,
+    authenticated: true,
+    version: VERSION
+  });
 });
 /* ---------------------------
 ----------------------------------------------- */
