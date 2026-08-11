@@ -1603,7 +1603,6 @@ export async function scanAllCities(
 /* -------------------------------------------------------------------------- */
 /* HEALTH                                                                     */
 /* -------------------------------------------------------------------------- */
-
 app.get("/api/health", async (req, res) => {
   let database = "unknown";
 
@@ -1613,9 +1612,7 @@ app.get("/api/health", async (req, res) => {
       .select("id")
       .limit(1);
 
-    database = error
-      ? "error"
-      : "connected";
+    database = error ? "error" : "connected";
   } catch (_) {
     database = "error";
   }
@@ -1627,24 +1624,18 @@ app.get("/api/health", async (req, res) => {
     database,
     engine: {
       running: ENGINE.running,
-      scannin
-      emergency_stopped:
-        ENGINE.emergencyStopped,
-      last_scan:
-        ENGINE.lastScan,
-      permits_found:
-        ENGINE.permitsFound,
+      scanning: ENGINE.scanning,
+      emergency_stopped: ENGINE.emergencyStopped,
+      last_scan: ENGINE.lastScan,
+      permits_found: ENGINE.permitsFound,
       errors: ENGINE.errors,
       uptime_seconds: Math.floor(
-        (Date.now() -
-          ENGINE.uptime) /
-          1000
+        (Date.now() - ENGINE.uptime) / 1000
       )
     },
-    os_count:
-      OS_MODULES.length,
-    timestamp:
-      new Date().toISOString()
+    os_count: OS_MODULES.length,
+    timestamp: new Date().toISOString(),
+    request_id: req.id
   });
 });
 
