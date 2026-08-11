@@ -1603,30 +1603,6 @@ export async function scanAllCities(
 /* -------------------------------------------------------------------------- */
 /* AUTH / ADMIN HELPERS                                                       */
 /* -------------------------------------------------------------------------- */
-function getAdminKey(req) {
-  return (
-    req.get("X-Admin-Key") ||
-    req.get("x-admin-key") ||
-    (req.get("Authorization") || "").replace(/^Bearer\s+/i, "") ||
-    req.query.admin_key ||
-    req.query.key ||
-    req.query.adminKey ||
-    null
-  );
-}
-
-function requireAdmin(req, res, next) {
-  const supplied = getAdminKey(req);
-
-  if (!supplied || supplied !== process.env.ADMIN_KEY) {
-    return res.status(401).json({
-      ok: false,
-      error: "Authentication required"
-    });
-  }
-
-  next();
-}
 
 function requireAdminOrSession(req, res, next) {
   if (req.isAuthenticated?.()) return next();
