@@ -279,7 +279,73 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(helmet({ contentSecurityPolicy: false }));
+/* -------------------------------------------------------------------------- */
+/* SECURITY HEADERS                                                           */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  helmet({
+    // Content Security Policy – adjust if you load external scripts/fonts/images
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // needed for inline dashboard scripts
+        styleSrc: ["'self'", "'unsafe-inline'"],  // needed for inline styles
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", process.env.FRONTEND_URL || "'self'"].filter(Boolean),
+        fontSrc: ["'self'", "data:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"]
+      }
+    },
+
+    // Prevent clickjacking
+    frameguard: { action: "deny" },
+
+    // Stop MIME-type sniffing
+    noSniff: true,
+
+    // XSS filter (legacy browsers)
+    xssFilter: true,
+
+    // Referrer policy
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+
+    // HSTS – only enable when you are fully on HTTPS
+    hsts: IS_PRODUCTION
+      ? {
+          maxAge: 31536000,        // 1 year
+          includeSubDomains: true,
+          preload: true
+        }
+      : false,
+
+    // Hide Express fingerprint
+    hidePoweredBy: true,
+
+    // Cross-Origin policies
+    crossOriginEmbedderPolicy: false, // keep false unless you fully control all assets
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" }
+  })
+);
+
+// Extra explicit headers (belt-and-suspenders)
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "0"); // modern browsers ignore this; CSP is better
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+  );
+  res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
+  next();
+});
 app.use(compression());
 app.use(morgan(":id :method :url :status :response-time ms"));
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
