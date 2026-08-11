@@ -104,7 +104,6 @@ const requireAuth = requireAdmin;
 const requireAdminKey = requireAdmin;
 const requireBrainAccess = requireAdmin;
   next();
-}
 // Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
