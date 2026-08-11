@@ -34,10 +34,6 @@ const ADMIN_KEY = process.env.ADMIN_KEY;
 /* SECURE API KEY VALIDATION                                                  */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Constant-time string comparison.
- * Prevents timing attacks.
- */
 function safeCompare(a, b) {
   const strA = String(a ?? "");
   const strB = String(b ?? "");
@@ -56,9 +52,6 @@ function safeCompare(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-/**
- * Extract admin key from request (header preferred).
- */
 function getAdminKey(req) {
   return (
     req.get("x-admin-key") ||
@@ -68,9 +61,6 @@ function getAdminKey(req) {
   ).trim();
 }
 
-/**
- * Main auth middleware – use on all protected routes.
- */
 function requireAdmin(req, res, next) {
   const supplied = getAdminKey(req);
   const expected = process.env.ADMIN_KEY || ADMIN_KEY || "";
@@ -99,25 +89,13 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Aliases so the rest of your file keeps working
 const requireAuth = requireAdmin;
 const requireAdminKey = requireAdmin;
 const requireBrainAccess = requireAdmin;
-  next();
+
 // Define __filename and __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Auto-detect whether the folder is named 'dashboard', 'Dashboard', 'public', or root
-const possibleDashboardPaths = [
-  path.join(__dirname, 'dashboard'),
-  path.join(__dirname, 'Dashboard'),
-  path.join(__dirname, 'public'),
-  __dirname
-];
-
-const DASHBOARD_DIR = possibleDashboardPaths.find(p => fs.existsSync(p)) || __dirname;
-const PUBLIC_DIR = path.join(__dirname, 'public');
 
 const app = express();
 export const VERSION = "6.3.6";
