@@ -30,11 +30,79 @@ import fs from 'fs';
 dotenv.config();
 const ADMIN_KEY = process.env.ADMIN_KEY;
 
-function requireAuth(req, res, next) {
-  const key = req.query.key || req.headers['x-admin-key'] || req.headers['x-ADMIN_KEY'];
-  if (!key || key !== ADMIN_KEY) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
+/* -------------------------------------------------------------------------- */
+/* SECURE API KEY VALIDATION                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Constant-time string comparison.
+ * Prevents timing attacks.
+ */
+function safeCompare(a, b) {
+  const strA = String(a ?? "");
+  const strB = String(b ?? "");
+
+  const bufA = Buffer.from(strA);
+  const bufB = Buffer.from(strB);
+
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(
+      Buffer.alloc(bufA.length || 1),
+      Buffer.alloc(bufA.length || 1)
+    );
+    return false;
   }
+
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Extract admin key from request (header preferred).
+ */
+function getAdminKey(req) {
+  return (
+    req.get("x-admin-key") ||
+    req.headers["x-admin-key"] ||
+    req.query.key ||
+    ""
+  ).trim();
+}
+
+/**
+ * Main auth middleware – use on all protected routes.
+ */
+function requireAdmin(req, res, next) {
+  const supplied = getAdminKey(req);
+  const expected = process.env.ADMIN_KEY || ADMIN_KEY || "";
+
+  if (!expected) {
+    console.error("[SECURITY] ADMIN_KEY is not set in environment");
+    return res.status(500).json({
+      ok: false,
+      error: "Server misconfiguration"
+    });
+  }
+
+  if (!supplied || !safeCompare(supplied, expected)) {
+    console.warn(
+      `[SECURITY] Invalid admin key attempt from ${req.ip} on ${req.method} ${req.originalUrl}`
+    );
+
+    return res.status(401).json({
+      ok: false,
+      authenticated: false,
+      error: "Authentication required"
+    });
+  }
+
+  req.isAdmin = true;
+  next();
+}
+
+// Aliases so the rest of your file keeps working
+const requireAuth = requireAdmin;
+const requireAdminKey = requireAdmin;
+const requireBrainAccess = requireAdmin;
   next();
 }
 // Define __filename and __dirname for ES Modules
