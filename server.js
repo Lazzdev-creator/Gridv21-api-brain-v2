@@ -1599,33 +1599,7 @@ export async function scanAllCities(
     currentScanAbortController = null;
     scanPromise = null;
   }
-    }
-/* -------------------------------------------------------------------------- */
-/* AUTH / ADMIN HELPERS                                                       */
-/* -------------------------------------------------------------------------- */
-
-function requireAdminOrSession(req, res, next) {
-  if (req.isAuthenticated?.()) return next();
-  return requireAdmin(req, res, next);
 }
-
-// Alias used by some routes
-function requireBrainAccess(req, res, next) {
-  return requireAdminOrSession(req, res, next);
-}
-
-app.get("/api/auth/verify", (req, res) => {
-  const supplied = getAdminKey(req);
-
-  if (!supplied || supplied !== process.env.ADMIN_KEY) {
-    return res.status(401).json({
-      ok: false,
-      error: "Authentication required"
-    });
-  }
-
-  res.json({ ok: true, authenticated: true, version: VERSION });
-});
 /* -------------------------------------------------------------------------- */
 /* HEALTH                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -1653,7 +1627,7 @@ app.get("/api/health", async (req, res) => {
     database,
     engine: {
       running: ENGINE.running,
-      scanning: ENGINE.scanning,
+      scannin
       emergency_stopped:
         ENGINE.emergencyStopped,
       last_scan:
