@@ -108,6 +108,7 @@ const DASHBOARD_DIR =
   possibleDashboardPaths.find(p => fs.existsSync(p)) || __dirname;
 
 const PUBLIC_DIR = path.join(__dirname, "public");
+
 const app = express();
 export const VERSION = "6.3.6";
 const PORT = Number(process.env.PORT || 3000);
