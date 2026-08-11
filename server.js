@@ -3486,7 +3486,6 @@ try {
 }
 
   next();
-}
 
 // BRAIN STATE - MEMORY
 let brainState = {
