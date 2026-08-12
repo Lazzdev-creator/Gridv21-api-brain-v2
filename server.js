@@ -3537,9 +3537,7 @@ app.post('/api/brain/emergency-stop', requireAdminKey, (req, res) => {
   brainState = {running: false, scanning: false, emergency: true, permitsFound: 0, errors: 0};
   res.json({ok: true});
 });
-
------------------------------------------------ */
-/* SERVER                                                                     */
+                                                                   */
 /* -------------------------------------------------------------------------- */
 // CRON JOB ROUTE
 app.get('/internal/run-cycle', requireAdminKey, async (req, res) => {
