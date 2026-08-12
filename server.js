@@ -3475,8 +3475,6 @@ try {
   );
 }
 
-  next();
-
 // BRAIN STATE - MEMORY
 let brainState = {
   running: true,
