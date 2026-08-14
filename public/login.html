@@ -1072,4 +1072,338 @@
             response.status;
 
           supabaseDiag.className =
-            "diag-line success
+                    "diag-line success";
+
+      } else {
+
+        supabaseDiag.textContent =
+          "2. FAIL: Supabase API returned HTTP " +
+          response.status +
+          " — " +
+          responseText.substring(0, 300);
+
+        supabaseDiag.className =
+          "diag-line error";
+      }
+
+    } catch (error) {
+
+      supabaseDiag.textContent =
+        "2. FAIL: Could not reach Supabase API — " +
+        (error.message || "Failed to fetch");
+
+      supabaseDiag.className =
+        "diag-line error";
+    }
+
+    /* =========================================================
+       3. TEST SUPABASE JAVASCRIPT CLIENT
+       ========================================================= */
+
+    if (typeof window.supabase === "undefined") {
+
+      supabaseDiag.insertAdjacentHTML(
+        "beforeend",
+        '<br><span class="diag-line error">' +
+        "3. FAIL: Supabase JavaScript client is not available." +
+        "</span>"
+      );
+
+      return false;
+    }
+
+    try {
+
+      const client = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+
+      if (!client || !client.auth) {
+
+        throw new Error(
+          "Supabase client was created but Auth is unavailable."
+        );
+      }
+
+      supabaseDiag.insertAdjacentHTML(
+        "beforeend",
+        '<br><span class="diag-line success">' +
+        "3. PASS: Supabase JavaScript client initialized." +
+        "</span>"
+      );
+
+      /* =======================================================
+         4. TEST AUTH SERVICE
+         ======================================================= */
+
+      try {
+
+        const {
+          data: sessionData,
+          error: sessionError
+        } = await client.auth.getSession();
+
+        if (sessionError) {
+
+          supabaseDiag.insertAdjacentHTML(
+            "beforeend",
+            '<br><span class="diag-line error">' +
+            "4. FAIL: Auth service responded with an error: " +
+            sessionError.message +
+            "</span>"
+          );
+
+        } else {
+
+          supabaseDiag.insertAdjacentHTML(
+            "beforeend",
+            '<br><span class="diag-line success">' +
+            "4. PASS: Supabase Auth is reachable." +
+            "</span>"
+          );
+
+          if (sessionData && sessionData.session) {
+
+            supabaseDiag.insertAdjacentHTML(
+              "beforeend",
+              '<br><span class="diag-line success">' +
+              "5. PASS: Existing authenticated session detected." +
+              "</span>"
+            );
+
+          } else {
+
+            supabaseDiag.insertAdjacentHTML(
+              "beforeend",
+              '<br><span class="diag-line">' +
+              "5. INFO: No active session. Login is required." +
+              "</span>"
+            );
+          }
+        }
+
+      } catch (authError) {
+
+        supabaseDiag.insertAdjacentHTML(
+          "beforeend",
+          '<br><span class="diag-line error">' +
+          "4. FAIL: Auth request failed — " +
+          (authError.message || "Unknown error") +
+          "</span>"
+        );
+      }
+
+      /* =======================================================
+         6. STORE CLIENT FOR LOGIN
+         ======================================================= */
+
+      window.gridv21Supabase = client;
+
+      supabaseDiag.insertAdjacentHTML(
+        "beforeend",
+        '<br><span class="diag-line success">' +
+        "6. PASS: GRIDV21 Supabase client is ready for login." +
+        "</span>"
+      );
+
+      return true;
+
+    } catch (clientError) {
+
+      supabaseDiag.insertAdjacentHTML(
+        "beforeend",
+        '<br><span class="diag-line error">' +
+        "3. FAIL: Supabase client initialization failed — " +
+        (clientError.message || "Unknown error") +
+        "</span>"
+      );
+
+      return false;
+    }
+  }
+
+
+  /* ============================================================
+     GRIDV21 LOGIN
+     ============================================================ */
+
+  async function loginToGridv21() {
+
+    const emailInput =
+      document.getElementById("email");
+
+    const passwordInput =
+      document.getElementById("password");
+
+    const loginButton =
+      document.getElementById("loginButton");
+
+    const loginMessage =
+      document.getElementById("loginMessage");
+
+    if (!emailInput || !passwordInput) {
+      console.error(
+        "GRIDV21: Email or password field not found."
+      );
+      return;
+    }
+
+    const email =
+      emailInput.value.trim();
+
+    const password =
+      passwordInput.value;
+
+    if (!email || !password) {
+
+      if (loginMessage) {
+        loginMessage.textContent =
+          "Please enter your email and password.";
+        loginMessage.className =
+          "login-message error";
+      }
+
+      return;
+    }
+
+    if (!window.gridv21Supabase) {
+
+      if (loginMessage) {
+        loginMessage.textContent =
+          "Supabase is not connected. Run diagnostics first.";
+        loginMessage.className =
+          "login-message error";
+      }
+
+      await runSupabaseDiagnostics();
+      return;
+    }
+
+    try {
+
+      if (loginButton) {
+        loginButton.disabled = true;
+        loginButton.textContent = "Authenticating...";
+      }
+
+      if (loginMessage) {
+        loginMessage.textContent =
+          "Connecting to GRIDV21...";
+        loginMessage.className =
+          "login-message";
+      }
+
+      const {
+        data,
+        error
+      } =
+        await window.gridv21Supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data || !data.session) {
+        throw new Error(
+          "Login completed but no authenticated session was returned."
+        );
+      }
+
+      if (loginMessage) {
+        loginMessage.textContent =
+          "Login successful. Opening GRIDV21...";
+        loginMessage.className =
+          "login-message success";
+      }
+
+      console.log(
+        "GRIDV21 authentication successful:",
+        data.user
+      );
+
+      /*
+       * Change this URL if your dashboard has
+       * a different location.
+       */
+      window.location.href =
+        "/dashboard";
+
+    } catch (error) {
+
+      console.error(
+        "GRIDV21 login error:",
+        error
+      );
+
+      let message =
+        error && error.message
+          ? error.message
+          : "Login failed.";
+
+      if (
+        message.toLowerCase().includes(
+          "invalid login credentials"
+        )
+      ) {
+        message =
+          "Invalid email or password.";
+      }
+
+      if (loginMessage) {
+        loginMessage.textContent =
+          message;
+        loginMessage.className =
+          "login-message error";
+      }
+
+    } finally {
+
+      if (loginButton) {
+        loginButton.disabled = false;
+        loginButton.textContent =
+          "Access GRIDV21";
+      }
+    }
+  }
+
+
+  /* ============================================================
+     PAGE INITIALIZATION
+     ============================================================ */
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    async function () {
+
+      console.log(
+        "GRIDV21: Authentication page loaded."
+      );
+
+      const loginButton =
+        document.getElementById("loginButton");
+
+      if (loginButton) {
+
+        loginButton.addEventListener(
+          "click",
+          loginToGridv21
+        );
+      }
+
+      /*
+       * Run diagnostics automatically.
+       */
+      await runSupabaseDiagnostics();
+
+    }
+  );
+
+})();
+</script>
+
+</body>
+</html>
