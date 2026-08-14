@@ -4,1063 +4,817 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>GRIDV21 — Enterprise Intelligence OS</title>
-
-  <!-- Supabase JavaScript -->
-  <script
-    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
-    onload="window.supabaseCDNLoaded = true"
-    onerror="window.supabaseCDNLoaded = false">
-  </script>
+  <title>GRIDV21 Secure Login</title>
 
   <style>
     * {
       box-sizing: border-box;
-      margin: 0;
-      padding: 0;
     }
 
     body {
+      margin: 0;
       min-height: 100vh;
-      background:
-        radial-gradient(circle at 20% 20%, rgba(0,180,255,.10), transparent 30%),
-        radial-gradient(circle at 80% 80%, rgba(0,100,255,.08), transparent 30%),
-        #070c19;
-      color: #fff;
-      font-family: Arial, Helvetica, sans-serif;
+      background: #101a31;
+      color: white;
+      font-family: Arial, sans-serif;
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 25px;
-    }
-
-    .page {
-      width: 100%;
-      max-width: 1050px;
-      display: grid;
-      grid-template-columns: 1.2fr .8fr;
-      gap: 45px;
       align-items: center;
-    }
-
-    .brand {
       padding: 20px;
     }
 
-    .logo {
-      width: 430px;
-      max-width: 100%;
-      height: 250px;
-      object-fit: cover;
-      object-position: center;
-      border-radius: 20px;
-      display: block;
-      margin-bottom: 25px;
-      box-shadow: 0 0 40px rgba(0,180,255,.12);
+    .container {
+      width: 100%;
+      max-width: 520px;
+      background: #15213d;
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.35);
     }
 
-    .tagline {
-      font-size: 30px;
-      line-height: 1.15;
-      font-weight: 700;
-      margin-bottom: 15px;
-    }
-
-    .tagline span {
-      color: #00b4ff;
-    }
-
-    .description {
-      max-width: 600px;
-      color: #aeb9cf;
-      font-size: 16px;
-      line-height: 1.7;
-      margin-bottom: 25px;
-    }
-
-    .features {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(150px, 1fr));
-      gap: 12px;
-      max-width: 600px;
-    }
-
-    .feature {
-      background: rgba(20,31,55,.75);
-      border: 1px solid rgba(0,180,255,.12);
-      border-radius: 12px;
-      padding: 15px;
-    }
-
-    .feature strong {
-      display: block;
-      color: #fff;
-      font-size: 14px;
-      margin-bottom: 5px;
-    }
-
-    .feature small {
-      color: #8794ad;
-      line-height: 1.4;
-    }
-
-    .login-card {
-      background: rgba(20,29,53,.96);
-      border: 1px solid rgba(255,255,255,.06);
-      border-radius: 20px;
-      padding: 32px;
-      box-shadow: 0 20px 60px rgba(0,0,0,.45);
-    }
-
-    .login-card h1 {
+    h1 {
       text-align: center;
-      font-size: 25px;
-      margin-bottom: 7px;
+      margin: 0;
+      font-size: 42px;
     }
 
     .subtitle {
       text-align: center;
-      color: #9da9bf;
-      font-size: 13px;
-      margin-bottom: 28px;
+      color: #aeb8d0;
+      font-size: 20px;
+      margin: 20px 0 35px;
     }
 
     label {
       display: block;
-      color: #b8c2d8;
-      font-size: 13px;
-      margin-bottom: 7px;
+      margin: 18px 0 8px;
+      color: #cbd3e6;
+      font-size: 17px;
     }
 
     input {
       width: 100%;
-      padding: 14px;
-      margin-bottom: 17px;
-      background: #222d4b;
-      border: 1px solid transparent;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 15px;
+      padding: 18px;
+      border-radius: 16px;
+      border: 1px solid #27385f;
+      background: #202e50;
+      color: white;
+      font-size: 17px;
       outline: none;
     }
 
     input:focus {
-      border-color: #00b4ff;
-      box-shadow: 0 0 0 3px rgba(0,180,255,.10);
+      border-color: #0aa9ff;
     }
 
     button {
       width: 100%;
-      padding: 15px;
-      border: none;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #00b4ff, #007bd1);
-      color: #fff;
-      font-size: 16px;
+      margin-top: 25px;
+      padding: 18px;
+      border: 0;
+      border-radius: 16px;
+      background: #079eea;
+      color: white;
+      font-size: 20px;
       font-weight: bold;
       cursor: pointer;
-      transition: .2s;
-    }
-
-    button:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 25px rgba(0,180,255,.25);
     }
 
     button:disabled {
       opacity: .6;
-      cursor: not-allowed;
-      transform: none;
     }
 
-    #error {
-      min-height: 22px;
-      margin-top: 15px;
-      text-align: center;
-      color: #ff7070;
-      font-size: 13px;
-      line-height: 1.5;
-    }
-
-    /* DIAGNOSTICS */
-
-    .diagnostics {
-      display: none;
-      margin-top: 18px;
-      padding: 14px;
-      border-radius: 10px;
-      background: #090e1a;
-      border: 1px solid rgba(255,255,255,.08);
-      font-size: 11px;
+    #status {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 14px;
+      background: #080d1b;
+      white-space: pre-wrap;
       line-height: 1.6;
-      word-break: break-word;
+      font-size: 14px;
+      overflow-wrap: anywhere;
     }
 
-    .diagnostics.show {
-      display: block;
+    .success {
+      color: #58e38b;
     }
 
-    .diag-title {
-      color: #00b4ff;
-      font-weight: bold;
-      margin-bottom: 8px;
+    .error {
+      color: #ff6b6b;
     }
 
-    .diag-ok {
-      color: #61e294;
-    }
-
-    .diag-error {
-      color: #ff7070;
-    }
-
-    .diag-warning {
+    .warning {
       color: #ffd166;
     }
 
-    .secure {
-      text-align: center;
+    .info {
+      color: #55bfff;
+    }
+
+    .diagnostics {
       margin-top: 20px;
-      color: #68758d;
-      font-size: 11px;
+      padding: 18px;
+      background: #080d1b;
+      border-radius: 14px;
+    }
+
+    .diagnostics h3 {
+      color: #00aaff;
+      margin-top: 0;
+    }
+
+    .step {
+      margin: 10px 0;
     }
 
     .footer {
-      margin-top: 25px;
-      color: #526079;
-      font-size: 11px;
       text-align: center;
-    }
-
-    @media (max-width: 800px) {
-
-      body {
-        padding: 15px;
-        align-items: flex-start;
-      }
-
-      .page {
-        grid-template-columns: 1fr;
-        gap: 20px;
-        margin-top: 15px;
-      }
-
-      .brand {
-        text-align: center;
-        padding: 5px;
-      }
-
-      .logo {
-        width: 100%;
-        height: 220px;
-        margin: 0 auto 18px;
-      }
-
-      .tagline {
-        font-size: 24px;
-      }
-
-      .description {
-        font-size: 14px;
-      }
-
-      .features {
-        text-align: left;
-      }
-
-      .login-card {
-        padding: 25px;
-      }
-    }
-
-    @media (max-width: 420px) {
-
-      .features {
-        grid-template-columns: 1fr;
-      }
-
-      .logo {
-        height: 190px;
-      }
+      margin-top: 30px;
+      color: #71809e;
+      font-size: 13px;
     }
   </style>
 </head>
 
 <body>
 
-<div class="page">
+<div class="container">
 
-  <!-- BRANDING -->
-  <section class="brand">
+  <h1>GRIDV21</h1>
 
-    <img
-      src="/assets/gridv21-login-logo-1.jpg"
-      class="logo"
-      alt="GRIDV21"
-      onerror="this.style.display='none'; console.error('GRIDV21 logo not found');"
-    >
+  <div class="subtitle">
+    Brain Enterprise — Secure Sign In
+  </div>
 
-    <div class="tagline">
-      Enterprise Intelligence.<br>
-      <span>Autonomous Business.</span>
+  <label for="email">Email address</label>
+
+  <input
+    id="email"
+    type="email"
+    autocomplete="email"
+    placeholder="Enter your email"
+  >
+
+  <label for="password">Password</label>
+
+  <input
+    id="password"
+    type="password"
+    autocomplete="current-password"
+    placeholder="Enter your password"
+  >
+
+  <button id="loginBtn" onclick="login()">
+    Access GRIDV21
+  </button>
+
+  <div id="status" class="info">
+    Initialising GRIDV21 authentication diagnostics...
+  </div>
+
+  <div class="diagnostics">
+
+    <h3>GRIDV21 AUTHENTICATION DIAGNOSTICS</h3>
+
+    <div id="diagnostics">
+      Waiting for diagnostic tests...
     </div>
 
-    <div class="description">
-      GRIDV21 is an intelligent enterprise operating system that
-      connects business data, AI decision-making, automation,
-      revenue intelligence and enterprise integrations into one
-      unified platform.
-    </div>
+  </div>
 
-    <div class="features">
-
-      <div class="feature">
-        <strong>🧠 Intelligence</strong>
-        <small>
-          Enterprise knowledge and AI-powered decision intelligence.
-        </small>
-      </div>
-
-      <div class="feature">
-        <strong>⚡ Automation</strong>
-        <small>
-          Automate repetitive business processes and workflows.
-        </small>
-      </div>
-
-      <div class="feature">
-        <strong>📊 Revenue Intelligence</strong>
-        <small>
-          Discover opportunities, leads and revenue signals.
-        </small>
-      </div>
-
-      <div class="feature">
-        <strong>🔗 Integrations</strong>
-        <small>
-          Connect APIs, data sources and enterprise systems.
-        </small>
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- LOGIN -->
-  <section class="login-card">
-
-    <h1>GRIDV21</h1>
-
-    <div class="subtitle">
-      Brain Enterprise — Secure Sign In
-    </div>
-
-    <form id="loginForm">
-
-      <label for="email">
-        Email address
-      </label>
-
-      <input
-        id="email"
-        type="email"
-        placeholder="Enter your email"
-        autocomplete="email"
-        required
-      >
-
-      <label for="password">
-        Password
-      </label>
-
-      <input
-        id="password"
-        type="password"
-        placeholder="Enter your password"
-        autocomplete="current-password"
-        required
-      >
-
-      <button
-        id="loginBtn"
-        type="submit">
-        Access GRIDV21
-      </button>
-
-    </form>
-
-    <div id="error"></div>
-
-    <!-- DIAGNOSTIC INFORMATION -->
-    <div
-      id="diagnostics"
-      class="diagnostics">
-
-      <div class="diag-title">
-        GRIDV21 AUTHENTICATION DIAGNOSTICS
-      </div>
-
-      <div id="diagContent">
-        Running diagnostics...
-      </div>
-
-    </div>
-
-    <div class="secure">
-      🔒 Secure authentication powered by Supabase
-    </div>
-
-    <div class="footer">
-      GRIDV21 VC MASTER BUILD V1<br>
-      Intelligent Systems • Autonomous Future • Limitless Value
-    </div>
-
-  </section>
+  <div class="footer">
+    🔒 Secure authentication powered by Supabase
+    <br><br>
+    GRIDV21 VC MASTER BUILD V1
+  </div>
 
 </div>
 
 
+<!-- ============================================================
+     SUPABASE LIBRARY
+     ============================================================ -->
+
+<script
+  src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+  id="supabase-cdn">
+</script>
+
+
 <script>
 
-  /*
-   * ============================================================
-   * GRIDV21 SUPABASE CONFIGURATION
-   * ============================================================
-   */
+"use strict";
 
-  const SUPABASE_URL =
-    'https://iatjgyrphrxeqaiqbpfb.supabase.co';
+/* ============================================================
+   GRIDV21 SUPABASE CONFIGURATION
+   ============================================================ */
 
-  const SUPABASE_ANON_KEY =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw';
+/*
+ IMPORTANT:
 
+ Replace these two values.
 
-  /*
-   * ============================================================
-   * ELEMENTS
-   * ============================================================
-   */
+ SUPABASE_URL:
+ https://YOUR-PROJECT-ID.supabase.co
 
-  const errorEl =
-    document.getElementById('error');
+ SUPABASE_KEY:
+ Use the PUBLIC / ANON / PUBLISHABLE key.
 
-  const diagnosticsEl =
-    document.getElementById('diagnostics');
+ NEVER put the service_role / secret key here.
+*/
 
-  const diagContent =
-    document.getElementById('diagContent');
+const SUPABASE_URL =
+  "https://YOUR-PROJECT-ID.supabase.co";
 
-  const loginForm =
-    document.getElementById('loginForm');
-
-  const loginBtn =
-    document.getElementById('loginBtn');
+const SUPABASE_KEY =
+  "YOUR_PUBLIC_ANON_OR_PUBLISHABLE_KEY";
 
 
-  /*
-   * ============================================================
-   * DIAGNOSTIC HELPER
-   * ============================================================
-   */
+/* ============================================================
+   ELEMENTS
+   ============================================================ */
 
-  function diagnostic(message, type = '') {
+const statusBox =
+  document.getElementById("status");
 
-    const line =
-      document.createElement('div');
+const diagnosticsBox =
+  document.getElementById("diagnostics");
 
-    line.className =
-      type ? 'diag-' + type : '';
+const loginButton =
+  document.getElementById("loginBtn");
 
-    line.textContent =
-      message;
 
-    diagContent.appendChild(line);
+/* ============================================================
+   DIAGNOSTIC LOGGER
+   ============================================================ */
+
+function log(message, type = "info") {
+
+  const line = document.createElement("div");
+
+  line.className = "step " + type;
+
+  line.textContent = message;
+
+  diagnosticsBox.appendChild(line);
+
+  console.log("[GRIDV21]", message);
+}
+
+
+function setStatus(message, type = "info") {
+
+  statusBox.className = type;
+
+  statusBox.textContent = message;
+
+}
+
+
+/* ============================================================
+   TEST 1 — BASIC BROWSER CONNECTIVITY
+   ============================================================ */
+
+async function testInternet() {
+
+  log("1. Checking browser network access...");
+
+  try {
+
+    const response = await fetch(
+      "https://www.google.com/favicon.ico",
+      {
+        method: "HEAD",
+        mode: "no-cors",
+        cache: "no-store"
+      }
+    );
+
+    log(
+      "PASS: Browser has network access.",
+      "success"
+    );
+
+    return true;
+
+  } catch (error) {
+
+    log(
+      "FAILED: Browser network request failed: " +
+      error.message,
+      "error"
+    );
+
+    return false;
+  }
+}
+
+
+/* ============================================================
+   TEST 2 — CHECK SUPABASE LIBRARY
+   ============================================================ */
+
+function testSupabaseLibrary() {
+
+  log("2. Checking Supabase JavaScript library...");
+
+  if (
+    typeof window.supabase !== "undefined" &&
+    typeof window.supabase.createClient === "function"
+  ) {
+
+    log(
+      "PASS: Supabase JavaScript library loaded.",
+      "success"
+    );
+
+    return true;
 
   }
 
+  log(
+    "FAILED: Supabase JavaScript library did not load.",
+    "error"
+  );
 
-  function showDiagnostics() {
-
-    diagnosticsEl.classList.add('show');
-
-  }
+  return false;
+}
 
 
-  /*
-   * ============================================================
-   * BASIC CONFIGURATION CHECK
-   * ============================================================
-   */
+/* ============================================================
+   TEST 3 — FALLBACK TO UNPKG
+   ============================================================ */
 
-  async function runDiagnostics() {
+function loadFallbackCDN() {
 
-    showDiagnostics();
+  return new Promise((resolve) => {
 
-    diagContent.innerHTML = '';
-
-    diagnostic(
-      '1. Checking Supabase JavaScript library...'
+    log(
+      "3. jsDelivr failed. Trying unpkg fallback...",
+      "warning"
     );
 
+    const script =
+      document.createElement("script");
 
-    /*
-     * CHECK CDN
-     */
+    script.src =
+      "https://unpkg.com/@supabase/supabase-js@2";
 
-    if (!window.supabase) {
+    script.onload = function() {
 
-      diagnostic(
-        'FAILED: Supabase JavaScript library did not load.',
-        'error'
-      );
+      if (
+        typeof window.supabase !== "undefined" &&
+        typeof window.supabase.createClient === "function"
+      ) {
 
-      diagnostic(
-        'The browser cannot load https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-        'warning'
-      );
-
-      diagnostic(
-        'Check internet access, CDN blocking, or browser/network restrictions.',
-        'warning'
-      );
-
-      return false;
-
-    }
-
-
-    diagnostic(
-      'OK: Supabase JavaScript library loaded.',
-      'ok'
-    );
-
-
-    /*
-     * CHECK URL
-     */
-
-    diagnostic(
-      '2. Checking Supabase URL...'
-    );
-
-    diagnostic(
-      SUPABASE_URL,
-      'ok'
-    );
-
-
-    /*
-     * CHECK ANON KEY
-     */
-
-    diagnostic(
-      '3. Checking Supabase public API key...'
-    );
-
-    if (
-      !SUPABASE_ANON_KEY ||
-      SUPABASE_ANON_KEY.length < 50
-    ) {
-
-      diagnostic(
-        'FAILED: Supabase anon/publishable key appears invalid.',
-        'error'
-      );
-
-      return false;
-
-    }
-
-    diagnostic(
-      'OK: Public API key is present.',
-      'ok'
-    );
-
-
-    /*
-     * CREATE CLIENT
-     */
-
-    diagnostic(
-      '4. Creating Supabase client...'
-    );
-
-    let client;
-
-    try {
-
-      client =
-        window.supabase.createClient(
-          SUPABASE_URL,
-          SUPABASE_ANON_KEY
+        log(
+          "PASS: Supabase loaded through unpkg.",
+          "success"
         );
 
-      diagnostic(
-        'OK: Supabase client created.',
-        'ok'
-      );
-
-    } catch (err) {
-
-      diagnostic(
-        'FAILED: Could not create Supabase client.',
-        'error'
-      );
-
-      diagnostic(
-        err.message || String(err),
-        'error'
-      );
-
-      return false;
-
-    }
-
-
-    /*
-     * DIRECT SUPABASE CONNECTION TEST
-     */
-
-    diagnostic(
-      '5. Testing direct connection to Supabase Auth...'
-    );
-
-    try {
-
-      const response =
-        await fetch(
-          SUPABASE_URL +
-          '/auth/v1/settings',
-          {
-            method: 'GET',
-
-            headers: {
-              'apikey': SUPABASE_ANON_KEY,
-              'Authorization':
-                'Bearer ' + SUPABASE_ANON_KEY
-            }
-          }
-        );
-
-
-      const text =
-        await response.text();
-
-
-      if (!response.ok) {
-
-        diagnostic(
-          'FAILED: Supabase returned HTTP ' +
-          response.status,
-          'error'
-        );
-
-        diagnostic(
-          text,
-          'error'
-        );
-
-        return false;
-
-      }
-
-
-      diagnostic(
-        'OK: Supabase Auth endpoint is reachable.',
-        'ok'
-      );
-
-
-      diagnostic(
-        '6. Testing Supabase session service...'
-      );
-
-
-      const {
-        data,
-        error
-      } =
-        await client.auth.getSession();
-
-
-      if (error) {
-
-        diagnostic(
-          'FAILED: Session service returned an error.',
-          'error'
-        );
-
-        diagnostic(
-          error.message,
-          'error'
-        );
-
-        return false;
-
-      }
-
-
-      diagnostic(
-        'OK: Supabase session service is working.',
-        'ok'
-      );
-
-
-      if (data && data.session) {
-
-        diagnostic(
-          'An existing login session was found.',
-          'ok'
-        );
+        resolve(true);
 
       } else {
 
-        diagnostic(
-          'No existing session. This is normal before login.',
-          'ok'
+        log(
+          "FAILED: unpkg loaded but Supabase object is unavailable.",
+          "error"
         );
 
+        resolve(false);
       }
+    };
 
+    script.onerror = function() {
 
-      diagnostic(
-        '================================'
+      log(
+        "FAILED: Both jsDelivr and unpkg are blocked or unreachable.",
+        "error"
       );
 
-      diagnostic(
-        'SUPABASE CONNECTION TEST PASSED.',
-        'ok'
-      );
+      resolve(false);
+    };
 
-      return true;
+    document.head.appendChild(script);
+  });
+}
 
 
-    } catch (err) {
+/* ============================================================
+   TEST 4 — SUPABASE URL
+   ============================================================ */
 
-      diagnostic(
-        'FAILED: Browser could not reach Supabase.',
-        'error'
-      );
+async function testSupabaseURL() {
 
-      diagnostic(
-        err.message || String(err),
-        'error'
-      );
+  log("4. Testing Supabase project URL...");
 
-      diagnostic(
-        'Possible causes: network, DNS, browser blocking, CORS, or Supabase project URL.',
-        'warning'
-      );
+  if (
+    SUPABASE_URL.includes("YOUR-PROJECT-ID")
+  ) {
 
-      return false;
+    log(
+      "FAILED: SUPABASE_URL has not been configured.",
+      "error"
+    );
 
-    }
+    return false;
+  }
 
+  try {
+
+    const response = await fetch(
+      SUPABASE_URL + "/auth/v1/health",
+      {
+        method: "GET",
+        headers: {
+          "apikey": SUPABASE_KEY
+        },
+        cache: "no-store"
+      }
+    );
+
+    const text =
+      await response.text();
+
+    log(
+      "Supabase HTTP status: " +
+      response.status,
+      response.ok ? "success" : "warning"
+    );
+
+    log(
+      "Supabase response: " +
+      text.substring(0, 300),
+      "info"
+    );
+
+    return response.ok;
+
+  } catch (error) {
+
+    log(
+      "FAILED: Cannot reach Supabase: " +
+      error.message,
+      "error"
+    );
+
+    return false;
+  }
+}
+
+
+/* ============================================================
+   TEST 5 — CREATE CLIENT
+   ============================================================ */
+
+function createSupabaseClient() {
+
+  log("5. Creating Supabase client...");
+
+  if (
+    typeof window.supabase === "undefined"
+  ) {
+
+    throw new Error(
+      "Supabase library is unavailable."
+    );
+  }
+
+  if (
+    !SUPABASE_URL ||
+    SUPABASE_URL.includes("YOUR-PROJECT-ID")
+  ) {
+
+    throw new Error(
+      "SUPABASE_URL is not configured."
+    );
+  }
+
+  if (
+    !SUPABASE_KEY ||
+    SUPABASE_KEY.includes("YOUR_PUBLIC")
+  ) {
+
+    throw new Error(
+      "SUPABASE_KEY is not configured."
+    );
+  }
+
+  const client =
+    window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY,
+      {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true
+        }
+      }
+    );
+
+  log(
+    "PASS: Supabase client created.",
+    "success"
+  );
+
+  return client;
+}
+
+
+/* ============================================================
+   GLOBAL CLIENT
+   ============================================================ */
+
+let supabaseClient = null;
+
+
+/* ============================================================
+   FULL DIAGNOSTIC
+   ============================================================ */
+
+async function runDiagnostics() {
+
+  diagnosticsBox.innerHTML = "";
+
+  setStatus(
+    "Running Supabase connection diagnostics...",
+    "info"
+  );
+
+  await testInternet();
+
+
+  /* Check primary CDN */
+
+  let libraryLoaded =
+    testSupabaseLibrary();
+
+
+  /* Try fallback */
+
+  if (!libraryLoaded) {
+
+    libraryLoaded =
+      await loadFallbackCDN();
   }
 
 
-  /*
-   * ============================================================
-   * START DIAGNOSTICS
-   * ============================================================
-   */
+  if (!libraryLoaded) {
 
-  window.addEventListener(
-    'load',
-    function() {
+    setStatus(
+      "Supabase JavaScript library could not be loaded. " +
+      "This is a CDN/network problem, not a login/password problem.",
+      "error"
+    );
 
-      setTimeout(
-        runDiagnostics,
-        300
+    return;
+  }
+
+
+  /* Test Supabase itself */
+
+  await testSupabaseURL();
+
+
+  /* Create client */
+
+  try {
+
+    supabaseClient =
+      createSupabaseClient();
+
+    setStatus(
+      "Supabase connection is ready. You can test login.",
+      "success"
+    );
+
+  } catch (error) {
+
+    log(
+      "CLIENT ERROR: " +
+      error.message,
+      "error"
+    );
+
+    setStatus(
+      "Supabase client configuration failed.",
+      "error"
+    );
+  }
+}
+
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+
+async function login() {
+
+  if (!supabaseClient) {
+
+    setStatus(
+      "Supabase client is not ready. Check diagnostics first.",
+      "error"
+    );
+
+    return;
+  }
+
+
+  const email =
+    document.getElementById("email").value.trim();
+
+  const password =
+    document.getElementById("password").value;
+
+
+  if (!email) {
+
+    setStatus(
+      "Enter your email address.",
+      "warning"
+    );
+
+    return;
+  }
+
+
+  if (!password) {
+
+    setStatus(
+      "Enter your password.",
+      "warning"
+    );
+
+    return;
+  }
+
+
+  loginButton.disabled = true;
+
+  loginButton.textContent =
+    "Authenticating...";
+
+
+  setStatus(
+    "Contacting Supabase Authentication...",
+    "info"
+  );
+
+
+  try {
+
+    log(
+      "6. Attempting Supabase email/password authentication..."
+    );
+
+
+    const result =
+      await supabaseClient.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+
+    const data =
+      result.data;
+
+    const error =
+      result.error;
+
+
+    if (error) {
+
+      log(
+        "AUTH FAILED: " +
+        error.message,
+        "error"
+      );
+
+      if (error.status) {
+
+        log(
+          "HTTP status: " +
+          error.status,
+          "error"
+        );
+      }
+
+      if (error.code) {
+
+        log(
+          "Supabase error code: " +
+          error.code,
+          "error"
+        );
+      }
+
+
+      setStatus(
+        "LOGIN FAILED\n\n" +
+        error.message +
+        "\n\nCode: " +
+        (error.code || "N/A") +
+        "\nStatus: " +
+        (error.status || "N/A"),
+        "error"
+      );
+
+      return;
+    }
+
+
+    if (
+      data &&
+      data.session &&
+      data.user
+    ) {
+
+      log(
+        "PASS: Authentication successful.",
+        "success"
+      );
+
+      log(
+        "User ID: " +
+        data.user.id,
+        "success"
+      );
+
+      log(
+        "Email: " +
+        data.user.email,
+        "success"
+      );
+
+
+      setStatus(
+        "LOGIN SUCCESSFUL\n\n" +
+        "GRIDV21 authentication is working.\n\n" +
+        "User: " +
+        data.user.email,
+        "success"
+      );
+
+
+      /*
+       AFTER SUCCESSFUL LOGIN:
+
+       Change this to your actual dashboard route.
+
+       Example:
+       window.location.href = "/dashboard";
+      */
+
+      setTimeout(() => {
+
+        window.location.href =
+          "/dashboard";
+
+      }, 1500);
+
+    } else {
+
+      setStatus(
+        "Supabase returned no session.",
+        "warning"
       );
 
     }
-  );
 
+  } catch (error) {
 
-  /*
-   * ============================================================
-   * LOGIN
-   * ============================================================
-   */
+    log(
+      "UNEXPECTED LOGIN ERROR: " +
+      error.message,
+      "error"
+    );
 
-  loginForm.addEventListener(
-    'submit',
-    async function(event) {
+    setStatus(
+      "Unexpected authentication error:\n\n" +
+      error.message,
+      "error"
+    );
 
-      event.preventDefault();
+  } finally {
 
-      errorEl.textContent = '';
+    loginButton.disabled = false;
 
-      loginBtn.disabled = true;
+    loginButton.textContent =
+      "Access GRIDV21";
+  }
+}
 
-      loginBtn.textContent =
-        'Testing authentication…';
 
+/* ============================================================
+   START DIAGNOSTICS
+   ============================================================ */
 
-      const email =
-        document
-          .getElementById('email')
-          .value
-          .trim();
-
-      const password =
-        document
-          .getElementById('password')
-          .value;
-
-
-      if (!email || !password) {
-
-        errorEl.textContent =
-          'Please enter your email and password.';
-
-        loginBtn.disabled = false;
-
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-        return;
-
-      }
-
-
-      /*
-       * CHECK SUPABASE LIBRARY
-       */
-
-      if (!window.supabase) {
-
-        errorEl.textContent =
-          'Supabase JavaScript library is not loaded.';
-
-        showDiagnostics();
-
-        loginBtn.disabled = false;
-
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-        return;
-
-      }
-
-
-      let supabaseClient;
-
-
-      /*
-       * CREATE CLIENT
-       */
-
-      try {
-
-        supabaseClient =
-          window.supabase.createClient(
-            SUPABASE_URL,
-            SUPABASE_ANON_KEY
-          );
-
-      } catch (err) {
-
-        errorEl.textContent =
-          'Could not initialize Supabase.';
-
-        showDiagnostics();
-
-        diagnostic(
-          'Client initialization error: ' +
-          err.message,
-          'error'
-        );
-
-        loginBtn.disabled = false;
-
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-        return;
-
-      }
-
-
-      /*
-       * LOGIN
-       */
-
-      try {
-
-        const {
-          data,
-          error
-        } =
-          await supabaseClient.auth.signInWithPassword({
-
-            email: email,
-
-            password: password
-
-          });
-
-
-        if (error) {
-
-          console.error(
-            'GRIDV21 Supabase authentication error:',
-            error
-          );
-
-
-          errorEl.textContent =
-            error.message ||
-            'Authentication failed.';
-
-
-          showDiagnostics();
-
-          diagnostic(
-            'LOGIN ERROR: ' +
-            (error.message || 'Unknown Supabase error'),
-            'error'
-          );
-
-
-          if (
-            error.message &&
-            error.message
-              .toLowerCase()
-              .includes('invalid login credentials')
-          ) {
-
-            diagnostic(
-              'The Supabase service is working, but the email/password is incorrect.',
-              'warning'
-            );
-
-          }
-
-
-          if (
-            error.message &&
-            error.message
-              .toLowerCase()
-              .includes('email not confirmed')
-          ) {
-
-            diagnostic(
-              'The account exists, but the email address has not been confirmed.',
-              'warning'
-            );
-
-          }
-
-
-          loginBtn.disabled = false;
-
-          loginBtn.textContent =
-            'Access GRIDV21';
-
-          return;
-
-        }
-
-
-        /*
-         * CHECK SESSION
-         */
-
-        if (
-          !data ||
-          !data.session
-        ) {
-
-          errorEl.textContent =
-            'Authentication completed but no session was created.';
-
-
-          showDiagnostics();
-
-          diagnostic(
-            'LOGIN FAILED: Supabase returned no session.',
-            'error'
-          );
-
-
-          loginBtn.disabled = false;
-
-          loginBtn.textContent =
-            'Access GRIDV21';
-
-          return;
-
-        }
-
-
-        /*
-         * SUCCESS
-         */
-
-        diagnostic(
-          'LOGIN SUCCESSFUL.',
-          'ok'
-        );
-
-        diagnostic(
-          'GRIDV21 session created successfully.',
-          'ok'
-        );
-
-
-        loginBtn.textContent =
-          'Access granted ✓';
-
-
-        /*
-         * GO TO DASHBOARD
-         */
-
-        setTimeout(
-          function() {
-
-            window.location.replace(
-              '/dashboard/'
-            );
-
-          },
-          500
-        );
-
-      } catch (err) {
-
-        console.error(
-          'GRIDV21 unexpected authentication error:',
-          err
-        );
-
-
-        errorEl.textContent =
-          'Authentication request failed.';
-
-
-        showDiagnostics();
-
-        diagnostic(
-          'UNEXPECTED ERROR: ' +
-          (err.message || String(err)),
-          'error'
-        );
-
-
-        loginBtn.disabled = false;
-
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-      }
-
-    }
-  );
+window.addEventListener(
+  "load",
+  runDiagnostics
+);
 
 </script>
 
