@@ -1,148 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GRIDV21 Brain Login</title>
-
-<style>
-*{
-margin:0;
-padding:0;
-box-sizing:border-box;
-font-family:Arial,Helvetica,sans-serif;
-}
-
-body{
-background:#0b1020;
-display:flex;
-justify-content:center;
-align-items:center;
-height:100vh;
-color:white;
-}
-
-.card{
-width:360px;
-background:#151d35;
-padding:35px;
-border-radius:16px;
-box-shadow:0 0 30px rgba(0,0,0,.35);
-}
-
-h1{
-text-align:center;
-margin-bottom:10px;
-font-size:30px;
-}
-
-p{
-text-align:center;
-color:#b8c2d8;
-margin-bottom:25px;
-}
-
-input{
-width:100%;
-padding:14px;
-border:none;
-border-radius:10px;
-margin-bottom:20px;
-background:#222d4b;
-color:white;
-font-size:16px;
-}
-
-button{
-width:100%;
-padding:14px;
-border:none;
-border-radius:10px;
-background:#00b4ff;
-color:white;
-font-size:16px;
-font-weight:bold;
-cursor:pointer;
-}
-
-button:hover{
-background:#0095d6;
-}
-
-#error{
-margin-top:18px;
-text-align:center;
-color:#ff6b6b;
-font-size:15px;
-}
-</style>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRIDV21 Brain Login</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+    body {
+      background: #0b1020;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: white;
+    }
+    .card {
+      width: 360px;
+      background: #151d35;
+      padding: 35px;
+      border-radius: 16px;
+      box-shadow: 0 0 30px rgba(0,0,0,.35);
+    }
+    h1 { text-align: center; margin-bottom: 8px; font-size: 28px; }
+    p { text-align: center; color: #b8c2d8; margin-bottom: 24px; font-size: 14px; }
+    input {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      margin-bottom: 14px;
+      background: #222d4b;
+      color: white;
+      font-size: 16px;
+    }
+    input::placeholder { color: #8a94a8; }
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #00b4ff;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 6px;
+    }
+    button:hover { background: #0095d6; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #error {
+      margin-top: 16px;
+      text-align: center;
+      color: #ff6b6b;
+      font-size: 14px;
+      min-height: 20px;
+    }
+  </style>
 </head>
-
 <body>
+  <div class="card">
+    <h1>GRIDV21</h1>
+    <p>Brain Enterprise — Sign in</p>
 
-<div class="card">
+    <input id="email" type="email" placeholder="Email" autocomplete="email">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
 
-<h1>GRIDV21</h1>
+    <button id="loginBtn" onclick="login()">Login</button>
+    <div id="error"></div>
+  </div>
 
-<p>Brain Enterprise v6.1.10</p>
+  <script>
+    const SUPABASE_URL = 'https://iatjgyrphrxeqaiqbpfb.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw';
 
-<input
-id="key"
-type="password"
-placeholder="Enter Admin Key">
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-<button onclick="login()">
-Login
-</button>
+    async function login() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('error');
+      const btn = document.getElementById('loginBtn');
 
-<div id="error"></div>
+      errorEl.textContent = '';
 
-</div>
+      if (!email || !password) {
+        errorEl.textContent = 'Enter email and password';
+        return;
+      }
 
-<script>
+      btn.disabled = true;
+      btn.textContent = 'Signing in…';
 
-async function login(){
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
 
-const key=document.getElementById("key").value;
+        if (error) {
+          errorEl.textContent = error.message || 'Invalid login';
+          btn.disabled = false;
+          btn.textContent = 'Login';
+          return;
+        }
 
-const res=await fetch("/api/login",{
+        // Success — session stored by Supabase
+        window.location.href = '/dashboard/';
+      } catch (err) {
+        errorEl.textContent = 'Login failed. Try again.';
+        btn.disabled = false;
+        btn.textContent = 'Login';
+      }
+    }
 
-method:"POST",
-
-headers:{
-"Content-Type":"application/json"
-},
-
-credentials:"include",
-
-body:JSON.stringify({
-key:key
-})
-
-});
-
-const data=await res.json();
-
-if(data.success){
-
-window.location="/dashboard";
-
-}else{
-
-document.getElementById("error").innerText="Invalid Admin Key";
-
-}
-
-}
-
-document.getElementById("key").addEventListener("keypress",e=>{
-
-if(e.key==="Enter") login();
-
-});
-
-</script>
-
+    document.getElementById('password').addEventListener('keypress', e => {
+      if (e.key === 'Enter') login();
+    });
+    document.getElementById('email').addEventListener('keypress', e => {
+      if (e.key === 'Enter') document.getElementById('password').focus();
+    });
+  </script>
 </body>
-</html>
+  </html>
