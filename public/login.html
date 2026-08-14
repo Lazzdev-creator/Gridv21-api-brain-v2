@@ -3,9 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#070c19">
 
   <title>GRIDV21 — Enterprise Intelligence OS</title>
+
+  <!-- Supabase JavaScript -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+    onload="window.supabaseCDNLoaded = true"
+    onerror="window.supabaseCDNLoaded = false">
+  </script>
 
   <style>
     * {
@@ -14,73 +20,50 @@
       padding: 0;
     }
 
-    html,
-    body {
-      min-height: 100%;
-      background: #070c19;
-    }
-
     body {
       min-height: 100vh;
       background:
-        radial-gradient(circle at 15% 15%, rgba(0,180,255,.10), transparent 30%),
-        radial-gradient(circle at 85% 85%, rgba(0,100,255,.08), transparent 30%),
+        radial-gradient(circle at 20% 20%, rgba(0,180,255,.10), transparent 30%),
+        radial-gradient(circle at 80% 80%, rgba(0,100,255,.08), transparent 30%),
         #070c19;
-
       color: #fff;
       font-family: Arial, Helvetica, sans-serif;
-
       display: flex;
+      align-items: center;
       justify-content: center;
-
-      padding: 28px 20px;
+      padding: 25px;
     }
 
     .page {
       width: 100%;
-      max-width: 1080px;
-
+      max-width: 1050px;
       display: grid;
-      grid-template-columns: 1.15fr .85fr;
-
+      grid-template-columns: 1.2fr .8fr;
       gap: 45px;
       align-items: center;
-
-      margin: auto 0;
     }
 
-    /* =========================
-       BRAND
-       ========================= */
-
     .brand {
-      padding: 10px;
+      padding: 20px;
     }
 
     .logo {
-      width: 460px;
+      width: 430px;
       max-width: 100%;
-      height: 235px;
-
-      object-fit: contain;
+      height: 250px;
+      object-fit: cover;
       object-position: center;
-
+      border-radius: 20px;
       display: block;
-
-      margin-bottom: 20px;
-
-      border-radius: 18px;
-
-      box-shadow:
-        0 0 45px rgba(0,180,255,.12);
+      margin-bottom: 25px;
+      box-shadow: 0 0 40px rgba(0,180,255,.12);
     }
 
     .tagline {
-      font-size: 31px;
-      line-height: 1.12;
-      font-weight: 800;
-
-      margin-bottom: 14px;
+      font-size: 30px;
+      line-height: 1.15;
+      font-weight: 700;
+      margin-bottom: 15px;
     }
 
     .tagline span {
@@ -89,331 +72,215 @@
 
     .description {
       max-width: 600px;
-
       color: #aeb9cf;
-
-      font-size: 15px;
-      line-height: 1.65;
-
-      margin-bottom: 22px;
+      font-size: 16px;
+      line-height: 1.7;
+      margin-bottom: 25px;
     }
-
-    /* =========================
-       FEATURES
-       ========================= */
 
     .features {
       display: grid;
-
-      grid-template-columns:
-        repeat(2, minmax(150px, 1fr));
-
+      grid-template-columns: repeat(2, minmax(150px, 1fr));
       gap: 12px;
-
       max-width: 600px;
     }
 
     .feature {
-      background: rgba(20,31,55,.78);
-
-      border:
-        1px solid rgba(0,180,255,.12);
-
+      background: rgba(20,31,55,.75);
+      border: 1px solid rgba(0,180,255,.12);
       border-radius: 12px;
-
-      padding: 14px;
+      padding: 15px;
     }
 
     .feature strong {
       display: block;
-
       color: #fff;
-
       font-size: 14px;
-
       margin-bottom: 5px;
     }
 
     .feature small {
-      display: block;
-
       color: #8794ad;
-
       line-height: 1.4;
-
-      font-size: 12px;
     }
 
-    /* =========================
-       LOGIN CARD
-       ========================= */
-
     .login-card {
-      background: rgba(20,29,53,.97);
-
-      border:
-        1px solid rgba(255,255,255,.07);
-
+      background: rgba(20,29,53,.96);
+      border: 1px solid rgba(255,255,255,.06);
       border-radius: 20px;
-
       padding: 32px;
-
-      box-shadow:
-        0 20px 60px rgba(0,0,0,.45);
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
     }
 
     .login-card h1 {
       text-align: center;
-
-      font-size: 26px;
-
+      font-size: 25px;
       margin-bottom: 7px;
     }
 
     .subtitle {
       text-align: center;
-
       color: #9da9bf;
-
       font-size: 13px;
-
-      margin-bottom: 27px;
+      margin-bottom: 28px;
     }
 
     label {
       display: block;
-
       color: #b8c2d8;
-
       font-size: 13px;
-
       margin-bottom: 7px;
     }
 
     input {
       width: 100%;
-
       padding: 14px;
-
       margin-bottom: 17px;
-
       background: #222d4b;
-
-      border:
-        1px solid transparent;
-
+      border: 1px solid transparent;
       border-radius: 10px;
-
       color: #fff;
-
       font-size: 15px;
-
       outline: none;
-    }
-
-    input::placeholder {
-      color: #8792a8;
     }
 
     input:focus {
       border-color: #00b4ff;
-
-      box-shadow:
-        0 0 0 3px rgba(0,180,255,.10);
+      box-shadow: 0 0 0 3px rgba(0,180,255,.10);
     }
 
     button {
       width: 100%;
-
       padding: 15px;
-
       border: none;
-
       border-radius: 10px;
-
-      background:
-        linear-gradient(
-          135deg,
-          #00b4ff,
-          #007bd1
-        );
-
+      background: linear-gradient(135deg, #00b4ff, #007bd1);
       color: #fff;
-
       font-size: 16px;
-
-      font-weight: 700;
-
+      font-weight: bold;
       cursor: pointer;
-
       transition: .2s;
     }
 
     button:hover {
       transform: translateY(-1px);
-
-      box-shadow:
-        0 8px 25px rgba(0,180,255,.25);
+      box-shadow: 0 8px 25px rgba(0,180,255,.25);
     }
 
     button:disabled {
-      opacity: .65;
-
+      opacity: .6;
       cursor: not-allowed;
-
       transform: none;
-
-      box-shadow: none;
     }
 
     #error {
       min-height: 22px;
-
       margin-top: 15px;
-
       text-align: center;
-
       color: #ff7070;
-
       font-size: 13px;
-
-      line-height: 1.45;
+      line-height: 1.5;
     }
 
-    #success {
-      min-height: 0;
+    /* DIAGNOSTICS */
 
-      margin-top: 8px;
+    .diagnostics {
+      display: none;
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 10px;
+      background: #090e1a;
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 11px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
 
-      text-align: center;
+    .diagnostics.show {
+      display: block;
+    }
 
-      color: #62e6a7;
+    .diag-title {
+      color: #00b4ff;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
 
-      font-size: 13px;
+    .diag-ok {
+      color: #61e294;
+    }
+
+    .diag-error {
+      color: #ff7070;
+    }
+
+    .diag-warning {
+      color: #ffd166;
     }
 
     .secure {
       text-align: center;
-
-      margin-top: 18px;
-
+      margin-top: 20px;
       color: #68758d;
-
       font-size: 11px;
     }
 
     .footer {
-      margin-top: 22px;
-
+      margin-top: 25px;
       color: #526079;
-
-      font-size: 10px;
-
-      line-height: 1.6;
-
+      font-size: 11px;
       text-align: center;
     }
-
-    /* =========================
-       MOBILE
-       ========================= */
 
     @media (max-width: 800px) {
 
       body {
-        padding: 14px;
-
+        padding: 15px;
         align-items: flex-start;
       }
 
       .page {
         grid-template-columns: 1fr;
-
-        gap: 18px;
-
-        margin: 0 auto;
-
-        max-width: 560px;
+        gap: 20px;
+        margin-top: 15px;
       }
 
       .brand {
-        padding: 0;
-
-        display: contents;
+        text-align: center;
+        padding: 5px;
       }
 
       .logo {
-        order: 1;
-
         width: 100%;
-
-        height: 165px;
-
-        margin: 0 auto 5px;
-
-        object-fit: contain;
+        height: 220px;
+        margin: 0 auto 18px;
       }
 
       .tagline {
-        order: 2;
-
-        text-align: center;
-
-        font-size: 25px;
-
-        margin:
-          0 8px 8px;
+        font-size: 24px;
       }
 
       .description {
-        order: 3;
-
-        text-align: center;
-
-        font-size: 13px;
-
-        line-height: 1.55;
-
-        margin:
-          0 8px 5px;
-      }
-
-      .login-card {
-        order: 4;
-
-        padding: 26px 22px;
+        font-size: 14px;
       }
 
       .features {
-        order: 5;
+        text-align: left;
+      }
 
-        grid-template-columns:
-          1fr 1fr;
-
-        max-width: none;
+      .login-card {
+        padding: 25px;
       }
     }
 
-    @media (max-width: 430px) {
-
-      .logo {
-        height: 150px;
-      }
-
-      .tagline {
-        font-size: 23px;
-      }
-
-      .description {
-        font-size: 13px;
-      }
+    @media (max-width: 420px) {
 
       .features {
         grid-template-columns: 1fr;
       }
 
-      .login-card {
-        border-radius: 18px;
+      .logo {
+        height: 190px;
       }
     }
   </style>
@@ -421,18 +288,16 @@
 
 <body>
 
-<main class="page">
+<div class="page">
 
-  <!-- =========================
-       GRIDV21 BRAND
-       ========================= -->
-
+  <!-- BRANDING -->
   <section class="brand">
 
     <img
       src="/assets/gridv21-login-logo-1.jpg"
       class="logo"
-      alt="GRIDV21 VC Master Build V1"
+      alt="GRIDV21"
+      onerror="this.style.display='none'; console.error('GRIDV21 logo not found');"
     >
 
     <div class="tagline">
@@ -441,10 +306,10 @@
     </div>
 
     <div class="description">
-      GRIDV21 is an intelligent enterprise operating system
-      that connects business data, AI decision-making,
-      automation, revenue intelligence and enterprise
-      integrations into one unified platform.
+      GRIDV21 is an intelligent enterprise operating system that
+      connects business data, AI decision-making, automation,
+      revenue intelligence and enterprise integrations into one
+      unified platform.
     </div>
 
     <div class="features">
@@ -452,32 +317,28 @@
       <div class="feature">
         <strong>🧠 Intelligence</strong>
         <small>
-          Enterprise knowledge and AI-powered
-          decision intelligence.
+          Enterprise knowledge and AI-powered decision intelligence.
         </small>
       </div>
 
       <div class="feature">
         <strong>⚡ Automation</strong>
         <small>
-          Automate repetitive business
-          processes and workflows.
+          Automate repetitive business processes and workflows.
         </small>
       </div>
 
       <div class="feature">
         <strong>📊 Revenue Intelligence</strong>
         <small>
-          Discover opportunities, leads
-          and revenue signals.
+          Discover opportunities, leads and revenue signals.
         </small>
       </div>
 
       <div class="feature">
         <strong>🔗 Integrations</strong>
         <small>
-          Connect APIs, data sources
-          and enterprise systems.
+          Connect APIs, data sources and enterprise systems.
         </small>
       </div>
 
@@ -486,10 +347,7 @@
   </section>
 
 
-  <!-- =========================
-       LOGIN
-       ========================= -->
-
+  <!-- LOGIN -->
   <section class="login-card">
 
     <h1>GRIDV21</h1>
@@ -508,8 +366,7 @@
         id="email"
         type="email"
         placeholder="Enter your email"
-        autocomplete="username"
-        inputmode="email"
+        autocomplete="email"
         required
       >
 
@@ -527,8 +384,7 @@
 
       <button
         id="loginBtn"
-        type="submit"
-      >
+        type="submit">
         Access GRIDV21
       </button>
 
@@ -536,7 +392,20 @@
 
     <div id="error"></div>
 
-    <div id="success"></div>
+    <!-- DIAGNOSTIC INFORMATION -->
+    <div
+      id="diagnostics"
+      class="diagnostics">
+
+      <div class="diag-title">
+        GRIDV21 AUTHENTICATION DIAGNOSTICS
+      </div>
+
+      <div id="diagContent">
+        Running diagnostics...
+      </div>
+
+    </div>
 
     <div class="secure">
       🔒 Secure authentication powered by Supabase
@@ -549,362 +418,649 @@
 
   </section>
 
-</main>
+</div>
 
 
 <script>
 
-/* ============================================================
-   GRIDV21 SUPABASE CONFIGURATION
-   ============================================================ */
+  /*
+   * ============================================================
+   * GRIDV21 SUPABASE CONFIGURATION
+   * ============================================================
+   */
 
-const SUPABASE_URL =
-  'https://iatjgyrphrxeqaiqbpfb.supabase.co';
+  const SUPABASE_URL =
+    'https://iatjgyrphrxeqaiqbpfb.supabase.co';
 
-const SUPABASE_ANON_KEY =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw';
-
-const PROJECT_REF =
-  'iatjgyrphrxeqaiqbpfb';
-
-const STORAGE_KEY =
-  `sb-${PROJECT_REF}-auth-token`;
+  const SUPABASE_ANON_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw';
 
 
-/* ============================================================
-   ELEMENTS
-   ============================================================ */
+  /*
+   * ============================================================
+   * ELEMENTS
+   * ============================================================
+   */
 
-const form =
-  document.getElementById('loginForm');
+  const errorEl =
+    document.getElementById('error');
 
-const emailInput =
-  document.getElementById('email');
+  const diagnosticsEl =
+    document.getElementById('diagnostics');
 
-const passwordInput =
-  document.getElementById('password');
+  const diagContent =
+    document.getElementById('diagContent');
 
-const loginBtn =
-  document.getElementById('loginBtn');
+  const loginForm =
+    document.getElementById('loginForm');
 
-const errorEl =
-  document.getElementById('error');
-
-const successEl =
-  document.getElementById('success');
-
-
-/* ============================================================
-   MESSAGE HELPERS
-   ============================================================ */
-
-function showError(message) {
-
-  successEl.textContent = '';
-
-  errorEl.textContent = message;
-}
+  const loginBtn =
+    document.getElementById('loginBtn');
 
 
-function clearMessages() {
+  /*
+   * ============================================================
+   * DIAGNOSTIC HELPER
+   * ============================================================
+   */
 
-  errorEl.textContent = '';
+  function diagnostic(message, type = '') {
 
-  successEl.textContent = '';
-}
+    const line =
+      document.createElement('div');
 
+    line.className =
+      type ? 'diag-' + type : '';
 
-/* ============================================================
-   SAVE SUPABASE SESSION
-   ============================================================ */
+    line.textContent =
+      message;
 
-function saveSession(data) {
-
-  const expiresIn =
-    Number(data.expires_in || 3600);
-
-  const expiresAt =
-    Math.floor(Date.now() / 1000)
-    + expiresIn;
-
-  const session = {
-
-    access_token:
-      data.access_token,
-
-    refresh_token:
-      data.refresh_token,
-
-    token_type:
-      data.token_type || 'bearer',
-
-    expires_in:
-      expiresIn,
-
-    expires_at:
-      expiresAt,
-
-    user:
-      data.user
-  };
-
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(session)
-  );
-
-  return session;
-}
-
-
-/* ============================================================
-   CHECK EXISTING SESSION
-   ============================================================ */
-
-function checkExistingSession() {
-
-  try {
-
-    const raw =
-      localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return;
-    }
-
-    const session =
-      JSON.parse(raw);
-
-    const now =
-      Math.floor(Date.now() / 1000);
-
-    if (
-      session.access_token &&
-      session.expires_at &&
-      session.expires_at > now
-    ) {
-
-      window.location.replace(
-        '/dashboard/'
-      );
-    }
-
-  } catch (error) {
-
-    console.error(
-      'Session check failed:',
-      error
-    );
+    diagContent.appendChild(line);
 
   }
-}
 
 
-/* ============================================================
-   LOGIN
-   ============================================================ */
+  function showDiagnostics() {
 
-form.addEventListener(
-  'submit',
-  async function(event) {
+    diagnosticsEl.classList.add('show');
 
-    event.preventDefault();
-
-    clearMessages();
-
-    const email =
-      emailInput.value.trim();
-
-    const password =
-      passwordInput.value;
+  }
 
 
-    if (!email || !password) {
+  /*
+   * ============================================================
+   * BASIC CONFIGURATION CHECK
+   * ============================================================
+   */
 
-      showError(
-        'Please enter your email and password.'
+  async function runDiagnostics() {
+
+    showDiagnostics();
+
+    diagContent.innerHTML = '';
+
+    diagnostic(
+      '1. Checking Supabase JavaScript library...'
+    );
+
+
+    /*
+     * CHECK CDN
+     */
+
+    if (!window.supabase) {
+
+      diagnostic(
+        'FAILED: Supabase JavaScript library did not load.',
+        'error'
       );
 
-      return;
+      diagnostic(
+        'The browser cannot load https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+        'warning'
+      );
+
+      diagnostic(
+        'Check internet access, CDN blocking, or browser/network restrictions.',
+        'warning'
+      );
+
+      return false;
+
     }
 
 
-    loginBtn.disabled = true;
+    diagnostic(
+      'OK: Supabase JavaScript library loaded.',
+      'ok'
+    );
 
-    loginBtn.textContent =
-      'Authenticating…';
 
+    /*
+     * CHECK URL
+     */
+
+    diagnostic(
+      '2. Checking Supabase URL...'
+    );
+
+    diagnostic(
+      SUPABASE_URL,
+      'ok'
+    );
+
+
+    /*
+     * CHECK ANON KEY
+     */
+
+    diagnostic(
+      '3. Checking Supabase public API key...'
+    );
+
+    if (
+      !SUPABASE_ANON_KEY ||
+      SUPABASE_ANON_KEY.length < 50
+    ) {
+
+      diagnostic(
+        'FAILED: Supabase anon/publishable key appears invalid.',
+        'error'
+      );
+
+      return false;
+
+    }
+
+    diagnostic(
+      'OK: Public API key is present.',
+      'ok'
+    );
+
+
+    /*
+     * CREATE CLIENT
+     */
+
+    diagnostic(
+      '4. Creating Supabase client...'
+    );
+
+    let client;
 
     try {
 
-      /*
-       * Direct Supabase Auth REST API.
-       *
-       * No JSDelivr.
-       * No external Supabase JavaScript library.
-       */
+      client =
+        window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY
+        );
+
+      diagnostic(
+        'OK: Supabase client created.',
+        'ok'
+      );
+
+    } catch (err) {
+
+      diagnostic(
+        'FAILED: Could not create Supabase client.',
+        'error'
+      );
+
+      diagnostic(
+        err.message || String(err),
+        'error'
+      );
+
+      return false;
+
+    }
+
+
+    /*
+     * DIRECT SUPABASE CONNECTION TEST
+     */
+
+    diagnostic(
+      '5. Testing direct connection to Supabase Auth...'
+    );
+
+    try {
 
       const response =
         await fetch(
-          `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
+          SUPABASE_URL +
+          '/auth/v1/settings',
           {
-            method: 'POST',
+            method: 'GET',
 
             headers: {
-
-              'Content-Type':
-                'application/json',
-
-              'apikey':
-                SUPABASE_ANON_KEY
-            },
-
-            body:
-              JSON.stringify({
-
-                email:
-                  email,
-
-                password:
-                  password
-
-              })
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization':
+                'Bearer ' + SUPABASE_ANON_KEY
+            }
           }
         );
 
 
-      let result;
+      const text =
+        await response.text();
 
-      try {
-
-        result =
-          await response.json();
-
-      } catch (error) {
-
-        throw new Error(
-          'Invalid response from Supabase.'
-        );
-      }
-
-
-      /* =========================
-         LOGIN FAILED
-         ========================= */
 
       if (!response.ok) {
 
-        console.error(
-          'Supabase authentication error:',
-          result
+        diagnostic(
+          'FAILED: Supabase returned HTTP ' +
+          response.status,
+          'error'
         );
 
-        showError(
-          result.error_description ||
-          result.msg ||
-          result.message ||
-          'Invalid email or password.'
+        diagnostic(
+          text,
+          'error'
         );
 
-        loginBtn.disabled = false;
+        return false;
 
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-        return;
       }
 
 
-      /* =========================
-         NO ACCESS TOKEN
-         ========================= */
-
-      if (!result.access_token) {
-
-        showError(
-          'Authentication succeeded but no session was returned.'
-        );
-
-        loginBtn.disabled = false;
-
-        loginBtn.textContent =
-          'Access GRIDV21';
-
-        return;
-      }
+      diagnostic(
+        'OK: Supabase Auth endpoint is reachable.',
+        'ok'
+      );
 
 
-      /* =========================
-         SAVE SESSION
-         ========================= */
-
-      saveSession(result);
+      diagnostic(
+        '6. Testing Supabase session service...'
+      );
 
 
-      successEl.textContent =
-        'Authentication successful. Opening GRIDV21…';
-
-      loginBtn.textContent =
-        'Access Granted ✓';
-
-
-      /* =========================
-         OPEN DASHBOARD
-         ========================= */
-
-      setTimeout(function() {
-
-        window.location.replace(
-          '/dashboard/'
-        );
-
-      }, 350);
-
-
-    } catch (error) {
-
-      console.error(
-        'GRIDV21 login error:',
+      const {
+        data,
         error
+      } =
+        await client.auth.getSession();
+
+
+      if (error) {
+
+        diagnostic(
+          'FAILED: Session service returned an error.',
+          'error'
+        );
+
+        diagnostic(
+          error.message,
+          'error'
+        );
+
+        return false;
+
+      }
+
+
+      diagnostic(
+        'OK: Supabase session service is working.',
+        'ok'
       );
 
-      showError(
-        'Unable to connect to GRIDV21 authentication service. Check your connection and try again.'
+
+      if (data && data.session) {
+
+        diagnostic(
+          'An existing login session was found.',
+          'ok'
+        );
+
+      } else {
+
+        diagnostic(
+          'No existing session. This is normal before login.',
+          'ok'
+        );
+
+      }
+
+
+      diagnostic(
+        '================================'
       );
 
-      loginBtn.disabled = false;
+      diagnostic(
+        'SUPABASE CONNECTION TEST PASSED.',
+        'ok'
+      );
+
+      return true;
+
+
+    } catch (err) {
+
+      diagnostic(
+        'FAILED: Browser could not reach Supabase.',
+        'error'
+      );
+
+      diagnostic(
+        err.message || String(err),
+        'error'
+      );
+
+      diagnostic(
+        'Possible causes: network, DNS, browser blocking, CORS, or Supabase project URL.',
+        'warning'
+      );
+
+      return false;
+
+    }
+
+  }
+
+
+  /*
+   * ============================================================
+   * START DIAGNOSTICS
+   * ============================================================
+   */
+
+  window.addEventListener(
+    'load',
+    function() {
+
+      setTimeout(
+        runDiagnostics,
+        300
+      );
+
+    }
+  );
+
+
+  /*
+   * ============================================================
+   * LOGIN
+   * ============================================================
+   */
+
+  loginForm.addEventListener(
+    'submit',
+    async function(event) {
+
+      event.preventDefault();
+
+      errorEl.textContent = '';
+
+      loginBtn.disabled = true;
 
       loginBtn.textContent =
-        'Access GRIDV21';
+        'Testing authentication…';
+
+
+      const email =
+        document
+          .getElementById('email')
+          .value
+          .trim();
+
+      const password =
+        document
+          .getElementById('password')
+          .value;
+
+
+      if (!email || !password) {
+
+        errorEl.textContent =
+          'Please enter your email and password.';
+
+        loginBtn.disabled = false;
+
+        loginBtn.textContent =
+          'Access GRIDV21';
+
+        return;
+
+      }
+
+
+      /*
+       * CHECK SUPABASE LIBRARY
+       */
+
+      if (!window.supabase) {
+
+        errorEl.textContent =
+          'Supabase JavaScript library is not loaded.';
+
+        showDiagnostics();
+
+        loginBtn.disabled = false;
+
+        loginBtn.textContent =
+          'Access GRIDV21';
+
+        return;
+
+      }
+
+
+      let supabaseClient;
+
+
+      /*
+       * CREATE CLIENT
+       */
+
+      try {
+
+        supabaseClient =
+          window.supabase.createClient(
+            SUPABASE_URL,
+            SUPABASE_ANON_KEY
+          );
+
+      } catch (err) {
+
+        errorEl.textContent =
+          'Could not initialize Supabase.';
+
+        showDiagnostics();
+
+        diagnostic(
+          'Client initialization error: ' +
+          err.message,
+          'error'
+        );
+
+        loginBtn.disabled = false;
+
+        loginBtn.textContent =
+          'Access GRIDV21';
+
+        return;
+
+      }
+
+
+      /*
+       * LOGIN
+       */
+
+      try {
+
+        const {
+          data,
+          error
+        } =
+          await supabaseClient.auth.signInWithPassword({
+
+            email: email,
+
+            password: password
+
+          });
+
+
+        if (error) {
+
+          console.error(
+            'GRIDV21 Supabase authentication error:',
+            error
+          );
+
+
+          errorEl.textContent =
+            error.message ||
+            'Authentication failed.';
+
+
+          showDiagnostics();
+
+          diagnostic(
+            'LOGIN ERROR: ' +
+            (error.message || 'Unknown Supabase error'),
+            'error'
+          );
+
+
+          if (
+            error.message &&
+            error.message
+              .toLowerCase()
+              .includes('invalid login credentials')
+          ) {
+
+            diagnostic(
+              'The Supabase service is working, but the email/password is incorrect.',
+              'warning'
+            );
+
+          }
+
+
+          if (
+            error.message &&
+            error.message
+              .toLowerCase()
+              .includes('email not confirmed')
+          ) {
+
+            diagnostic(
+              'The account exists, but the email address has not been confirmed.',
+              'warning'
+            );
+
+          }
+
+
+          loginBtn.disabled = false;
+
+          loginBtn.textContent =
+            'Access GRIDV21';
+
+          return;
+
+        }
+
+
+        /*
+         * CHECK SESSION
+         */
+
+        if (
+          !data ||
+          !data.session
+        ) {
+
+          errorEl.textContent =
+            'Authentication completed but no session was created.';
+
+
+          showDiagnostics();
+
+          diagnostic(
+            'LOGIN FAILED: Supabase returned no session.',
+            'error'
+          );
+
+
+          loginBtn.disabled = false;
+
+          loginBtn.textContent =
+            'Access GRIDV21';
+
+          return;
+
+        }
+
+
+        /*
+         * SUCCESS
+         */
+
+        diagnostic(
+          'LOGIN SUCCESSFUL.',
+          'ok'
+        );
+
+        diagnostic(
+          'GRIDV21 session created successfully.',
+          'ok'
+        );
+
+
+        loginBtn.textContent =
+          'Access granted ✓';
+
+
+        /*
+         * GO TO DASHBOARD
+         */
+
+        setTimeout(
+          function() {
+
+            window.location.replace(
+              '/dashboard/'
+            );
+
+          },
+          500
+        );
+
+      } catch (err) {
+
+        console.error(
+          'GRIDV21 unexpected authentication error:',
+          err
+        );
+
+
+        errorEl.textContent =
+          'Authentication request failed.';
+
+
+        showDiagnostics();
+
+        diagnostic(
+          'UNEXPECTED ERROR: ' +
+          (err.message || String(err)),
+          'error'
+        );
+
+
+        loginBtn.disabled = false;
+
+        loginBtn.textContent =
+          'Access GRIDV21';
+
+      }
+
     }
-
-  }
-);
-
-
-/* ============================================================
-   ENTER KEY
-   ============================================================ */
-
-passwordInput.addEventListener(
-  'keydown',
-  function(event) {
-
-    if (event.key === 'Enter') {
-
-      form.requestSubmit();
-
-    }
-
-  }
-);
-
-
-/* ============================================================
-   START
-   ============================================================ */
-
-checkExistingSession();
+  );
 
 </script>
 
