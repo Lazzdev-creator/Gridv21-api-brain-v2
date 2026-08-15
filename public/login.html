@@ -13,27 +13,29 @@
   <title>GRIDV21 — Secure Sign In</title>
 
   <style>
+
     /* =====================================================
-       GRIDV21 RESPONSIVE LOGIN
+       GRIDV21 LOGIN — RESPONSIVE BASE
        ===================================================== */
 
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     html {
       width: 100%;
       min-height: 100%;
-      overflow-x: hidden;
       background: #071126;
+      overflow-x: hidden;
     }
 
     body {
-      margin: 0;
       width: 100%;
       min-height: 100vh;
       min-height: 100dvh;
 
+      margin: 0;
       padding:
         max(12px, env(safe-area-inset-top))
         max(8px, env(safe-area-inset-right))
@@ -45,15 +47,16 @@
         Helvetica,
         sans-serif;
 
+      color: #ffffff;
+
       background:
         radial-gradient(
           circle at 50% 0%,
-          #142852 0%,
-          #071126 48%,
+          #193363 0%,
+          #0b1835 42%,
+          #071126 75%,
           #040a18 100%
         );
-
-      color: #ffffff;
 
       display: flex;
       justify-content: center;
@@ -64,7 +67,7 @@
     }
 
     /* =====================================================
-       MAIN CARD
+       MAIN LOGIN CARD
        ===================================================== */
 
     .login-card {
@@ -79,22 +82,22 @@
         linear-gradient(
           145deg,
           rgba(22, 39, 76, 0.98),
-          rgba(10, 21, 47, 0.98)
+          rgba(8, 18, 42, 0.98)
         );
 
-      border: 1px solid rgba(80, 130, 210, 0.35);
+      border: 1px solid rgba(80, 145, 225, 0.35);
 
       border-radius: 22px;
 
       box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.45),
+        0 24px 70px rgba(0, 0, 0, 0.5),
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
 
       overflow: visible;
     }
 
     /* =====================================================
-       GRIDV21 LOGO
+       BRAND
        ===================================================== */
 
     .brand {
@@ -106,20 +109,25 @@
       align-items: center;
       justify-content: center;
 
-      margin-bottom: 8px;
-
       text-align: center;
+
+      margin: 0 0 8px;
     }
+
+    /* Built-in SVG logo.
+       No external image or CDN required. */
 
     .grid-logo {
       width: 92px;
       height: 92px;
 
-      max-width: 100%;
-
-      margin: 0 auto 7px;
-
       display: block;
+
+      flex: 0 0 auto;
+
+      margin: 0 auto 8px;
+
+      overflow: visible;
     }
 
     .brand-name {
@@ -127,7 +135,10 @@
 
       margin: 0;
 
-      font-size: clamp(30px, 8vw, 44px);
+      color: #ffffff;
+
+      font-size:
+        clamp(32px, 8vw, 46px);
 
       line-height: 1.08;
 
@@ -135,7 +146,9 @@
 
       letter-spacing: 1px;
 
-      color: #ffffff;
+      text-align: center;
+
+      white-space: normal;
 
       overflow-wrap: anywhere;
     }
@@ -145,13 +158,14 @@
 
       margin: 10px 0 28px;
 
-      text-align: center;
-
       color: #aeb9d0;
 
-      font-size: clamp(16px, 4.5vw, 21px);
+      font-size:
+        clamp(16px, 4.5vw, 21px);
 
       line-height: 1.4;
+
+      text-align: center;
 
       overflow-wrap: anywhere;
     }
@@ -160,9 +174,16 @@
        FORM
        ===================================================== */
 
+    #loginForm {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
     .form-group {
       width: 100%;
       margin: 0;
+      padding: 0;
     }
 
     label {
@@ -174,18 +195,31 @@
 
       color: #d7deef;
 
-      font-size: clamp(16px, 4.5vw, 18px);
+      font-size:
+        clamp(16px, 4.5vw, 19px);
 
       line-height: 1.35;
 
+      font-weight: 400;
+
       overflow-wrap: anywhere;
     }
+
+    /* =====================================================
+       INPUT WRAPPER
+       ===================================================== */
 
     .input-wrapper {
       position: relative;
 
       width: 100%;
+
+      display: block;
     }
+
+    /* =====================================================
+       INPUTS
+       ===================================================== */
 
     input {
       display: block;
@@ -194,78 +228,113 @@
       max-width: 100%;
       min-width: 0;
 
-      padding: 17px 18px;
+      height: 62px;
+
+      margin: 0;
+      padding: 0 18px;
 
       border: 1px solid transparent;
 
-      border-radius: 16px;
+      border-radius: 18px;
 
-      background: #eaf0ff;
+      background: #edf2ff;
 
       color: #101828;
 
-      font-size: 16px;
+      font-family: inherit;
+
+      font-size: 17px;
 
       line-height: 1.4;
 
       outline: none;
 
       -webkit-appearance: none;
+      appearance: none;
 
       transition:
         border-color .2s ease,
-        box-shadow .2s ease;
+        box-shadow .2s ease,
+        background .2s ease;
+    }
+
+    input::placeholder {
+      color: #737b8b;
+      opacity: 1;
     }
 
     input:focus {
-      border-color: #079ee8;
+      background: #ffffff;
+
+      border-color: #08a9ef;
 
       box-shadow:
-        0 0 0 3px rgba(7, 158, 232, .18);
+        0 0 0 3px rgba(8, 169, 239, 0.18);
     }
 
     #password {
-      padding-right: 58px;
+      padding-right: 62px;
     }
 
     /* =====================================================
-       PASSWORD TOGGLE
+       PASSWORD EYE BUTTON
        ===================================================== */
 
     .password-toggle {
       position: absolute;
 
-      right: 10px;
+      right: 7px;
       top: 50%;
 
-      transform: translateY(-50%);
+      width: 48px;
+      height: 48px;
 
-      width: 40px;
-      height: 40px;
+      transform: translateY(-50%);
 
       margin: 0;
       padding: 0;
 
       border: 0;
 
+      border-radius: 50%;
+
       background: transparent;
 
-      color: #42526f;
-
-      font-size: 18px;
-
-      cursor: pointer;
+      color: #4b5870;
 
       display: flex;
       align-items: center;
       justify-content: center;
 
-      box-shadow: none;
+      font-size: 22px;
+
+      line-height: 1;
+
+      cursor: pointer;
+
+      touch-action: manipulation;
+
+      -webkit-user-select: none;
+      user-select: none;
+
+      z-index: 20;
+
+      transition:
+        background .15s ease,
+        transform .15s ease;
     }
 
     .password-toggle:hover {
-      background: transparent;
-      box-shadow: none;
+      background: rgba(0, 0, 0, 0.06);
+    }
+
+    .password-toggle:active {
+      transform: translateY(-50%) scale(.92);
+    }
+
+    .password-toggle:focus {
+      outline: 2px solid rgba(8, 169, 239, .45);
+      outline-offset: 1px;
     }
 
     /* =====================================================
@@ -273,30 +342,37 @@
        ===================================================== */
 
     #loginBtn {
-      display: block;
+      display: flex;
+
+      align-items: center;
+      justify-content: center;
 
       width: 100%;
       max-width: 100%;
       min-width: 0;
 
-      margin-top: 26px;
+      min-height: 62px;
 
-      padding: 17px 14px;
+      margin: 26px 0 0;
+      padding: 15px 14px;
 
       border: none;
 
-      border-radius: 16px;
+      border-radius: 18px;
 
       background:
         linear-gradient(
           135deg,
-          #08a9ef,
-          #087de5
+          #08a9ef 0%,
+          #087de5 100%
         );
 
       color: #ffffff;
 
-      font-size: clamp(18px, 5vw, 22px);
+      font-family: inherit;
+
+      font-size:
+        clamp(18px, 5vw, 22px);
 
       line-height: 1.25;
 
@@ -310,45 +386,79 @@
 
       cursor: pointer;
 
+      touch-action: manipulation;
+
+      -webkit-user-select: none;
+      user-select: none;
+
       box-shadow:
-        0 8px 24px rgba(8, 142, 230, .25);
+        0 9px 26px rgba(8, 142, 230, 0.28);
 
       transition:
         transform .15s ease,
-        opacity .15s ease;
+        opacity .15s ease,
+        box-shadow .15s ease;
+    }
+
+    #loginBtn:hover {
+      box-shadow:
+        0 12px 30px rgba(8, 142, 230, 0.38);
     }
 
     #loginBtn:active {
-      transform: scale(.99);
+      transform: scale(.985);
     }
 
     #loginBtn:disabled {
-      opacity: .6;
+      opacity: .65;
       cursor: wait;
+      transform: none;
     }
 
     /* =====================================================
-       STATUS
+       LOGIN BUTTON LOADING
        ===================================================== */
 
-    .status {
+    .button-spinner {
+      width: 20px;
+      height: 20px;
+
+      margin-right: 10px;
+
+      border: 2px solid rgba(255,255,255,.35);
+
+      border-top-color: #ffffff;
+
+      border-radius: 50%;
+
+      animation:
+        gridv21Spin .7s linear infinite;
+    }
+
+    @keyframes gridv21Spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* =====================================================
+       LOGIN MESSAGE
+       ===================================================== */
+
+    #loginMessage {
       width: 100%;
 
-      margin-top: 18px;
+      margin-top: 16px;
 
-      padding: 16px;
+      padding: 13px 14px;
 
-      border-radius: 14px;
-
-      background: #070c1b;
-
-      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 12px;
 
       font-size: 14px;
 
-      line-height: 1.55;
+      line-height: 1.5;
 
-      white-space: pre-wrap;
+      text-align: center;
 
       overflow-wrap: anywhere;
 
@@ -357,100 +467,43 @@
       display: none;
     }
 
-    .success {
-      color: #4ade80;
+    #loginMessage.info {
+      display: block;
+      color: #67c7ff;
+      background: rgba(8, 169, 239, .08);
+      border: 1px solid rgba(8, 169, 239, .18);
     }
 
-    .error {
-      color: #ff7373;
+    #loginMessage.error {
+      display: block;
+      color: #ff7777;
+      background: rgba(255, 75, 75, .08);
+      border: 1px solid rgba(255, 75, 75, .18);
     }
 
-    .warning {
-      color: #ffd166;
-    }
-
-    .info {
-      color: #5dbdff;
-    }
-
-    /* =====================================================
-       DIAGNOSTICS
-       ===================================================== */
-
-    .diagnostics {
-      width: 100%;
-
-      margin-top: 20px;
-
-      padding: 17px;
-
-      border-radius: 15px;
-
-      background: rgba(3, 8, 20, .88);
-
-      border: 1px solid rgba(255,255,255,.04);
-
-      overflow: visible;
-    }
-
-    .diagnostics h3 {
-      width: 100%;
-
-      margin: 0 0 18px;
-
-      color: #00aaff;
-
-      font-size: clamp(17px, 4.5vw, 20px);
-
-      line-height: 1.35;
-
-      font-weight: 700;
-
-      overflow-wrap: anywhere;
-    }
-
-    .diag-line {
-      width: 100%;
-
-      margin: 13px 0;
-
-      padding-bottom: 13px;
-
-      border-bottom: 1px solid rgba(255,255,255,.06);
-
-      font-size: 14px;
-
-      line-height: 1.55;
-
-      white-space: pre-wrap;
-
-      overflow-wrap: anywhere;
-
-      word-break: break-word;
-    }
-
-    .diag-line:last-child {
-      margin-bottom: 0;
-      padding-bottom: 0;
-      border-bottom: none;
+    #loginMessage.success {
+      display: block;
+      color: #5ee58a;
+      background: rgba(74, 222, 128, .08);
+      border: 1px solid rgba(74, 222, 128, .18);
     }
 
     /* =====================================================
-       FOOTER
+       SECURITY FOOTER
        ===================================================== */
 
     .security-footer {
       width: 100%;
 
-      margin-top: 24px;
-
-      text-align: center;
+      margin-top: 26px;
 
       color: #9ba9c4;
 
       font-size: 14px;
 
       line-height: 1.6;
+
+      text-align: center;
 
       overflow-wrap: anywhere;
     }
@@ -467,6 +520,8 @@
       font-size: 13px;
 
       line-height: 1.6;
+
+      overflow-wrap: anywhere;
     }
 
     /* =====================================================
@@ -485,37 +540,45 @@
 
       .login-card {
         padding: 22px 16px 26px;
-
         border-radius: 18px;
       }
 
       .grid-logo {
-        width: 76px;
-        height: 76px;
+        width: 78px;
+        height: 78px;
+      }
+
+      .brand-name {
+        font-size: 34px;
       }
 
       .subtitle {
-        margin-bottom: 22px;
+        margin-bottom: 21px;
+        font-size: 16px;
+      }
+
+      label {
+        font-size: 16px;
       }
 
       input {
-        padding: 15px 14px;
+        height: 58px;
+        padding: 0 15px;
+        font-size: 16px;
       }
 
       #password {
-        padding-right: 54px;
+        padding-right: 58px;
+      }
+
+      .password-toggle {
+        width: 46px;
+        height: 46px;
       }
 
       #loginBtn {
-        padding: 16px 10px;
-      }
-
-      .diagnostics {
-        padding: 14px;
-      }
-
-      .diag-line {
-        font-size: 13px;
+        min-height: 58px;
+        padding: 14px 10px;
       }
 
       .security-footer {
@@ -547,17 +610,21 @@
         height: 68px;
       }
 
-      .diagnostics {
-        padding: 12px;
+      .brand-name {
+        font-size: 30px;
       }
 
-      .diag-line {
-        font-size: 12px;
+      input {
+        height: 56px;
+      }
+
+      #loginBtn {
+        min-height: 56px;
       }
     }
 
     /* =====================================================
-       PREVENT MEDIA CROPPING
+       PREVENT IMAGE/SVG CROPPING
        ===================================================== */
 
     img,
@@ -579,7 +646,8 @@
     p,
     span,
     div,
-    label {
+    label,
+    button {
       max-width: 100%;
       overflow-wrap: anywhere;
     }
@@ -592,12 +660,11 @@
   <main class="login-card">
 
     <!-- =================================================
-         GRIDV21 BRAND / LOGO
+         GRIDV21 BRAND
          ================================================= -->
 
     <div class="brand">
 
-      <!-- Built-in logo: no CDN required -->
       <svg
         class="grid-logo"
         viewBox="0 0 120 120"
@@ -626,27 +693,8 @@
             />
           </linearGradient>
 
-          <linearGradient
-            id="logoDark"
-            x1="0"
-            y1="0"
-            x2="1"
-            y2="1"
-          >
-            <stop
-              offset="0%"
-              stop-color="#125ac8"
-            />
-
-            <stop
-              offset="100%"
-              stop-color="#07316f"
-            />
-          </linearGradient>
-
         </defs>
 
-        <!-- Hexagonal GRID structure -->
         <path
           d="M60 8 L99 30 L99 75 L60 98 L21 75 L21 30 Z"
           fill="none"
@@ -654,7 +702,6 @@
           stroke-width="10"
         />
 
-        <!-- G shape -->
         <path
           d="M79 38
              C73 30 64 26 54 26
@@ -672,11 +719,10 @@
           fill="url(#logoBlue)"
         />
 
-        <!-- 21 -->
         <text
           x="78"
           y="32"
-          font-family="Arial, sans-serif"
+          font-family="Arial, Helvetica, sans-serif"
           font-size="20"
           font-weight="800"
           fill="#ffd166"
@@ -694,12 +740,15 @@
       Brain Enterprise — Secure Sign In
     </div>
 
-
     <!-- =================================================
          LOGIN FORM
          ================================================= -->
 
-    <form id="loginForm" autocomplete="on">
+    <form
+      id="loginForm"
+      autocomplete="on"
+      novalidate
+    >
 
       <div class="form-group">
 
@@ -718,7 +767,6 @@
         >
 
       </div>
-
 
       <div class="form-group">
 
@@ -742,6 +790,7 @@
             id="passwordToggle"
             class="password-toggle"
             aria-label="Show password"
+            aria-pressed="false"
           >
             👁
           </button>
@@ -749,7 +798,6 @@
         </div>
 
       </div>
-
 
       <button
         type="submit"
@@ -760,55 +808,17 @@
 
     </form>
 
-
-    <!-- =================================================
-         STATUS
-         ================================================= -->
+    <!-- Login response only.
+         Diagnostics have deliberately been removed. -->
 
     <div
-      id="status"
-      class="status"
+      id="loginMessage"
       role="alert"
       aria-live="polite"
     ></div>
 
-
     <!-- =================================================
-         DIAGNOSTICS
-         ================================================= -->
-
-    <section class="diagnostics">
-
-      <h3>
-        GRIDV21 AUTHENTICATION DIAGNOSTICS
-      </h3>
-
-      <div
-        id="networkDiag"
-        class="diag-line warning"
-      >
-        1. Checking browser network access...
-      </div>
-
-      <div
-        id="supabaseDiag"
-        class="diag-line warning"
-      >
-        2. Checking Supabase API connection...
-      </div>
-
-      <div
-        id="authDiag"
-        class="diag-line warning"
-      >
-        3. Authentication service waiting...
-      </div>
-
-    </section>
-
-
-    <!-- =================================================
-         FOOTER
+         SECURITY FOOTER
          ================================================= -->
 
     <div class="security-footer">
@@ -826,410 +836,3 @@
     </div>
 
   </main>
-
-
-  <!-- ===================================================
-       GRIDV21 JAVASCRIPT
-
-       IMPORTANT:
-       NO SUPABASE CDN IS USED.
-
-       This communicates directly with the Supabase
-       Auth REST API.
-       =================================================== -->
-
-  <script>
-/* =========================================================
-   GRIDV21 — DIRECT SUPABASE AUTHENTICATION
-   Does NOT depend on supabase-js CDN
-   ========================================================= */
-
-const SUPABASE_URL = "https://iatjgyrphrxeqaiqbpfb.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw";
-
-
-/* ---------------------------------------------------------
-   PASSWORD EYE
-   --------------------------------------------------------- */
-
-document.addEventListener("DOMContentLoaded", function () {
-
-    const password =
-        document.getElementById("password");
-
-    const eye =
-        document.getElementById("togglePassword");
-
-    if (password && eye) {
-
-        eye.addEventListener("click", function (e) {
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (password.type === "password") {
-
-                password.type = "text";
-                eye.textContent = "🙈";
-
-            } else {
-
-                password.type = "password";
-                eye.textContent = "👁";
-            }
-        });
-    }
-
-
-    /* -----------------------------------------------------
-       LOGIN BUTTON
-       ----------------------------------------------------- */
-
-    const loginButton =
-        document.getElementById("loginButton");
-
-    if (loginButton) {
-
-        loginButton.addEventListener(
-            "click",
-            loginToGridv21
-        );
-    }
-
-
-    /* Allow ENTER to login */
-
-    const email =
-        document.getElementById("email");
-
-    if (email) {
-        email.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
-                loginToGridv21();
-            }
-        });
-    }
-
-    if (password) {
-        password.addEventListener("keydown", function (e) {
-            if (e.key === "Enter") {
-                loginToGridv21();
-            }
-        });
-    }
-
-});
-
-
-/* =========================================================
-   LOGIN
-   ========================================================= */
-
-async function loginToGridv21() {
-
-    const emailInput =
-        document.getElementById("email");
-
-    const passwordInput =
-        document.getElementById("password");
-
-    const loginButton =
-        document.getElementById("loginButton");
-
-    let message =
-        document.getElementById("loginMessage");
-
-
-    /* Create message element if missing */
-
-    if (!message) {
-
-        message =
-            document.createElement("div");
-
-        message.id =
-            "loginMessage";
-
-        message.style.marginTop =
-            "18px";
-
-        message.style.textAlign =
-            "center";
-
-        message.style.fontSize =
-            "16px";
-
-        loginButton.parentNode.appendChild(message);
-    }
-
-
-    const email =
-        emailInput.value.trim();
-
-    const password =
-        passwordInput.value;
-
-
-    /* -----------------------------------------------------
-       VALIDATION
-       ----------------------------------------------------- */
-
-    if (!email) {
-
-        message.textContent =
-            "Please enter your email address.";
-
-        message.style.color =
-            "#ff6b6b";
-
-        emailInput.focus();
-
-        return;
-    }
-
-
-    if (!password) {
-
-        message.textContent =
-            "Please enter your password.";
-
-        message.style.color =
-            "#ff6b6b";
-
-        passwordInput.focus();
-
-        return;
-    }
-
-
-    /* -----------------------------------------------------
-       START LOGIN
-       ----------------------------------------------------- */
-
-    loginButton.disabled =
-        true;
-
-    loginButton.textContent =
-        "Connecting...";
-
-    message.textContent =
-        "Connecting securely to GRIDV21...";
-
-    message.style.color =
-        "#4db8ff";
-
-
-    try {
-
-        const controller =
-            new AbortController();
-
-        const timeout =
-            setTimeout(
-                () => controller.abort(),
-                15000
-            );
-
-
-        const response =
-            await fetch(
-                SUPABASE_URL +
-                "/auth/v1/token?grant_type=password",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-
-                        "apikey":
-                            SUPABASE_ANON_KEY,
-
-                        "Authorization":
-                            "Bearer " +
-                            SUPABASE_ANON_KEY
-                    },
-
-                    body: JSON.stringify({
-                        email: email,
-                        password: password
-                    }),
-
-                    signal:
-                        controller.signal
-                }
-            );
-
-
-        clearTimeout(timeout);
-
-
-        const result =
-            await response.json()
-                .catch(() => ({}));
-
-
-        console.log(
-            "GRIDV21 Supabase response:",
-            response.status,
-            result
-        );
-
-
-        /* -------------------------------------------------
-           LOGIN FAILED
-           ------------------------------------------------- */
-
-        if (!response.ok) {
-
-            let errorMessage =
-                result.error_description ||
-                result.msg ||
-                result.message ||
-                "Authentication failed.";
-
-
-            if (
-                errorMessage
-                    .toLowerCase()
-                    .includes(
-                        "invalid login credentials"
-                    )
-            ) {
-
-                errorMessage =
-                    "Invalid email or password.";
-            }
-
-
-            if (
-                errorMessage
-                    .toLowerCase()
-                    .includes(
-                        "email not confirmed"
-                    )
-            ) {
-
-                errorMessage =
-                    "Email address has not been confirmed.";
-            }
-
-
-            message.textContent =
-                "LOGIN FAILED: " +
-                errorMessage;
-
-            message.style.color =
-                "#ff6b6b";
-
-
-            loginButton.disabled =
-                false;
-
-            loginButton.textContent =
-                "Access GRIDV21";
-
-            return;
-        }
-
-
-        /* -------------------------------------------------
-           SUCCESS
-           ------------------------------------------------- */
-
-        if (!result.access_token) {
-
-            throw new Error(
-                "Supabase responded successfully but no access token was returned."
-            );
-        }
-
-
-        /* Store authentication session */
-
-        localStorage.setItem(
-            "gridv21_access_token",
-            result.access_token
-        );
-
-
-        if (result.refresh_token) {
-
-            localStorage.setItem(
-                "gridv21_refresh_token",
-                result.refresh_token
-            );
-        }
-
-
-        if (result.user) {
-
-            localStorage.setItem(
-                "gridv21_user",
-                JSON.stringify(result.user)
-            );
-        }
-
-
-        message.textContent =
-            "LOGIN SUCCESSFUL — Opening GRIDV21...";
-
-        message.style.color =
-            "#35d07f";
-
-
-        loginButton.textContent =
-            "Access Granted";
-
-
-        /* -------------------------------------------------
-           DASHBOARD REDIRECT
-           ------------------------------------------------- */
-
-        setTimeout(function () {
-
-            window.location.href =
-                "/dashboard";
-
-        }, 700);
-
-
-    } catch (error) {
-
-        console.error(
-            "GRIDV21 authentication error:",
-            error
-        );
-
-
-        if (
-            error.name ===
-            "AbortError"
-        ) {
-
-            message.textContent =
-                "CONNECTION TIMEOUT: Supabase did not respond within 15 seconds.";
-
-        } else {
-
-            message.textContent =
-                "CONNECTION ERROR: " +
-                (error.message ||
-                "Could not connect to Supabase.");
-        }
-
-
-        message.style.color =
-            "#ff6b6b";
-
-
-        loginButton.disabled =
-            false;
-
-        loginButton.textContent =
-            "Access GRIDV21";
-    }
-}
-  </script>
-</body>
-</html>
