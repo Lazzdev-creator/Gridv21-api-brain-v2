@@ -1494,3 +1494,163 @@
     );
 
   </script>
+  <!-- ===================================================
+       GRIDV21 FINAL SESSION / API HANDLING
+       =================================================== -->
+
+  <script>
+
+    /* =====================================================
+       OPTIONAL API HEALTH CHECK
+       
+       This does NOT appear on the login screen.
+       It is only logged to the browser console.
+       ===================================================== */
+
+    async function checkGridv21API() {
+
+      try {
+
+        const response =
+          await fetch(
+            GRIDV21_API + "/api/health",
+            {
+              method: "GET",
+              headers: {
+                "Accept":
+                  "application/json"
+              },
+
+              cache: "no-store"
+            }
+          );
+
+
+        console.log(
+          "GRIDV21 API status:",
+          response.status
+        );
+
+
+      } catch (error) {
+
+        console.warn(
+          "GRIDV21 API health check unavailable:",
+          error
+        );
+
+      }
+
+    }
+
+
+    /* =====================================================
+       RESTORE SAVED ACCESS TOKEN
+       ===================================================== */
+
+    function getGridv21Token() {
+
+      try {
+
+        const token =
+          localStorage.getItem(
+            "gridv21_access_token"
+          );
+
+        return token || null;
+
+      } catch (error) {
+
+        console.warn(
+          "Unable to read GRIDV21 session.",
+          error
+        );
+
+        return null;
+      }
+    }
+
+
+    /* =====================================================
+       GLOBAL GRIDV21 SESSION OBJECT
+       ===================================================== */
+
+    window.GRIDV21 = {
+
+      supabaseUrl:
+        SUPABASE_URL,
+
+      apiUrl:
+        GRIDV21_API,
+
+      getToken:
+        getGridv21Token,
+
+      getSession:
+        function () {
+
+          try {
+
+            const session =
+              localStorage.getItem(
+                "gridv21_session"
+              );
+
+            return session
+              ? JSON.parse(session)
+              : null;
+
+          } catch (error) {
+
+            return null;
+          }
+        },
+
+      logout:
+        function () {
+
+          localStorage.removeItem(
+            "gridv21_session"
+          );
+
+          localStorage.removeItem(
+            "gridv21_access_token"
+          );
+
+          localStorage.removeItem(
+            "gridv21_refresh_token"
+          );
+
+          localStorage.removeItem(
+            "gridv21_user_id"
+          );
+
+          window.location.href =
+            "/login.html";
+        }
+    };
+
+
+    /* =====================================================
+       START API CHECK
+       
+       Console only.
+       Nothing is displayed on the login screen.
+       ===================================================== */
+
+    checkGridv21API();
+
+
+    /* =====================================================
+       FINAL READY MESSAGE
+       ===================================================== */
+
+    console.log(
+      "GRIDV21 Secure Login initialized."
+    );
+
+  </script>
+
+
+</body>
+  </html>
