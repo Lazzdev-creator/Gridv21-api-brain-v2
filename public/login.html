@@ -836,3 +836,661 @@
     </div>
 
   </main>
+  <!-- ===================================================
+       GRIDV21 AUTHENTICATION ENGINE
+       Direct Supabase REST API
+       No CDN required
+       =================================================== -->
+
+  <script>
+
+    /* =====================================================
+       GRIDV21 CONFIGURATION
+       ===================================================== */
+
+    const SUPABASE_URL =
+      "https://iatjgyrphrxeqaiqbpfb.supabase.co";
+
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlhdGpneXJwaHJ4ZXFhaXFicGZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTgxNjEsImV4cCI6MjA5MzE5NDE2MX0.sL1_y9VjvppM06p8DG5rybOLvROPuMyhYv4KG5IXhSw";
+
+    const GRIDV21_API =
+      "https://gridv21-api-brain-v2-1.onrender.com";
+
+
+    /* =====================================================
+       ELEMENTS
+       ===================================================== */
+
+    const loginForm =
+      document.getElementById("loginForm");
+
+    const emailInput =
+      document.getElementById("email");
+
+    const passwordInput =
+      document.getElementById("password");
+
+    const passwordToggle =
+      document.getElementById("passwordToggle");
+
+    const loginBtn =
+      document.getElementById("loginBtn");
+
+    const loginMessage =
+      document.getElementById("loginMessage");
+
+
+    /* =====================================================
+       MESSAGE HANDLER
+       ===================================================== */
+
+    function showMessage(message, type) {
+
+      loginMessage.textContent = message;
+
+      loginMessage.className = "";
+
+      if (type) {
+        loginMessage.classList.add(type);
+      }
+
+      loginMessage.style.display = "block";
+    }
+
+
+    function clearMessage() {
+
+      loginMessage.textContent = "";
+
+      loginMessage.className = "";
+
+      loginMessage.style.display = "none";
+    }
+
+
+    /* =====================================================
+       PASSWORD VISIBILITY
+       ===================================================== */
+
+    passwordToggle.addEventListener(
+      "click",
+      function (event) {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const isHidden =
+          passwordInput.type === "password";
+
+        if (isHidden) {
+
+          passwordInput.type = "text";
+
+          passwordToggle.textContent = "🙈";
+
+          passwordToggle.setAttribute(
+            "aria-label",
+            "Hide password"
+          );
+
+          passwordToggle.setAttribute(
+            "aria-pressed",
+            "true"
+          );
+
+        } else {
+
+          passwordInput.type = "password";
+
+          passwordToggle.textContent = "👁";
+
+          passwordToggle.setAttribute(
+            "aria-label",
+            "Show password"
+          );
+
+          passwordToggle.setAttribute(
+            "aria-pressed",
+            "false"
+          );
+        }
+
+        passwordInput.focus();
+      }
+    );
+
+
+    /* =====================================================
+       BUTTON LOADING STATE
+       ===================================================== */
+
+    function setLoginLoading(loading) {
+
+      if (loading) {
+
+        loginBtn.disabled = true;
+
+        loginBtn.innerHTML =
+          '<span class="button-spinner"></span>' +
+          'Connecting...';
+
+      } else {
+
+        loginBtn.disabled = false;
+
+        loginBtn.textContent =
+          "Access GRIDV21";
+      }
+    }
+
+
+    /* =====================================================
+       VALIDATE EMAIL
+       ===================================================== */
+
+    function validEmail(email) {
+
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        .test(email);
+    }
+
+
+    /* =====================================================
+       SUPABASE LOGIN
+       ===================================================== */
+
+    async function loginToGridv21() {
+
+      const email =
+        emailInput.value.trim();
+
+      const password =
+        passwordInput.value;
+
+
+      clearMessage();
+
+
+      /* ---------------------------------------------------
+         BASIC VALIDATION
+         --------------------------------------------------- */
+
+      if (!email) {
+
+        showMessage(
+          "Please enter your email address.",
+          "error"
+        );
+
+        emailInput.focus();
+
+        return;
+      }
+
+
+      if (!validEmail(email)) {
+
+        showMessage(
+          "Please enter a valid email address.",
+          "error"
+        );
+
+        emailInput.focus();
+
+        return;
+      }
+
+
+      if (!password) {
+
+        showMessage(
+          "Please enter your password.",
+          "error"
+        );
+
+        passwordInput.focus();
+
+        return;
+      }
+
+
+      /* ---------------------------------------------------
+         START LOGIN
+         --------------------------------------------------- */
+
+      setLoginLoading(true);
+
+      showMessage(
+        "Connecting securely to GRIDV21...",
+        "info"
+      );
+
+
+      let timeoutId;
+
+
+      try {
+
+        const controller =
+          new AbortController();
+
+
+        timeoutId =
+          setTimeout(
+            function () {
+              controller.abort();
+            },
+            20000
+          );
+
+
+        /* -----------------------------------------------
+           SUPABASE PASSWORD AUTH
+           ----------------------------------------------- */
+
+        const response =
+          await fetch(
+            SUPABASE_URL +
+            "/auth/v1/token?grant_type=password",
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+
+                "apikey":
+                  SUPABASE_ANON_KEY,
+
+                "Authorization":
+                  "Bearer " +
+                  SUPABASE_ANON_KEY,
+
+                "Accept":
+                  "application/json"
+              },
+
+              body: JSON.stringify({
+
+                email:
+                  email,
+
+                password:
+                  password
+              }),
+
+              signal:
+                controller.signal
+            }
+          );
+
+
+        clearTimeout(timeoutId);
+
+
+        /* -----------------------------------------------
+           READ RESPONSE
+           ----------------------------------------------- */
+
+        const responseText =
+          await response.text();
+
+
+        let result = {};
+
+
+        try {
+
+          result =
+            responseText
+              ? JSON.parse(responseText)
+              : {};
+
+        } catch (jsonError) {
+
+          result = {};
+        }
+
+
+        console.log(
+          "GRIDV21 Supabase HTTP:",
+          response.status
+        );
+
+
+        console.log(
+          "GRIDV21 Supabase response:",
+          result
+        );
+
+
+        /* -----------------------------------------------
+           SUCCESS
+           ----------------------------------------------- */
+
+        if (
+          response.ok &&
+          result.access_token
+        ) {
+
+          const accessToken =
+            result.access_token;
+
+          const refreshToken =
+            result.refresh_token || "";
+
+          const expiresIn =
+            result.expires_in || 3600;
+
+          const user =
+            result.user || null;
+
+
+          /* ---------------------------------------------
+             SAVE SESSION
+             --------------------------------------------- */
+
+          const session = {
+
+            access_token:
+              accessToken,
+
+            refresh_token:
+              refreshToken,
+
+            expires_in:
+              expiresIn,
+
+            token_type:
+              result.token_type || "bearer",
+
+            user:
+              user,
+
+            created_at:
+              Date.now()
+          };
+
+
+          localStorage.setItem(
+            "gridv21_session",
+            JSON.stringify(session)
+          );
+
+
+          localStorage.setItem(
+            "gridv21_access_token",
+            accessToken
+          );
+
+
+          if (refreshToken) {
+
+            localStorage.setItem(
+              "gridv21_refresh_token",
+              refreshToken
+            );
+          }
+
+
+          if (user && user.id) {
+
+            localStorage.setItem(
+              "gridv21_user_id",
+              user.id
+            );
+          }
+
+
+          /* ---------------------------------------------
+             SUCCESS MESSAGE
+             --------------------------------------------- */
+
+          showMessage(
+            "Login successful. Opening GRIDV21...",
+            "success"
+          );
+
+
+          /* ---------------------------------------------
+             OPEN DASHBOARD
+             --------------------------------------------- */
+
+          setTimeout(
+            function () {
+
+              window.location.href =
+                GRIDV21_API +
+                "/dashboard";
+
+            },
+            700
+          );
+
+
+          return;
+        }
+
+
+        /* -----------------------------------------------
+           SUPABASE ERROR
+           ----------------------------------------------- */
+
+        let errorMessage =
+          "Login failed. Please check your email and password.";
+
+
+        if (result.error_description) {
+
+          errorMessage =
+            result.error_description;
+
+        } else if (result.msg) {
+
+          errorMessage =
+            result.msg;
+
+        } else if (result.message) {
+
+          errorMessage =
+            result.message;
+        }
+
+
+        /* Friendlier common messages */
+
+        const lowerError =
+          String(errorMessage).toLowerCase();
+
+
+        if (
+          lowerError.includes(
+            "invalid login credentials"
+          )
+        ) {
+
+          errorMessage =
+            "Invalid email or password.";
+
+        } else if (
+          lowerError.includes(
+            "email not confirmed"
+          )
+        ) {
+
+          errorMessage =
+            "Your email address has not been confirmed.";
+
+        } else if (
+          lowerError.includes(
+            "too many requests"
+          )
+        ) {
+
+          errorMessage =
+            "Too many login attempts. Please wait and try again.";
+
+        }
+
+
+        showMessage(
+          errorMessage,
+          "error"
+        );
+
+
+        setLoginLoading(false);
+
+      } catch (error) {
+
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+
+        console.error(
+          "GRIDV21 login error:",
+          error
+        );
+
+
+        /* ---------------------------------------------
+           NETWORK / TIMEOUT ERROR
+           --------------------------------------------- */
+
+        if (
+          error &&
+          error.name === "AbortError"
+        ) {
+
+          showMessage(
+            "Connection timed out. Please check your internet connection and try again.",
+            "error"
+          );
+
+        } else {
+
+          showMessage(
+            "Unable to connect to GRIDV21 authentication. Please check your internet connection.",
+            "error"
+          );
+        }
+
+
+        setLoginLoading(false);
+      }
+    }
+
+
+    /* =====================================================
+       FORM SUBMISSION
+       ===================================================== */
+
+    loginForm.addEventListener(
+      "submit",
+      function (event) {
+
+        event.preventDefault();
+
+        event.stopPropagation();
+
+        loginToGridv21();
+      }
+    );
+
+
+    /* =====================================================
+       ENTER KEY SUPPORT
+       ===================================================== */
+
+    emailInput.addEventListener(
+      "keydown",
+      function (event) {
+
+        if (event.key === "Enter") {
+
+          event.preventDefault();
+
+          loginToGridv21();
+        }
+      }
+    );
+
+
+    passwordInput.addEventListener(
+      "keydown",
+      function (event) {
+
+        if (event.key === "Enter") {
+
+          event.preventDefault();
+
+          loginToGridv21();
+        }
+      }
+    );
+
+
+    /* =====================================================
+       CHECK EXISTING SESSION
+       ===================================================== */
+
+    function checkExistingSession() {
+
+      try {
+
+        const saved =
+          localStorage.getItem(
+            "gridv21_session"
+          );
+
+
+        if (!saved) {
+          return;
+        }
+
+
+        const session =
+          JSON.parse(saved);
+
+
+        if (
+          session &&
+          session.access_token
+        ) {
+
+          console.log(
+            "GRIDV21 existing session detected."
+          );
+        }
+
+      } catch (error) {
+
+        console.warn(
+          "GRIDV21 session check failed:",
+          error
+        );
+
+      }
+    }
+
+
+    /* =====================================================
+       PAGE INITIALIZATION
+       ===================================================== */
+
+    document.addEventListener(
+      "DOMContentLoaded",
+      function () {
+
+        checkExistingSession();
+
+        console.log(
+          "GRIDV21 login system ready."
+        );
+
+      }
+    );
+
+  </script>
