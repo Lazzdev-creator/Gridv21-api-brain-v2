@@ -643,18 +643,12 @@ input:focus {
 </main>
 
 <script>
-
 /* =========================================================
-   GRIDV21 LOGIN — SERVER SESSION AUTHENTICATION
+   GRIDV21 SECURE LOGIN
+   SERVER-SIDE SESSION AUTHENTICATION
    ========================================================= */
 
-const DASHBOARD_URL =
-  "/dashboard/";
-
-
-/* =========================================================
-   ELEMENTS
-   ========================================================= */
+const API_BASE = "";
 
 const loginForm =
   document.getElementById("loginForm");
@@ -681,10 +675,6 @@ const statusBox =
 
 function showStatus(message, type) {
 
-  if (!statusBox) {
-    return;
-  }
-
   statusBox.textContent =
     message;
 
@@ -697,358 +687,343 @@ function showStatus(message, type) {
    PASSWORD SHOW / HIDE
    ========================================================= */
 
-if (passwordToggle) {
+passwordToggle.addEventListener(
+  "click",
+  function () {
 
-  passwordToggle.addEventListener(
-    "click",
-    function () {
+    const showing =
+      passwordInput.type === "text";
 
-      const showing =
-        passwordInput.type === "text";
+    if (showing) {
 
-      if (showing) {
+      passwordInput.type =
+        "password";
 
-        passwordInput.type =
-          "password";
+      passwordToggle.textContent =
+        "👁";
 
-        passwordToggle.textContent =
-          "👁";
+      passwordToggle.setAttribute(
+        "aria-label",
+        "Show password"
+      );
 
-        passwordToggle.setAttribute(
-          "aria-label",
-          "Show password"
-        );
+      passwordToggle.setAttribute(
+        "aria-pressed",
+        "false"
+      );
 
-        passwordToggle.setAttribute(
-          "aria-pressed",
-          "false"
-        );
+    } else {
 
-      } else {
+      passwordInput.type =
+        "text";
 
-        passwordInput.type =
-          "text";
+      passwordToggle.textContent =
+        "🙈";
 
-        passwordToggle.textContent =
-          "🙈";
+      passwordToggle.setAttribute(
+        "aria-label",
+        "Hide password"
+      );
 
-        passwordToggle.setAttribute(
-          "aria-label",
-          "Hide password"
-        );
-
-        passwordToggle.setAttribute(
-          "aria-pressed",
-          "true"
-        );
-      }
-
+      passwordToggle.setAttribute(
+        "aria-pressed",
+        "true"
+      );
     }
-  );
 
-}
+  }
+);
 
 
 /* =========================================================
    LOGIN
    ========================================================= */
 
-if (loginForm) {
+loginForm.addEventListener(
+  "submit",
+  async function (event) {
 
-  loginForm.addEventListener(
-    "submit",
-    async function (event) {
+    event.preventDefault();
 
-      event.preventDefault();
-
-
-      const email =
-        String(
-          emailInput.value || ""
-        )
+    const email =
+      emailInput.value
         .trim()
         .toLowerCase();
 
-      const password =
-        String(
-          passwordInput.value || ""
-        );
+    const password =
+      passwordInput.value;
 
 
-      /* -----------------------------------------------------
-         VALIDATION
-         ----------------------------------------------------- */
+    /* -----------------------------------------------------
+       VALIDATION
+       ----------------------------------------------------- */
 
-      if (!email) {
-
-        showStatus(
-          "Please enter your email address.",
-          "error"
-        );
-
-        emailInput.focus();
-
-        return;
-      }
-
-
-      if (!password) {
-
-        showStatus(
-          "Please enter your password.",
-          "error"
-        );
-
-        passwordInput.focus();
-
-        return;
-      }
-
-
-      /* -----------------------------------------------------
-         LOCK BUTTON
-         ----------------------------------------------------- */
-
-      loginBtn.disabled =
-        true;
-
-      loginBtn.textContent =
-        "Authenticating...";
+    if (!email) {
 
       showStatus(
-        "Authenticating with GRIDV21...",
-        "info"
+        "Please enter your email address.",
+        "error"
       );
 
+      emailInput.focus();
 
-      /* -----------------------------------------------------
-         REQUEST TIMEOUT
-         ----------------------------------------------------- */
+      return;
+    }
 
-      const controller =
-        new AbortController();
 
-      const timeout =
-        setTimeout(
-          function () {
+    if (!emailInput.checkValidity()) {
 
-            controller.abort();
+      showStatus(
+        "Please enter a valid email address.",
+        "error"
+      );
 
-          },
-          20000
+      emailInput.focus();
+
+      return;
+    }
+
+
+    if (!password) {
+
+      showStatus(
+        "Please enter your password.",
+        "error"
+      );
+
+      passwordInput.focus();
+
+      return;
+    }
+
+
+    /* -----------------------------------------------------
+       LOCK BUTTON
+       ----------------------------------------------------- */
+
+    loginBtn.disabled =
+      true;
+
+    loginBtn.textContent =
+      "Signing in...";
+
+    showStatus(
+      "Authenticating securely with GRIDV21...",
+      "info"
+    );
+
+
+    try {
+
+      /* ---------------------------------------------------
+         SERVER-SIDE AUTHENTICATION
+         --------------------------------------------------- */
+
+      const response =
+        await fetch(
+          API_BASE +
+          "/api/auth/login",
+          {
+            method:
+              "POST",
+
+            credentials:
+              "include",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              "Accept":
+                "application/json"
+            },
+
+            body:
+              JSON.stringify({
+                email,
+                password
+              })
+          }
         );
 
+
+      let result = {};
 
       try {
 
-        /* ---------------------------------------------------
-           IMPORTANT
+        result =
+          await response.json();
 
-           We authenticate through the GRIDV21 SERVER.
+      } catch (_) {
 
-           The server then authenticates with Supabase and
-           creates the secure express-session.
-
-           Credentials MUST be included so the browser
-           receives the connect.sid session cookie.
-           --------------------------------------------------- */
-
-        const response =
-          await fetch(
-            "/api/auth/login",
-            {
-              method:
-                "POST",
-
-              credentials:
-                "include",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-
-                "Accept":
-                  "application/json"
-              },
-
-              body:
-                JSON.stringify({
-                  email:
-                    email,
-
-                  password:
-                    password
-                }),
-
-              signal:
-                controller.signal
-            }
-          );
-
-
-        clearTimeout(
-          timeout
-        );
-
-
-        /* ---------------------------------------------------
-           READ RESPONSE
-           --------------------------------------------------- */
-
-        let result = {};
-
-        try {
-
-          result =
-            await response.json();
-
-        } catch (
-          jsonError
-        ) {
-
-          result = {};
-
-        }
-
-
-        /* ---------------------------------------------------
-           AUTHENTICATION FAILURE
-           --------------------------------------------------- */
-
-        if (!response.ok) {
-
-          throw new Error(
-            result.error ||
-            "Invalid email or password."
-          );
-
-        }
-
-
-        /* ---------------------------------------------------
-           VERIFY SERVER SESSION
-           --------------------------------------------------- */
-
-        if (
-          !result.ok ||
-          !result.authenticated
-        ) {
-
-          throw new Error(
-            "Authentication was not completed."
-          );
-
-        }
-
-
-        /* ---------------------------------------------------
-           SUCCESS
-           --------------------------------------------------- */
-
-        showStatus(
-          "Login successful. Opening GRIDV21...",
-          "success"
-        );
-
-        loginBtn.textContent =
-          "Access Granted";
-
-
-        /* ---------------------------------------------------
-           OPEN DASHBOARD
-
-           IMPORTANT:
-           Do NOT use the Render root URL.
-
-           The authenticated destination is /dashboard/
-           --------------------------------------------------- */
-
-        setTimeout(
-          function () {
-
-            window.location.replace(
-              DASHBOARD_URL
-            );
-
-          },
-          500
-        );
-
-      } catch (
-        error
-      ) {
-
-        clearTimeout(
-          timeout
-        );
-
-
-        console.error(
-          "GRIDV21 LOGIN ERROR:",
-          error
-        );
-
-
-        /* ---------------------------------------------------
-           TIMEOUT
-           --------------------------------------------------- */
-
-        if (
-          error.name ===
-          "AbortError"
-        ) {
-
-          showStatus(
-            "Authentication server took too long to respond. Please try again.",
-            "error"
-          );
-
-
-        /* ---------------------------------------------------
-           NETWORK ERROR
-           --------------------------------------------------- */
-
-        } else if (
-          error instanceof TypeError
-        ) {
-
-          showStatus(
-            "Unable to reach GRIDV21 authentication server. Please check your connection and try again.",
-            "error"
-          );
-
-
-        /* ---------------------------------------------------
-           SUPABASE / SERVER ERROR
-           --------------------------------------------------- */
-
-        } else {
-
-          showStatus(
-            error.message ||
-            "Login failed. Please check your email and password.",
-            "error"
-          );
-
-        }
-
-
-        loginBtn.disabled =
-          false;
-
-        loginBtn.textContent =
-          "Access GRIDV21";
+        result = {};
 
       }
 
-    }
-  );
 
-}
+      /* ---------------------------------------------------
+         AUTHENTICATION FAILURE
+         --------------------------------------------------- */
+
+      if (!response.ok) {
+
+        throw new Error(
+          result.error ||
+          "Invalid email or password."
+        );
+      }
+
+
+      /* ---------------------------------------------------
+         SESSION CREATED
+         --------------------------------------------------- */
+
+      if (
+        !result.ok ||
+        !result.authenticated
+      ) {
+
+        throw new Error(
+          "GRIDV21 authentication was not completed."
+        );
+      }
+
+
+      /* ---------------------------------------------------
+         SUCCESS
+         --------------------------------------------------- */
+
+      showStatus(
+        "Login successful. Opening GRIDV21...",
+        "success"
+      );
+
+      loginBtn.textContent =
+        "Access Granted";
+
+
+      /* ---------------------------------------------------
+         DO NOT STORE ADMIN KEY
+         DO NOT STORE SERVICE ROLE KEY
+         DO NOT STORE SUPABASE ACCESS TOKEN
+         
+         The server-side session cookie handles
+         authentication.
+         --------------------------------------------------- */
+
+
+      setTimeout(
+        function () {
+
+          window.location.href =
+            "/dashboard/";
+
+        },
+        500
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "GRIDV21 LOGIN ERROR:",
+        error
+      );
+
+
+      showStatus(
+        error.message ||
+        "Login failed. Please check your email and password.",
+        "error"
+      );
+
+
+      loginBtn.disabled =
+        false;
+
+      loginBtn.textContent =
+        "Access GRIDV21";
+
+    }
+
+  }
+);
+
+
+/* =========================================================
+   EXISTING SERVER SESSION CHECK
+   ========================================================= */
+
+(async function checkExistingSession() {
+
+  try {
+
+    const response =
+      await fetch(
+        "/api/auth/me",
+        {
+          method:
+            "GET",
+
+          credentials:
+            "include",
+
+          cache:
+            "no-store",
+
+          headers: {
+            "Accept":
+              "application/json"
+          }
+        }
+      );
+
+
+    if (!response.ok) {
+
+      return;
+    }
+
+
+    const result =
+      await response.json();
+
+
+    if (
+      result.ok &&
+      result.authenticated
+    ) {
+
+      showStatus(
+        "Existing GRIDV21 session detected. Opening GRIDV21...",
+        "success"
+      );
+
+
+      setTimeout(
+        function () {
+
+          window.location.href =
+            "/dashboard/";
+
+        },
+        300
+      );
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "[GRIDV21] Session check failed:",
+      error
+    );
+
+  }
+
+})();
 
       </script>
-  <script>
-
 /* =========================================================
    GRIDV21 SESSION CHECK
    ========================================================= */
