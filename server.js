@@ -2859,3 +2859,848 @@ async function scanAllCities(
 /* -------------------------------------------------------------------------- */
 /* END OF THIS CONTINUATION                                                   */
 /* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* FINAL AUTH + SERVER STARTUP                                                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * IMPORTANT:
+ * This section completes the GRIDV21 authentication flow.
+ *
+ * Login:
+ *   login.html
+ *        ↓
+ *   POST /api/auth/login
+ *        ↓
+ *   Supabase Auth
+ *        ↓
+ *   Server session created
+ *        ↓
+ *   Dashboard access
+ */
+
+/* -------------------------------------------------------------------------- */
+/* AUTH LOGIN                                                                 */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/login",
+  authLimiter,
+  async (req, res) => {
+
+    try {
+
+      const email =
+        String(
+          req.body?.email ||
+          ""
+        )
+        .trim()
+        .toLowerCase();
+
+      const password =
+        String(
+          req.body?.password ||
+          ""
+        );
+
+      if (
+        !email ||
+        !password
+      ) {
+
+        return res.status(400).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Email and password are required."
+        });
+
+      }
+
+      /*
+       * Authenticate directly against Supabase.
+       */
+
+      const {
+        data,
+        error
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (error) {
+
+        console.warn(
+          `[AUTH] Login failed for ${email}: ${error.message}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Invalid email or password."
+        });
+
+      }
+
+      if (
+        !data ||
+        !data.user
+      ) {
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Authentication failed."
+        });
+
+      }
+
+      /*
+       * Regenerate the session after successful authentication.
+       *
+       * This prevents session fixation.
+       */
+
+      req.session.regenerate(
+        (sessionError) => {
+
+          if (sessionError) {
+
+            console.error(
+              "[AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure session."
+            });
+
+          }
+
+          /*
+           * SERVER-SIDE AUTH STATE
+           */
+
+          req.session.gridv21Authenticated =
+            true;
+
+          req.session.userId =
+            data.user.id;
+
+          req.session.userEmail =
+            data.user.email;
+
+          req.session.userRole =
+            data.user.user_metadata?.role ||
+            "admin";
+
+          req.session.authenticatedAt =
+            new Date().toISOString();
+
+          /*
+           * Save before responding.
+           */
+
+          req.session.save(
+            (saveError) => {
+
+              if (saveError) {
+
+                console.error(
+                  "[AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save authentication session."
+                });
+
+              }
+
+              console.log(
+                `[AUTH] Successful GRIDV21 login: ${data.user.email}`
+              );
+
+              return res.json({
+
+                ok: true,
+
+                authenticated:
+                  true,
+
+                message:
+                  "Authentication successful.",
+
+                user: {
+
+                  id:
+                    data.user.id,
+
+                  email:
+                    data.user.email,
+
+                  role:
+                    data.user.user_metadata?.role ||
+                    "admin"
+
+                }
+
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[AUTH] Login exception:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        authenticated:
+          false,
+
+        error:
+          "Authentication service unavailable."
+
+      });
+
+    }
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* AUTH SESSION CHECK                                                         */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/session",
+  (req, res) => {
+
+    if (
+      req.session?.gridv21Authenticated ===
+      true
+    ) {
+
+      return res.json({
+
+        ok: true,
+
+        authenticated:
+          true,
+
+        user: {
+
+          id:
+            req.session.userId ||
+            null,
+
+          email:
+            req.session.userEmail ||
+            null,
+
+          role:
+            req.session.userRole ||
+            "admin"
+
+        }
+
+      });
+
+    }
+
+    return res.status(401).json({
+
+      ok: true,
+
+      authenticated:
+        false
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* AUTH LOGOUT                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/logout",
+  (req, res) => {
+
+    req.session.destroy(
+      (error) => {
+
+        if (error) {
+
+          console.error(
+            "[AUTH] Logout error:",
+            error
+          );
+
+          return res.status(500).json({
+            ok: false,
+            error:
+              "Logout failed."
+          });
+
+        }
+
+        res.clearCookie(
+          "gridv21.sid"
+        );
+
+        return res.json({
+
+          ok: true,
+
+          authenticated:
+            false,
+
+          message:
+            "Logged out successfully."
+
+        });
+
+      }
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* AUTH STATUS                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/status",
+  (req, res) => {
+
+    return res.json({
+
+      ok: true,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      user:
+        req.session?.gridv21Authenticated ===
+        true
+          ? {
+              id:
+                req.session.userId ||
+                null,
+
+              email:
+                req.session.userEmail ||
+                null,
+
+              role:
+                req.session.userRole ||
+                "admin"
+            }
+          : null
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* HEALTH                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/health",
+  async (req, res) => {
+
+    let database =
+      "unknown";
+
+    try {
+
+      const {
+        error
+      } =
+        await supabase
+          .from("permits")
+          .select("id")
+          .limit(1);
+
+      database =
+        error
+          ? "error"
+          : "connected";
+
+    } catch (
+      error
+    ) {
+
+      database =
+        "error";
+
+    }
+
+    return res.json({
+
+      ok: true,
+
+      status:
+        "online",
+
+      version:
+        VERSION,
+
+      database,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      uptime:
+        Math.floor(
+          (
+            Date.now() -
+            ENGINE.uptime
+          ) / 1000
+        ),
+
+      engine: {
+
+        running:
+          ENGINE.running,
+
+        scanning:
+          ENGINE.scanning,
+
+        permitsFound:
+          ENGINE.permitsFound,
+
+        errors:
+          ENGINE.errors
+
+      }
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* DASHBOARD ACCESS                                                           */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/dashboard",
+  requireAuth,
+  async (req, res) => {
+
+    try {
+
+      return res.json({
+
+        ok: true,
+
+        authenticated:
+          true,
+
+        version:
+          VERSION,
+
+        user: {
+
+          id:
+            req.session?.userId ||
+            null,
+
+          email:
+            req.session?.userEmail ||
+            null,
+
+          role:
+            req.session?.userRole ||
+            "admin"
+
+        },
+
+        engine: {
+
+          running:
+            ENGINE.running,
+
+          scanning:
+            ENGINE.scanning,
+
+          lastScan:
+            ENGINE.lastScan,
+
+          permitsFound:
+            ENGINE.permitsFound,
+
+          errors:
+            ENGINE.errors
+
+        },
+
+        osModules:
+          OS_MODULES
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        "[DASHBOARD]",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        error:
+          "Unable to load dashboard."
+
+      });
+
+    }
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* CURRENT USER                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/me",
+  requireAuth,
+  (req, res) => {
+
+    return res.json({
+
+      ok: true,
+
+      authenticated:
+        true,
+
+      user: {
+
+        id:
+          req.session?.userId ||
+          null,
+
+        email:
+          req.session?.userEmail ||
+          null,
+
+        role:
+          req.session?.userRole ||
+          "admin"
+
+      }
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * login.html remains publicly accessible.
+ */
+
+app.get(
+  "/login.html",
+  (req, res) => {
+
+    return res.sendFile(
+      path.join(
+        PUBLIC_DIR,
+        "login.html"
+      )
+    );
+
+  }
+);
+
+
+/*
+ * Dashboard itself should only be returned to an authenticated user.
+ */
+
+app.get(
+  "/dashboard.html",
+  requireAuth,
+  (req, res) => {
+
+    return res.sendFile(
+      path.join(
+        PUBLIC_DIR,
+        "dashboard.html"
+      )
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* ROOT                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+
+    /*
+     * If already authenticated, send dashboard.
+     */
+
+    if (
+      req.session?.gridv21Authenticated ===
+      true
+    ) {
+
+      return res.sendFile(
+        path.join(
+          PUBLIC_DIR,
+          "dashboard.html"
+        )
+      );
+
+    }
+
+    /*
+     * Otherwise send login.
+     */
+
+    return res.sendFile(
+      path.join(
+        PUBLIC_DIR,
+        "login.html"
+      )
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* 404 HANDLER                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (req, res) => {
+
+    if (
+      req.path.startsWith(
+        "/api/"
+      )
+    ) {
+
+      return res.status(404).json({
+
+        ok: false,
+
+        error:
+          "API endpoint not found."
+
+      });
+
+    }
+
+    return res.status(404).send(
+      "GRIDV21 — Page not found."
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* GLOBAL ERROR HANDLER                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (
+    error,
+    req,
+    res,
+    next
+  ) => {
+
+    console.error(
+      "[SERVER ERROR]",
+      error
+    );
+
+    if (
+      res.headersSent
+    ) {
+
+      return next(
+        error
+      );
+
+    }
+
+    return res.status(
+      error.status ||
+      500
+    ).json({
+
+      ok: false,
+
+      error:
+        IS_PRODUCTION
+          ? "Internal server error."
+          : (
+              error.message ||
+              "Internal server error."
+            )
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* START SERVER                                                               */
+/* -------------------------------------------------------------------------- */
+
+async function startServer() {
+
+  try {
+
+    /*
+     * Session middleware must already have been
+     * configured before this point.
+     */
+
+    app.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+
+        console.log("");
+        console.log(
+          "=================================================="
+        );
+
+        console.log(
+          "GRIDV21 BRAIN ENTERPRISE"
+        );
+
+        console.log(
+          `Version: ${VERSION}`
+        );
+
+        console.log(
+          `Port: ${PORT}`
+        );
+
+        console.log(
+          `Environment: ${
+            process.env.NODE_ENV ||
+            "development"
+          }`
+        );
+
+        console.log(
+          "Authentication: Supabase + server session"
+        );
+
+        console.log(
+          "Dashboard authentication: ENABLED"
+        );
+
+        console.log(
+          "=================================================="
+        );
+
+      }
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[STARTUP] Fatal error:",
+      error
+    );
+
+    process.exit(
+      1
+    );
+
+  }
+
+}
+
+
+/* -------------------------------------------------------------------------- */
+/* PROCESS ERROR HANDLERS                                                     */
+/* -------------------------------------------------------------------------- */
+
+process.on(
+  "unhandledRejection",
+  (reason) => {
+
+    console.error(
+      "[PROCESS] Unhandled rejection:",
+      reason
+    );
+
+  }
+);
+
+process.on(
+  "uncaughtException",
+  (error) => {
+
+    console.error(
+      "[PROCESS] Uncaught exception:",
+      error
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* START                                                                      */
+/* -------------------------------------------------------------------------- */
+
+startServer();
