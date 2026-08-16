@@ -583,364 +583,87 @@
         payload;
     }
   }
-
-
-  /* ========================================================================
-   * ADMIN KEY STORAGE
-   * ====================================================================== */
-
-  function loadAdminKey() {
-    let key = "";
-
-    try {
-      key =
-        sessionStorage.getItem(
-          "gridv21_admin_key"
-        ) ||
-        localStorage.getItem(
-          "gridv21_admin_key"
-        ) ||
-        "";
-    } catch (_) {
-      key = "";
-    }
-
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
-
-    const queryKey =
-      params.get("admin_key") ||
-      params.get("key") ||
-      "";
-
-    if (queryKey) {
-      key = queryKey;
-
-      try {
-        sessionStorage.setItem(
-          "gridv21_admin_key",
-          key
-        );
-      } catch (_) {}
-    }
-
-    state.adminKey =
-      String(key || "").trim();
-
-    return state.adminKey;
-  }
-
-
-    /* ========================================================================
-   * SAVE ADMIN KEY
-   * ====================================================================== */
-
-  function saveAdminKey(key) {
-    state.adminKey = String(key || "").trim();
-
-    if (!state.adminKey) {
-      return;
-    }
-
-    try {
-      sessionStorage.setItem("gridv21_admin_key", state.adminKey);
-    } catch (_) {}
-
-    try {
-      localStorage.setItem("gridv21_admin_key", state.adminKey);
-    } catch (_) {}
-  }
-
-
-  /* ========================================================================
-   * AUTH UI (lock / unlock dashboard)
-   * ====================================================================== */
-
-  function setAuthUI(authenticated) {
-    document.body.classList.toggle("is-authenticated", !!authenticated);
-    document.body.classList.toggle("is-locked", !authenticated);
-
-    const status = byId("keyStatus");
-    if (status) {
-      status.textContent = authenticated ? "Authenticated" : "";
-    }
-  }
-
-
-  /* ========================================================================
-   * CLEAR ADMIN KEY
-   * ====================================================================== */
-
-  function clearAdminKey() {
-    state.adminKey = "";
-    state.authenticated = false;
-
-    try {
-      sessionStorage.removeItem("gridv21_admin_key");
-    } catch (_) {}
-
-    try {
-      localStorage.removeItem("gridv21_admin_key");
-    } catch (_) {}
-
-    setGlobalStatus(false, "Authentication required");
-    setAuthUI(false);
-    showToast("Admin key cleared.", "warning");
-        }
-
-
-    /* ========================================================================
-   * API FETCH
-   * ====================================================================== */
-
-  async function apiFetch(url, opts = {}) {
-    const requestOptions = {
-      ...opts,
-      headers: {
-        Accept: "application/json",
-        ...(opts.body ? { "Content-Type": "application/json" } : {}),
-        ...(state.adminKey
-          ? {
-              "x-admin-key": state.adminKey,
-              Authorization: `Bearer ${state.adminKey}`
-            }
-          : {}),
-        ...(opts.headers || {})
-      }
-    };
-
-    let response;
-
-    try {
-      response = await fetch(url, requestOptions);
-    } catch (error) {
-      throw new APIError(
-        `Network error: ${error.message || "Unable to connect to GRIDV21."}`,
-        0
-      );
-    }
-
-    let payload = null;
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("application/json")) {
-      try {
-        payload = await response.json();
-      } catch (_) {
-        payload = null;
-      }
-    } else {
-      try {
-        const textResponse = await response.text();
-        payload = textResponse ? { raw: textResponse } : null;
-      } catch (_) {
-        payload = null;
-      }
-    }
-
-    if (!response.ok) {
-      const message =
-        payload?.error ||
-        payload?.message ||
-        `Request failed (${response.status})`;
-
-      if (response.status === 401) {
-        state.authenticated = false;
-        setGlobalStatus(false, "Authentication required");
-      }
-
-      throw new APIError(message, response.status, payload);
-    }
-
-    return payload;
-   }
-
- /* ============================================================
- * AUTHENTICATION
+/* ============================================================
+ * SESSION AUTHENTICATION
  * ============================================================ */
 
-async function verifyAdminKey() {
-  const key = String(state.adminKey || "").trim();
-
-  if (!key) {
-    state.authenticated = false;
-
-    setGlobalStatus(
-      false,
-      "Admin key required"
-    );
-
-    return false;
-  }
-
-  /*
-   * Keep the key normalized in application state.
-   */
-  state.adminKey = key;
+async function verifySession() {
 
   try {
-    /*
-     * Call the verification endpoint directly.
-     *
-     * IMPORTANT:
-     * Do not use apiFetch() here because apiFetch()
-     * itself handles 401 authentication failures.
-     */
-    const response = await fetch(
-      API.authVerify,
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "x-admin-key": key,
-          Authorization: `Bearer ${key}`
-        },
-        cache: "no-store",
-        credentials: "same-origin"
-      }
-    );
 
-    let payload = {};
+    const response =
+      await fetch(
+        "/api/auth/me",
+        {
+          method: "GET",
 
-    const contentType =
-      response.headers.get("content-type") || "";
+          credentials: "include",
 
-    if (contentType.includes("application/json")) {
-      payload = await response.json().catch(() => ({}));
-    } else {
-      const text = await response.text().catch(() => "");
+          cache: "no-store",
 
-      payload = {
-        raw: text
-      };
-    }
-
-    console.info(
-      "[GRIDV21 AUTH]",
-      {
-        status: response.status,
-        httpOk: response.ok,
-        serverOk: payload?.ok,
-        authenticated: payload?.authenticated,
-        version: payload?.version
-      }
-    );
-
-    /*
-     * Server rejected the request.
-     */
-    if (!response.ok) {
-      state.authenticated = false;
-
-      setGlobalStatus(
-        false,
-        response.status === 401
-          ? "Invalid admin key"
-          : `Authentication failed (${response.status})`
+          headers: {
+            "Accept":
+              "application/json"
+          }
+        }
       );
 
-      const message =
-        payload?.message ||
-        payload?.error ||
-        payload?.detail ||
-        payload?.raw ||
-        (
-          response.status === 401
-            ? "GRIDV21 rejected the admin key."
-            : `Authentication request failed (${response.status}).`
-        );
+    const payload =
+      await response
+        .json()
+        .catch(() => ({}));
 
-      showToast(
-        message,
-        "error"
-      );
-
-      return false;
-    }
-
-    /*
-     * Require explicit confirmation from GRIDV21.
-     */
     if (
-      payload?.ok !== true ||
-      payload?.authenticated !== true
+      !response.ok ||
+      payload.authenticated !== true
     ) {
+
       state.authenticated = false;
 
       setGlobalStatus(
         false,
-        "Authentication rejected"
+        "Login required"
       );
 
-      console.error(
-        "[GRIDV21 AUTH] Unexpected verification response:",
-        payload
-      );
-
-      showToast(
-        "GRIDV21 did not confirm authentication.",
-        "error"
+      window.location.replace(
+        "/login.html"
       );
 
       return false;
     }
 
-    /*
-     * AUTHENTICATION SUCCESS
-     */
     state.authenticated = true;
-
-    try {
-      sessionStorage.setItem(
-        "gridv21_admin_key",
-        key
-      );
-    } catch (_) {}
-
-    try {
-      localStorage.setItem(
-        "gridv21_admin_key",
-        key
-      );
-    } catch (_) {}
 
     setGlobalStatus(
       true,
-      "Connected"
+      "Authenticated"
     );
 
-    console.info(
-      "[GRIDV21 AUTH] Authentication successful.",
-      payload?.version
-        ? `Backend v${payload.version}`
-        : ""
-    );
+    setAuthUI(true);
 
     return true;
 
   } catch (error) {
+
+    console.error(
+      "[GRIDV21 SESSION]",
+      error
+    );
+
     state.authenticated = false;
 
     setGlobalStatus(
       false,
-      "Connection error"
+      "Authentication error"
     );
 
-    console.error(
-      "[GRIDV21 AUTH] Verification request failed:",
-      error
-    );
-
-    showToast(
-      "Unable to reach the GRIDV21 authentication endpoint.",
-      "error"
+    window.location.replace(
+      "/login.html"
     );
 
     return false;
   }
-}
+        }
 
   /* ========================================================================
    * AUTH FAILURE HANDLER
