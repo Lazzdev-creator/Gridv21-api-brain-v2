@@ -2675,3 +2675,633 @@ window.emergencyStop =
 
 window.toggleOS =
   toggleOS;
+    /*
+     * Global delegated click handler.
+     *
+     * This handles dynamically rendered buttons as well.
+     */
+    document.addEventListener(
+      "click",
+      event => {
+
+        /*
+         * Section target buttons.
+         */
+        const sectionButton =
+          event.target.closest(
+            "[data-section-target]"
+          );
+
+        if (sectionButton) {
+
+          navigate(
+            sectionButton.dataset.sectionTarget
+          );
+
+          return;
+        }
+
+
+        /*
+         * Engine/action buttons.
+         */
+        const actionButton =
+          event.target.closest(
+            "[data-action]"
+          );
+
+        if (actionButton) {
+
+          const action =
+            String(
+              actionButton.dataset.action ||
+              ""
+            ).trim();
+
+
+          switch (action) {
+
+            case "scan-start":
+
+              engineAction(
+                "scan/start"
+              );
+
+              break;
+
+
+            case "scan-stop":
+
+              engineAction(
+                "scan/stop"
+              );
+
+              break;
+
+
+            case "brain-pause":
+
+              engineAction(
+                "brain/pause"
+              );
+
+              break;
+
+
+            case "brain-resume":
+
+              engineAction(
+                "brain/resume"
+              );
+
+              break;
+
+
+            case "emergency-stop":
+
+              emergencyStop();
+
+              break;
+
+
+            case "refresh":
+
+              refreshDashboardData();
+
+              break;
+
+
+            case "clear-logs":
+
+              html(
+                "log-container",
+                `
+                  <div class="empty">
+                    Audit view cleared.
+                  </div>
+                `
+              );
+
+              break;
+
+
+            default:
+
+              console.warn(
+                "[GRIDV21] Unknown action:",
+                action
+              );
+
+              break;
+          }
+
+
+          return;
+        }
+
+
+        /*
+         * OS module toggle.
+         */
+        const osButton =
+          event.target.closest(
+            "[data-os-toggle]"
+          );
+
+
+        if (osButton) {
+
+          toggleOS(
+            osButton.dataset.osToggle
+          );
+
+        }
+
+      }
+    );
+
+
+    /*
+     * Topbar refresh button.
+     */
+    byId("refresh-btn")
+      ?.addEventListener(
+        "click",
+        () => {
+          refreshDashboardData();
+        }
+      );
+
+
+    /*
+     * Clear admin key.
+     */
+    byId("logout-btn")
+      ?.addEventListener(
+        "click",
+        () => {
+          clearAdminKey();
+        }
+      );
+
+
+    /*
+     * Mobile sidebar.
+     */
+    byId("open-sidebar")
+      ?.addEventListener(
+        "click",
+        openMobileSidebar
+      );
+
+
+    byId("close-sidebar")
+      ?.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+
+
+    byId("sidebar-overlay")
+      ?.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+
+
+    /*
+     * Keyboard shortcuts.
+     */
+    document.addEventListener(
+      "keydown",
+      event => {
+
+        /*
+         * Escape closes mobile navigation.
+         */
+        if (
+          event.key === "Escape"
+        ) {
+
+          closeMobileSidebar();
+
+        }
+
+
+        /*
+         * Ctrl+R / Cmd+R.
+         *
+         * Refresh GRIDV21 data instead of
+         * performing a full browser reload.
+         */
+        if (
+          event.key.toLowerCase() === "r" &&
+          (
+            event.ctrlKey ||
+            event.metaKey
+          )
+        ) {
+
+          /*
+           * Do NOT interfere with browser reload
+           * if the user is typing inside an input.
+           */
+
+          const tag =
+            event.target?.tagName
+              ?.toLowerCase();
+
+
+          const typing =
+            tag === "input" ||
+            tag === "textarea" ||
+            tag === "select";
+
+
+          if (!typing) {
+
+            event.preventDefault();
+
+            refreshDashboardData();
+
+          }
+
+        }
+
+      }
+    );
+
+  }
+
+
+  /* ========================================================================
+   * STARTUP ERROR DISPLAY
+   * ====================================================================== */
+
+  function renderStartupError(
+    error
+  ) {
+
+    console.error(
+      "[GRIDV21] Startup failure:",
+      error
+    );
+
+
+    setGlobalStatus(
+      false,
+      "Startup error"
+    );
+
+
+    text(
+      "metric-engine",
+      "ERROR"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      error?.message ||
+      "Dashboard startup failed."
+    );
+
+
+    showToast(
+      error?.message ||
+      "GRIDV21 dashboard startup failed.",
+      "error"
+    );
+
+  }
+
+
+  /* ========================================================================
+   * INITIALISE APPLICATION
+   * ====================================================================== */
+
+  async function init() {
+
+    console.info(
+      `[GRIDV21] Starting Dashboard v${VERSION}`
+    );
+
+
+    loadAdminKey();
+
+    setAuthUI(false);
+
+
+    /*
+     * Bind UI before making API calls.
+     *
+     * This is important:
+     * even if the backend is unavailable,
+     * the dashboard buttons remain responsive.
+     */
+
+    bindEvents();
+
+
+    /*
+     * Initial connection state.
+     */
+
+    setGlobalStatus(
+      false,
+      "Connecting"
+    );
+
+
+    /*
+     * Initialise navigation immediately.
+     */
+
+    navigate(
+      "dashboard"
+    );
+
+
+    /*
+     * Show canonical OS modules immediately.
+     *
+     * This prevents "Loading modules..."
+     * from remaining permanently visible.
+     */
+
+    state.osModules =
+      OS_MODULES.map(
+        module => ({
+          ...module,
+          enabled: true
+        })
+      );
+
+
+    renderOSOverview(
+      state.osModules
+    );
+
+
+    /*
+     * If an admin key exists, validate it.
+     * If there is no key, keep the UI locked.
+     */
+
+    if (state.adminKey) {
+
+      const valid =
+        await verifyAdminKey();
+
+
+      if (!valid) {
+
+        setAuthUI(false);
+
+        setControlsEnabled(false);
+
+        renderDashboardError(
+          new APIError(
+            "Authentication required",
+            401
+          )
+        );
+
+        return;
+      }
+
+
+      setAuthUI(true);
+
+      setControlsEnabled(true);
+
+
+      /*
+       * Load live data after successful authentication.
+       */
+
+      try {
+
+        await loadDashboard();
+
+        if (
+          typeof refreshDashboardData ===
+          "function"
+        ) {
+
+          await refreshDashboardData();
+
+        }
+
+      } catch (err) {
+
+        console.error(
+          "[GRIDV21] Post-auth data load failed:",
+          err
+        );
+
+      }
+
+    } else {
+
+      setAuthUI(false);
+
+      setGlobalStatus(
+        false,
+        "Admin key required"
+      );
+
+      setControlsEnabled(false);
+
+      renderDashboardError(
+        new APIError(
+          "Enter the GRIDV21 admin key.",
+          401
+        )
+      );
+
+      return;
+    }
+
+  }
+
+
+  /* ========================================================================
+   * GLOBAL COMPATIBILITY
+   * ====================================================================== */
+
+  window.engineAction =
+    engineAction;
+
+  window.emergencyStop =
+    emergencyStop;
+
+  window.verifyAdminKey =
+    verifyAdminKey;
+
+  window.refreshAll =
+    refreshDashboardData;
+
+  window.logout =
+    clearAdminKey;
+
+  window.toggleOS =
+    toggleOS;
+
+  window.navigate =
+    navigate;
+
+
+  /* ========================================================================
+   * EXTEND GRIDV21 PUBLIC API
+   * ====================================================================== */
+
+  window.GRIDV21 = {
+
+    ...(window.GRIDV21 || {}),
+
+    VERSION,
+
+    API,
+
+    state,
+
+    init,
+
+    bindEvents,
+
+    navigate,
+
+    engineAction,
+
+    emergencyStop,
+
+    toggleOS,
+
+    refreshDashboardData,
+
+    verifyAdminKey,
+
+    clearAdminKey
+
+  };
+
+
+  /* ========================================================================
+   * START APPLICATION
+   * ====================================================================== */
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+
+      const adminInput =
+        document.getElementById(
+          "adminKeyInput"
+        );
+
+
+      const saveKeyBtn =
+        document.getElementById(
+          "saveKeyBtn"
+        );
+
+
+      const keyStatus =
+        document.getElementById(
+          "keyStatus"
+        );
+
+
+      if (
+        state.adminKey &&
+        adminInput
+      ) {
+
+        adminInput.value =
+          state.adminKey;
+
+
+        if (keyStatus) {
+
+          keyStatus.textContent =
+            "Key loaded";
+
+        }
+
+      }
+
+
+      if (
+        saveKeyBtn &&
+        adminInput
+      ) {
+
+        saveKeyBtn.addEventListener(
+          "click",
+          async () => {
+
+            const key =
+              adminInput.value.trim();
+
+
+            if (!key) {
+
+              showToast(
+                "Enter an admin key",
+                "warning"
+              );
+
+              return;
+            }
+
+
+            saveAdminKey(
+              key
+            );
+
+
+            const ok =
+              await verifyAdminKey();
+
+
+            setAuthUI(
+              ok
+            );
+
+
+            if (ok) {
+
+              if (keyStatus) {
+
+                keyStatus.textContent =
+                  "Authenticated";
+
+              }
+
+
+              showToast(
+                "Authenticated",
+                "success"
+              );
+
+
+              setControlsEnabled(
+                true
+              );
+
+
+              await loadDashboard();
+
+            } else {
+
+              if (keyStatus) {
+
+                keyStatus.textContent =
+                  "Invalid admin key";
+
+              }
+
+
+              showToast(
+                "Invalid
