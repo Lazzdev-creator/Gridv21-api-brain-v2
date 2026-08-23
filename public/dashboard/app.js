@@ -1614,3 +1614,1064 @@ function renderTopLeads(leads) {
       .slice(0, 10);
 
   // Fallback 1: state.leads
+  if (!rows.length) {
+    rows =
+      safeArray(state.leads)
+        .slice(0, 10);
+  }
+
+  // Fallback 2: highest-value permits
+  if (!rows.length) {
+    rows =
+      safeArray(state.permits)
+        .slice()
+        .sort((a, b) =>
+          Number(b.estimated_value || b.ai_score || 0) -
+          Number(a.estimated_value || a.ai_score || 0)
+        )
+        .slice(0, 10);
+  }
+
+  // Fallback 3: dashboard permits
+  if (!rows.length && state.dashboard?.permits) {
+    rows =
+      safeArray(state.dashboard.permits)
+        .slice()
+        .sort((a, b) =>
+          Number(b.estimated_value || b.ai_score || 0) -
+          Number(a.estimated_value || a.ai_score || 0)
+        )
+        .slice(0, 10);
+  }
+
+  if (!rows.length) {
+    container.innerHTML =
+      `<tr><td colspan="4" class="empty">No lead data available.</td></tr>`;
+    return;
+  }
+
+  container.innerHTML =
+    rows.map(item => {
+
+      const r =
+        safeObject(item);
+
+      const city =
+        r.city ||
+        r.region ||
+        r.location ||
+        "—";
+
+      const type =
+        r.type ||
+        r.permit_type ||
+        r.trade_type ||
+        r.project_type ||
+        "—";
+
+      const score =
+        r.score ??
+        r.ai_score ??
+        r.lead_score ??
+        "—";
+
+      const value =
+        r.estimated_value ??
+        r.value_estimate ??
+        r.value ??
+        r.predicted_revenue ??
+        "";
+
+      return `
+        <tr>
+          <td>${escapeHTML(city)}</td>
+          <td>${escapeHTML(type)}</td>
+          <td>${escapeHTML(score)}</td>
+          <td>${value !== "" && value != null ? money(value) : "—"}</td>
+        </tr>`;
+
+    }).join("");
+}
+
+
+/* ========================================================================
+ * LATEST EVENTS
+ * ====================================================================== */
+
+function renderLatestEvents(
+  events
+) {
+
+  const container =
+    byId("dashboard-activity") ||
+    byId("latest-events") ||
+    byId("events-container") ||
+    document.querySelector(
+      "[data-latest-events]"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  const rows =
+    safeArray(events)
+      .slice(0, 10);
+
+
+  if (!rows.length) {
+
+    container.innerHTML = `
+      <div class="empty">
+        No recent activity.
+      </div>
+    `;
+
+    return;
+  }
+
+
+  container.innerHTML =
+    rows.map(
+      event => {
+
+        const item =
+          safeObject(event);
+
+
+        const message =
+          item.message ||
+          item.action ||
+          item.event_type ||
+          item.eventType ||
+          "System event";
+
+
+        const created =
+          item.created_at ||
+          item.createdAt ||
+          item.timestamp;
+
+
+        return `
+          <div class="event-row">
+            <strong>
+              ${escapeHTML(message)}
+            </strong>
+
+            <small>
+              ${escapeHTML(dateTime(created))}
+            </small>
+          </div>
+        `;
+      }
+    ).join("");
+}
+
+
+/* ========================================================================
+ * OS OVERVIEW
+ * ====================================================================== */
+
+function renderOSOverview(
+  modules
+) {
+
+  const container =
+    byId("os-overview-grid") ||
+    byId("os-overview") ||
+    byId("os-modules") ||
+    document.querySelector(
+      "[data-os-overview]"
+    );
+
+
+  if (!container) {
+    return;
+  }
+
+
+  const rows =
+    safeArray(modules);
+
+
+  if (!rows.length) {
+
+    container.innerHTML = `
+      <div class="empty">
+        No operating-system modules available.
+      </div>
+    `;
+
+    return;
+  }
+
+
+  container.innerHTML =
+    rows.map(
+      module => {
+
+        const item =
+          safeObject(module);
+
+
+        const id =
+          item.id ??
+          "";
+
+
+        const name =
+          item.name ||
+          `OS Module ${id}`;
+
+
+        const enabled =
+          item.enabled ??
+          item.active ??
+          item.status === "active";
+
+
+        const layer =
+          item.layer ||
+          "Enterprise OS";
+
+
+        return `
+          <div
+            class="os-module-row"
+            data-os-module="${escapeHTML(id)}"
+          >
+
+            <div class="os-module-info">
+
+              <strong>
+                ${escapeHTML(name)}
+              </strong>
+
+              <small>
+                ${escapeHTML(layer)}
+              </small>
+
+            </div>
+
+            <button
+              type="button"
+              class="os-toggle ${enabled ? "active" : ""}"
+              data-os-toggle="${escapeHTML(id)}"
+              aria-pressed="${enabled ? "true" : "false"}"
+            >
+              ${enabled ? "Active" : "Off"}
+            </button>
+
+          </div>
+        `;
+      }
+    ).join("");
+}
+
+
+/* ========================================================================
+ * EXPORT PART 2 FUNCTIONS
+ * ====================================================================== */
+
+window.GRIDV21 = {
+  ...(window.GRIDV21 || {}),
+
+  normaliseDashboard,
+
+  loadDashboard,
+  loadOSModules,
+  loadPermits,
+
+  refreshDashboardData,
+
+  renderDashboard,
+  renderTelemetry,
+  renderDashboardError,
+
+  renderRecommendation,
+  renderTopLeads,
+  renderLatestEvents,
+  renderOSOverview
+};
+
+
+/* ==========================================================================
+ * GRIDV21 BRAIN ENTERPRISE — DASHBOARD APP
+ * VERSION: 6.3.7
+ *
+ * PART 3 / 4
+ * - Engine controls
+ * - Scan controls
+ * - Brain pause/resume
+ * - Emergency stop
+ * - OS toggles
+ * - Control error handling
+ * ========================================================================== */
+
+
+/* ========================================================================
+ * GENERIC CONTROL REQUEST
+ * ====================================================================== */
+
+async function controlRequest(
+  url,
+  options = {}
+) {
+
+  try {
+
+    const payload =
+      await apiFetch(
+        url,
+        {
+          method:
+            options.method || "POST",
+
+          body:
+            options.body !== undefined
+              ? JSON.stringify(
+                  options.body
+                )
+              : undefined,
+
+          headers:
+            options.headers || {}
+        }
+      );
+
+
+    state.authenticated =
+      true;
+
+
+    setGlobalStatus(
+      true,
+      "Connected"
+    );
+
+
+    return payload;
+
+
+  } catch (error) {
+
+    handleAuthFailure(
+      error
+    );
+
+
+    console.error(
+      "[GRIDV21] Control request failed:",
+      error
+    );
+
+
+    throw error;
+  }
+}
+
+
+/* ========================================================================
+ * ENGINE ACTION
+ *
+ * Supported actions:
+ *   scan/start
+ *   scan/stop
+ *   brain/pause
+ *   brain/resume
+ * ====================================================================== */
+
+async function engineAction(
+  action
+) {
+
+  const normalized =
+    String(action || "")
+      .trim()
+      .toLowerCase();
+
+
+  const actionMap = {
+
+    "scan/start":
+      API.scrapeNow,
+
+    "scan/stop":
+      API.scanStop,
+
+    "brain/pause":
+      API.brainPause,
+
+    "brain/resume":
+      API.brainResume
+  };
+
+
+  const endpoint =
+    actionMap[normalized];
+
+
+  if (!endpoint) {
+
+    showToast(
+      `Unknown engine action: ${normalized}`,
+      "error"
+    );
+
+    return false;
+  }
+
+
+  const button =
+    document.querySelector(
+      `[data-action="${CSS.escape(normalized.replace("/", "-"))}"]`
+    );
+
+
+  if (button) {
+
+    button.disabled =
+      true;
+  }
+
+
+  const labels = {
+
+    "scan/start":
+      "Starting scan...",
+
+    "scan/stop":
+      "Stopping scan...",
+
+    "brain/pause":
+      "Pausing engine...",
+
+    "brain/resume":
+      "Resuming engine..."
+  };
+
+
+  if (button) {
+
+    button.dataset.originalText =
+      button.textContent;
+
+    button.textContent =
+      labels[normalized];
+  }
+
+
+  try {
+
+    const payload =
+      await controlRequest(
+        endpoint,
+        {
+          method: "POST"
+        }
+      );
+
+
+    const messages = {
+
+      "scan/start":
+        "Scan started successfully.",
+
+      "scan/stop":
+        "Scan stop requested.",
+
+      "brain/pause":
+        "Brain engine paused.",
+
+      "brain/resume":
+        "Brain engine resumed."
+    };
+
+
+    showToast(
+      payload?.message ||
+      messages[normalized],
+      "success"
+    );
+
+
+    /*
+     * Give the backend a moment to update
+     * ENGINE telemetry before refreshing.
+     */
+
+    await wait(350);
+
+    await refreshDashboardData();
+
+    return true;
+
+
+  } catch (error) {
+
+    const messages = {
+
+      "scan/start":
+        "Unable to start scan.",
+
+      "scan/stop":
+        "Unable to stop scan.",
+
+      "brain/pause":
+        "Unable to pause engine.",
+
+      "brain/resume":
+        "Unable to resume engine."
+    };
+
+
+    showToast(
+      error?.message ||
+      messages[normalized],
+      "error"
+    );
+
+
+    return false;
+
+
+  } finally {
+
+    if (button) {
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        button.dataset.originalText ||
+        button.textContent;
+    }
+  }
+}
+
+
+/* ========================================================================
+ * EMERGENCY STOP
+ * ====================================================================== */
+
+async function emergencyStop() {
+
+  const confirmed =
+    window.confirm(
+      "EMERGENCY STOP\n\n" +
+      "This will request an immediate GRIDV21 engine stop.\n\n" +
+      "Continue?"
+    );
+
+
+  if (!confirmed) {
+    return false;
+  }
+
+
+  const button =
+    document.querySelector(
+      '[data-action="emergency-stop"]'
+    );
+
+
+  if (button) {
+
+    button.disabled =
+      true;
+
+    button.dataset.originalText =
+      button.textContent;
+
+    button.textContent =
+      "Stopping...";
+  }
+
+
+  try {
+
+    const payload =
+      await controlRequest(
+        API.emergencyStop,
+        {
+          method: "POST"
+        }
+      );
+
+
+    showToast(
+      payload?.message ||
+      "Emergency stop requested.",
+      "success"
+    );
+
+
+    await wait(500);
+
+    await refreshDashboardData();
+
+
+    return true;
+
+
+  } catch (error) {
+
+    showToast(
+      error?.message ||
+      "Emergency stop request failed.",
+      "error"
+    );
+
+
+    return false;
+
+
+  } finally {
+
+    if (button) {
+
+      button.disabled =
+        false;
+
+      button.textContent =
+        button.dataset.originalText ||
+        "Emergency Stop";
+    }
+  }
+}
+
+
+/* ========================================================================
+ * OS TOGGLE
+ * ====================================================================== */
+
+async function toggleOS(
+  moduleId
+) {
+
+  const id =
+    String(moduleId ?? "")
+      .trim();
+
+
+  if (!id) {
+
+    showToast(
+      "Invalid OS module.",
+      "error"
+    );
+
+    return false;
+  }
+
+
+  const button =
+    document.querySelector(
+      `[data-os-toggle="${CSS.escape(id)}"]`
+    );
+
+
+  if (button) {
+
+    button.disabled =
+      true;
+  }
+
+
+  try {
+
+    /*
+     * Backend versions may accept:
+     *   { enabled: true/false }
+     *
+     * We derive the requested state from
+     * the current button state.
+     */
+
+    const currentlyEnabled =
+      button?.getAttribute(
+        "aria-pressed"
+      ) === "true";
+
+
+    const nextEnabled =
+      !currentlyEnabled;
+
+
+    const payload =
+      await controlRequest(
+        API.osToggle(id),
+        {
+          method: "POST",
+
+          body: {
+            enabled:
+              nextEnabled
+          }
+        }
+      );
+
+
+    showToast(
+      payload?.message ||
+      (
+        nextEnabled
+          ? "OS module enabled."
+          : "OS module disabled."
+      ),
+      "success"
+    );
+
+
+    await wait(250);
+
+    await refreshDashboardData();
+
+
+    return true;
+
+
+  } catch (error) {
+
+    showToast(
+      error?.message ||
+      "Unable to update OS module.",
+      "error"
+    );
+
+
+    return false;
+
+
+  } finally {
+
+    if (button) {
+
+      button.disabled =
+        false;
+    }
+  }
+}
+
+
+/* ========================================================================
+ * WAIT HELPER
+ * ====================================================================== */
+
+function wait(
+  milliseconds
+) {
+
+  return new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        milliseconds
+      )
+  );
+}
+
+
+/* ========================================================================
+ * NAVIGATION
+ * ====================================================================== */
+
+function navigate(
+  section
+) {
+
+  const target =
+    String(section || "")
+      .trim();
+
+
+  if (!target) {
+    return;
+  }
+
+
+  /*
+   * Hide all sections.
+   */
+
+  $$(".section")
+    .forEach(
+      element => {
+
+        element.classList.remove(
+          "active-section"
+        );
+
+        element.classList.remove(
+          "active"
+        );
+      }
+    );
+
+
+  /*
+   * Activate requested section.
+   */
+
+  const sectionElement =
+    byId(
+      `section-${target}`
+    );
+
+
+  if (sectionElement) {
+
+    sectionElement.classList.add(
+      "active-section"
+    );
+
+    sectionElement.classList.add(
+      "active"
+    );
+  }
+
+
+  /*
+   * Update navigation state.
+   */
+
+  $$(".nav-item")
+    .forEach(
+      button => {
+
+        const active =
+          button.dataset.section ===
+          target;
+
+
+        button.classList.toggle(
+          "active",
+          active
+        );
+
+
+        button.setAttribute(
+          "aria-current",
+          active
+            ? "page"
+            : "false"
+        );
+      }
+    );
+
+
+  /*
+   * Update page title.
+   */
+
+  const activeNav =
+    document.querySelector(
+      `.nav-item[data-section="${CSS.escape(target)}"]`
+    );
+
+
+  const label =
+    activeNav
+      ?.querySelector("span")
+      ?.textContent
+      ?.trim();
+
+
+  if (label) {
+
+    text(
+      "page-title",
+      label
+    );
+  }
+
+
+  /*
+   * Dashboard is the default command centre.
+   */
+
+  if (
+    target === "dashboard"
+  ) {
+
+    text(
+      "page-kicker",
+      "COMMAND CENTRE"
+    );
+
+  } else {
+
+    text(
+      "page-kicker",
+      "INTELLIGENCE OS"
+    );
+  }
+
+
+  closeMobileSidebar();
+}
+
+
+/* ========================================================================
+ * MOBILE SIDEBAR
+ * ====================================================================== */
+
+function openMobileSidebar() {
+
+  state.mobileSidebarOpen =
+    true;
+
+
+  document.body.classList.add(
+    "sidebar-open"
+  );
+
+
+  const sidebar =
+    document.querySelector(
+      ".sidebar"
+    );
+
+
+  if (sidebar) {
+
+    sidebar.classList.add(
+      "open"
+    );
+  }
+
+
+  const overlay =
+    byId(
+      "sidebar-overlay"
+    );
+
+
+  if (overlay) {
+
+    overlay.classList.add(
+      "active"
+    );
+  }
+}
+
+
+function closeMobileSidebar() {
+
+  state.mobileSidebarOpen =
+    false;
+
+
+  document.body.classList.remove(
+    "sidebar-open"
+  );
+
+
+  const sidebar =
+    document.querySelector(
+      ".sidebar"
+    );
+
+
+  if (sidebar) {
+
+    sidebar.classList.remove(
+      "open"
+    );
+  }
+
+
+  const overlay =
+    byId(
+      "sidebar-overlay"
+    );
+
+
+  if (overlay) {
+
+    overlay.classList.remove(
+      "active"
+    );
+  }
+}
+
+
+/* ========================================================================
+ * DISABLE CONTROL BUTTONS WHEN AUTHENTICATION IS LOST
+ * ====================================================================== */
+
+function setControlsEnabled(
+  enabled
+) {
+
+  const selectors = [
+
+    '[data-action="scan-start"]',
+
+    '[data-action="scan-stop"]',
+
+    '[data-action="brain-pause"]',
+
+    '[data-action="brain-resume"]',
+
+    '[data-action="emergency-stop"]',
+
+    "[data-os-toggle]"
+  ];
+
+
+  selectors.forEach(
+    selector => {
+
+      $$(selector)
+        .forEach(
+          button => {
+
+            button.disabled =
+              !enabled;
+          }
+        );
+    }
+  );
+}
+
+
+/* ========================================================================
+ * EXPORT ENGINE CONTROLS
+ * ====================================================================== */
+
+window.GRIDV21 = {
+  ...(window.GRIDV21 || {}),
+
+  engineAction,
+  emergencyStop,
+  toggleOS,
+
+  navigate,
+
+  openMobileSidebar,
+  closeMobileSidebar,
+
+  setControlsEnabled
+};
+
+
+/*
+ * Legacy/global compatibility.
+ *
+ * These are also assigned again in Part 4,
+ * but exposing them here makes the controls
+ * available immediately.
+ */
+
+window.engineAction =
+  engineAction;
+
+window.emergencyStop =
+  emergencyStop;
+
+window.toggleOS =
+  toggleOS;
