@@ -438,209 +438,540 @@
     }
   }
 
-  class APIError extends Error {
-    constructor(
-      message,
-      status = 0,
-      payload = null
-    ) {
-      super(message);
+/* ========================================================================
+ * ADMIN AUTHENTICATION
+ * ====================================================================== */
 
-      this.name =
-        "APIError";
+const ADMIN_STORAGE_KEY =
+  "GRIDV21_ADMIN_KEY";
 
-      this.status =
-        status;
 
-      this.payload =
-        payload;
-    }
-  }
+/* ------------------------------------------------------------------------
+ * API FETCH
+ * ---------------------------------------------------------------------- */
 
-  async function verifySession() {
-    try {
-      const response =
-        await fetch(
-          "/api/auth/me",
-          {
-            method: "GET",
-            credentials: "include",
-            cache: "no-store",
-            headers: {
-              "Accept":
-                "application/json"
-            }
+async function apiFetch(
+  url,
+  options = {}
+) {
+
+  const requestOptions = {
+    ...options,
+
+    credentials:
+      "include",
+
+    cache:
+      options.cache ||
+      "no-store",
+
+    headers: {
+      "Accept":
+        "application/json",
+
+      ...(options.body
+        ? {
+            "Content-Type":
+              "application/json"
           }
-        );
+        : {}),
 
-      const payload =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      if (
-        !response.ok ||
-        payload.authenticated !== true
-      ) {
-        state.authenticated = false;
-
-        setGlobalStatus(
-          false,
-          "Login required"
-        );
-
-        window.location.replace(
-          "/login.html"
-        );
-
-        return false;
-      }
-
-      state.authenticated = true;
-
-      setGlobalStatus(
-        true,
-        "Authenticated"
-      );
-
-      setAuthUI(true);
-
-      return true;
-
-    } catch (error) {
-      console.error(
-        "[GRIDV21 SESSION]",
-        error
-      );
-
-      state.authenticated = false;
-
-      setGlobalStatus(
-        false,
-        "Authentication error"
-      );
-
-      window.location.replace(
-        "/login.html"
-      );
-
-      return false;
+      ...(options.headers || {})
     }
+  };
+
+
+  /*
+   * Send ADMIN_KEY as a header.
+   *
+   * The server can then validate it directly,
+   * or use the authenticated owner session.
+   */
+  if (state.adminKey) {
+
+    requestOptions.headers[
+      "x-admin-key"
+    ] =
+      state.adminKey;
   }
 
-  function handleAuthFailure(
-    error
+
+  let response;
+
+  try {
+
+    response =
+      await fetch(
+        url,
+        requestOptions
+      );
+
+  } catch (error) {
+
+    throw new APIError(
+      "Unable to connect to GRIDV21 server.",
+      0,
+      null
+    );
+  }
+
+
+  const payload =
+    await response
+      .json()
+      .catch(
+        () => ({})
+      );
+
+
+  if (!response.ok) {
+
+    throw new APIError(
+      payload.error ||
+      payload.message ||
+      `Request failed (${response.status})`,
+      response.status,
+      payload
+    );
+  }
+
+
+  return payload;
+}
+
+
+/* ------------------------------------------------------------------------
+ * LOAD ADMIN KEY
+ * ---------------------------------------------------------------------- */
+
+function loadAdminKey() {
+
+  try {
+
+    state.adminKey =
+      localStorage.getItem(
+        ADMIN_STORAGE_KEY
+      ) ||
+      "";
+
+  } catch (error) {
+
+    console.warn(
+      "[GRIDV21] Unable to read admin key:",
+      error
+    );
+
+    state.adminKey =
+      "";
+  }
+
+
+  const input =
+    byId(
+      "adminKeyInput"
+    );
+
+
+  if (
+    input &&
+    state.adminKey
   ) {
-    if (
-      error instanceof APIError &&
-      error.status === 401
-    ) {
-      state.authenticated =
-        false;
 
-      setGlobalStatus(
-        false,
-        "Authentication required"
-      );
+    input.value =
+      state.adminKey;
+  }
 
-      showToast(
-        "GRIDV21 rejected the admin key.",
-        "error"
-      );
 
-      return true;
-    }
+  return state.adminKey;
+}
+
+
+/* ------------------------------------------------------------------------
+ * SAVE ADMIN KEY
+ * ---------------------------------------------------------------------- */
+
+function saveAdminKey(
+  key
+) {
+
+  const value =
+    String(
+      key ??
+      ""
+    ).trim();
+
+
+  if (!value) {
 
     return false;
   }
 
-  window.GRIDV21 = {
-    VERSION,
-    API,
-    state,
-    apiFetch,
-    verifyAdminKey,
-    saveAdminKey,
-    clearAdminKey,
-    showToast
-  };      );
-    },
-    3500
+
+  state.adminKey =
+    value;
+
+
+  try {
+
+    localStorage.setItem(
+      ADMIN_STORAGE_KEY,
+      value
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "[GRIDV21] Unable to persist admin key:",
+      error
+    );
+  }
+
+
+  return true;
+}
+
+
+/* ------------------------------------------------------------------------
+ * CLEAR ADMIN KEY
+ * ---------------------------------------------------------------------- */
+
+async function clearAdminKey() {
+
+  state.adminKey =
+    "";
+
+  state.authenticated =
+    false;
+
+
+  try {
+
+    localStorage.removeItem(
+      ADMIN_STORAGE_KEY
+    );
+
+  } catch (_) {}
+
+
+  /*
+   * Destroy the OWNER server session.
+   */
+  try {
+
+    await fetch(
+      "/api/auth/logout",
+      {
+        method:
+          "POST",
+
+        credentials:
+          "include",
+
+        headers: {
+          "Accept":
+            "application/json"
+        }
+      }
+    );
+
+  } catch (error) {
+
+    console.warn(
+      "[GRIDV21] Admin logout request failed:",
+      error
+    );
+  }
+
+
+  setAuthUI(
+    false
+  );
+
+  setControlsEnabled(
+    false
+  );
+
+  setGlobalStatus(
+    false,
+    "Admin key required"
+  );
+
+
+  const input =
+    byId(
+      "adminKeyInput"
+    );
+
+  if (input) {
+
+    input.value =
+      "";
+  }
+
+
+  const status =
+    byId(
+      "keyStatus"
+    );
+
+  if (status) {
+
+    status.textContent =
+      "Admin key cleared";
+  }
+
+
+  showToast(
+    "Admin access cleared.",
+    "success"
   );
 }
 
-/* ========================================================================
- * GLOBAL STATUS
- * ====================================================================== */
 
-function setGlobalStatus(
-  connected,
-  message
-) {
-  state.connected =
-    Boolean(connected);
+/* ------------------------------------------------------------------------
+ * VERIFY ADMIN KEY
+ * ---------------------------------------------------------------------- */
 
-  const badge =
-    byId("global-status");
+async function verifyAdminKey() {
 
-  const textElement =
-    byId("global-status-text");
+  const key =
+    String(
+      state.adminKey ||
+      ""
+    ).trim();
 
-  const dot =
-    byId("global-status-dot");
 
-  if (textElement) {
-    textElement.textContent =
-      message ||
-      (
-        connected
-          ? "Connected"
-          : "Disconnected"
+  if (!key) {
+
+    setAuthUI(
+      false
+    );
+
+    setControlsEnabled(
+      false
+    );
+
+    return false;
+  }
+
+
+  try {
+
+    const payload =
+      await apiFetch(
+        API.authVerify,
+        {
+          method:
+            "POST",
+
+          headers: {
+            "x-admin-key":
+              key
+          }
+        }
       );
-  }
 
-  if (badge) {
-    badge.classList.toggle(
-      "badge-success",
-      connected
+
+    if (
+      payload.ok !== true ||
+      payload.authenticated !== true
+    ) {
+
+      throw new APIError(
+        "Invalid admin key.",
+        401,
+        payload
+      );
+    }
+
+
+    state.authenticated =
+      true;
+
+
+    state.connected =
+      true;
+
+
+    setGlobalStatus(
+      true,
+      "Admin authenticated"
     );
 
-    badge.classList.toggle(
-      "badge-muted",
-      !connected
-    );
-  }
 
-  if (dot) {
-    dot.classList.toggle(
-      "status-online",
-      connected
+    setAuthUI(
+      true
     );
+
+
+    setControlsEnabled(
+      true
+    );
+
+
+    const status =
+      byId(
+        "keyStatus"
+      );
+
+    if (status) {
+
+      status.textContent =
+        "Owner authenticated";
+    }
+
+
+    return true;
+
+  } catch (error) {
+
+    state.authenticated =
+      false;
+
+
+    setAuthUI(
+      false
+    );
+
+
+    setControlsEnabled(
+      false
+    );
+
+
+    setGlobalStatus(
+      false,
+      "Admin key rejected"
+    );
+
+
+    const status =
+      byId(
+        "keyStatus"
+      );
+
+    if (status) {
+
+      status.textContent =
+        error.status === 401
+          ? "Invalid admin key"
+          : "Verification failed";
+    }
+
+
+    console.error(
+      "[GRIDV21 ADMIN AUTH]",
+      error
+    );
+
+
+    return false;
   }
 }
 
-/* ========================================================================
- * API ERROR
- * ====================================================================== */
 
-class APIError extends Error {
-  constructor(
-    message,
-    status = 0,
-    payload = null
-  ) {
-    super(message);
+/* ------------------------------------------------------------------------
+ * ADMIN UI
+ * ---------------------------------------------------------------------- */
 
-    this.name =
-      "APIError";
+function setAuthUI(
+  authenticated
+) {
 
-    this.status =
-      status;
+  const input =
+    byId(
+      "adminKeyInput"
+    );
 
-    this.payload =
-      payload;
+  const saveButton =
+    byId(
+      "saveKeyBtn"
+    );
+
+  const status =
+    byId(
+      "keyStatus"
+    );
+
+
+  if (input) {
+
+    input.disabled =
+      Boolean(authenticated);
   }
+
+
+  if (saveButton) {
+
+    saveButton.disabled =
+      Boolean(authenticated);
+  }
+
+
+  if (status) {
+
+    status.textContent =
+      authenticated
+        ? "Owner authenticated"
+        : "Admin key required";
+  }
+
+
+  setControlsEnabled(
+    Boolean(authenticated)
+  );
 }
+
+
+/* ------------------------------------------------------------------------
+ * SESSION CHECK
+ *
+ * IMPORTANT:
+ * We intentionally DO NOT use the tenant Supabase session here.
+ *
+ * The Brain Control dashboard is ADMIN_KEY protected.
+ * ---------------------------------------------------------------------- */
+
+async function verifyAdminSession() {
+
+  try {
+
+    const payload =
+      await apiFetch(
+        "/api/auth/me"
+      );
+
+
+    if (
+      payload.authenticated === true &&
+      payload.authType === "admin_key"
+    ) {
+
+      state.authenticated =
+        true;
+
+      setAuthUI(
+        true
+      );
+
+      setGlobalStatus(
+        true,
+        "Admin authenticated"
+      );
+
+      return true;
+    }
+
+  } catch (_) {
+
+    /*
+     * Expected when there is no owner session.
+     */
+  }
+
+
+  return false;
+        }
 
 /* ============================================================
  * SESSION AUTHENTICATION
