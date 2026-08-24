@@ -3311,151 +3311,113 @@ window.toggleOS =
    * INITIALISE APPLICATION
    * ====================================================================== */
 
-  async function init() {
+async function init() {
 
-    console.info(
-      `[GRIDV21] Starting Dashboard v${VERSION}`
+  console.info(
+    `[GRIDV21] Starting Dashboard v${VERSION}`
+  );
+
+
+  loadAdminKey();
+
+
+  bindEvents();
+
+
+  setGlobalStatus(
+    false,
+    "Admin key required"
+  );
+
+
+  navigate(
+    "dashboard"
+  );
+
+
+  state.osModules =
+    OS_MODULES.map(
+      module => ({
+        ...module,
+        enabled: true
+      })
     );
 
 
-    loadAdminKey();
-
-    setAuthUI(false);
-
-
-    /*
-     * Bind UI before making API calls.
-     *
-     * This is important:
-     * even if the backend is unavailable,
-     * the dashboard buttons remain responsive.
-     */
-
-    bindEvents();
+  renderOSOverview(
+    state.osModules
+  );
 
 
-    /*
-     * Initial connection state.
-     */
-
-    setGlobalStatus(
-      false,
-      "Connecting"
-    );
+  /*
+   * Try existing OWNER session first.
+   */
+  const existingAdminSession =
+    await verifyAdminSession();
 
 
-    /*
-     * Initialise navigation immediately.
-     */
+  if (
+    existingAdminSession
+  ) {
 
-    navigate(
-      "dashboard"
-    );
+    await refreshDashboardData();
 
-
-    /*
-     * Show canonical OS modules immediately.
-     *
-     * This prevents "Loading modules..."
-     * from remaining permanently visible.
-     */
-
-    state.osModules =
-      OS_MODULES.map(
-        module => ({
-          ...module,
-          enabled: true
-        })
-      );
+    return;
+  }
 
 
-    renderOSOverview(
-      state.osModules
-    );
+  /*
+   * Otherwise use the stored ADMIN_KEY.
+   */
+  if (
+    state.adminKey
+  ) {
+
+    const valid =
+      await verifyAdminKey();
 
 
-    /*
-     * If an admin key exists, validate it.
-     * If there is no key, keep the UI locked.
-     */
+    if (
+      valid
+    ) {
 
-    if (state.adminKey) {
-
-      const valid =
-        await verifyAdminKey();
-
-
-      if (!valid) {
-
-        setAuthUI(false);
-
-        setControlsEnabled(false);
-
-        renderDashboardError(
-          new APIError(
-            "Authentication required",
-            401
-          )
-        );
-
-        return;
-      }
-
-
-      setAuthUI(true);
-
-      setControlsEnabled(true);
-
-
-      /*
-       * Load live data after successful authentication.
-       */
-
-      try {
-
-        await loadDashboard();
-
-        if (
-          typeof refreshDashboardData ===
-          "function"
-        ) {
-
-          await refreshDashboardData();
-
-        }
-
-      } catch (err) {
-
-        console.error(
-          "[GRIDV21] Post-auth data load failed:",
-          err
-        );
-
-      }
-
-    } else {
-
-      setAuthUI(false);
-
-      setGlobalStatus(
-        false,
-        "Admin key required"
-      );
-
-      setControlsEnabled(false);
-
-      renderDashboardError(
-        new APIError(
-          "Enter the GRIDV21 admin key.",
-          401
-        )
-      );
+      await refreshDashboardData();
 
       return;
     }
-
   }
 
+
+  /*
+   * No owner authentication yet.
+   */
+  state.authenticated =
+    false;
+
+
+  setAuthUI(
+    false
+  );
+
+
+  setControlsEnabled(
+    false
+  );
+
+
+  setGlobalStatus(
+    false,
+    "Admin key required"
+  );
+
+
+  renderDashboardError(
+    new APIError(
+      "Enter the GRIDV21 admin key.",
+      401
+    )
+  );
+}
 
   /* ========================================================================
    * GLOBAL COMPATIBILITY
