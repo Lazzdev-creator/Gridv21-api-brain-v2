@@ -3580,7 +3580,7 @@ app.get(
         error
       );
 
-      return res.status(500).json({
+       res.status(500).json({
 
         ok: false,
 
