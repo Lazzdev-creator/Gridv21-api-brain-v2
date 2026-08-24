@@ -3139,7 +3139,166 @@ app.post(
   }
 );
 
+/* -------------------------------------------------------------------------- */
+/* OWNER ADMIN-KEY VERIFICATION                                               */
+/* -------------------------------------------------------------------------- */
 
+/*
+ * This endpoint is ONLY for the GRIDV21 owner/admin.
+ *
+ * It is completely separate from tenant email/password authentication.
+ */
+
+app.post(
+  "/api/auth/verify",
+  authLimiter,
+  (req, res) => {
+
+    try {
+
+      const supplied =
+        getAdminKey(req);
+
+      const expected =
+        process.env.ADMIN_KEY ||
+        ADMIN_KEY ||
+        "";
+
+
+      if (!expected) {
+
+        console.error(
+          "[ADMIN AUTH] ADMIN_KEY is missing."
+        );
+
+        return res.status(500).json({
+          ok: false,
+          authenticated: false,
+          error: "Server misconfiguration"
+        });
+      }
+
+
+      if (
+        !supplied ||
+        !safeCompare(
+          supplied,
+          expected
+        )
+      ) {
+
+        console.warn(
+          `[ADMIN AUTH] Invalid admin key attempt from ${req.ip}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error: "Invalid admin key"
+        });
+      }
+
+
+      /*
+       * Regenerate the session so the owner session
+       * cannot inherit a previous tenant session.
+       */
+      req.session.regenerate(
+        sessionError => {
+
+          if (sessionError) {
+
+            console.error(
+              "[ADMIN AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure admin session."
+            });
+          }
+
+
+          /*
+           * OWNER SESSION
+           */
+          req.session.gridv21Authenticated =
+            true;
+
+          req.session.authType =
+            "admin_key";
+
+          req.session.userId =
+            null;
+
+          req.session.userEmail =
+            null;
+
+          req.session.userRole =
+            "owner";
+
+          req.session.authenticatedAt =
+            new Date().toISOString();
+
+
+          req.session.save(
+            saveError => {
+
+              if (saveError) {
+
+                console.error(
+                  "[ADMIN AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save admin session."
+                });
+              }
+
+
+              console.log(
+                "[ADMIN AUTH] Owner session established."
+              );
+
+
+              return res.json({
+                ok: true,
+                authenticated: true,
+                authType: "admin_key",
+                role: "owner",
+                message:
+                  "GRIDV21 owner authentication successful."
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[ADMIN AUTH] Verification exception:",
+        error
+      );
+
+      return res.status(500).json({
+        ok: false,
+        authenticated: false,
+        error:
+          "Admin authentication service unavailable."
+      });
+    }
+  }
+);
 /* -------------------------------------------------------------------------- */
 /* AUTH SESSION CHECK                                                         */
 /* -------------------------------------------------------------------------- */
