@@ -3508,217 +3508,7 @@ app.get(
 
   }
 );
-
 /* -------------------------------------------------------------------------- */
-/* DASHBOARD ACCESS                                                           */
-/* -------------------------------------------------------------------------- */
-
-app.get(
-  "/dashboard.html",
-  (req, res) => {
-
-    return res.sendFile(
-      path.join(
-        PUBLIC_DIR,
-        "dashboard.html"
-      )
-    );
-
-  }
-);
-
-        ok: true,
-
-        authenticated
-          true,
-
-        version
-          VERSION,
-
-        user 
-
-          id
-            req.session?.userId ||
-            null,
-
-          email
-            req.session?.userEmail ||
-            null,
-
-          role
-            req.session?.userRole ||
-            "admin"
-
-
-        engine 
-
-          running
-            ENGINE.running,
-
-          scanning
-            ENGINE.scanning,
-
-          lastScan
-            ENGINE.lastScan,
-
-          permitsFound
-            ENGINE.permitsFound,
-
-          errors
-            ENGINE.errors
-
-
-        osModules
-          OS_MODULES
-
-
-    (error) 
-
-      console.error(
-        "[DASHBOARD]",
-        error
-      );
-
-       res.status(500).json({
-
-        ok: false,
-
-        error:
-          "Unable to load dashboard."
-
-      });
-
-/* -------------------------------------------------------------------------- */
-/* CURRENT USER                                                                */
-/* -------------------------------------------------------------------------- */
-
-app.get(
-  "/api/auth/me",
-  requireAuth,
-  (req, res) => {
-
-    return res.json({
-
-      ok: true,
-
-      authenticated:
-        true,
-
-      user: {
-
-        id:
-          req.session?.userId ||
-          null,
-
-        email:
-          req.session?.userEmail ||
-          null,
-
-        role:
-          req.session?.userRole ||
-          "admin"
-
-
-/* -------------------------------------------------------------------------- */
-/* STATIC FRONTEND                                                            */
-/* -------------------------------------------------------------------------- */
-
-/*
- * login.html remains publicly accessible.
- */
-
-   .get(
-  "/login.html",
-  (req, res) => {
-
-    return res.sendFile(
-      path.join(
-        PUBLIC_DIR,
-        "login.html"
-      )
-    );
-
-
-/*
- * Dashboard itself should only be returned to an authenticated user.
- */
-
-app.get(
-  "/dashboard.html",
-  requireAuth,
-  (req, res) => {
-
-    return res.sendFile(
-      path.join(
-        PUBLIC_DIR,
-        "dashboard.html"
-      )
-    );
-
-
-/* -------------------------------------------------------------------------- */
-/* ROOT                                                                       */
-/* -------------------------------------------------------------------------- */
-
-app.get(
-  "/",
-  (req, res) => {
-
-    /*
-     * If already authenticated, send dashboard.
-     */
-
-    if (
-      req.session?.gridv21Authenticated ===
-      true
-    ) {
-
-      return res.sendFile(
-        path.join(
-          PUBLIC_DIR,
-          "dashboard.html"
-        )
-      );
-
-    }
-
-    /*
-     * Otherwise send login.
-     */
-
-    return res.sendFile(
-      path.join(
-        PUBLIC_DIR,
-        "login.html"
-      )
-    );
-
-
-/* -------------------------------------------------------------------------- */
-/* 404 HANDLER                                                                */
-/* -------------------------------------------------------------------------- */
-
-app.use(
-  (req, res) => {
-
-    if (
-      req.path.startsWith(
-        "/api/"
-      )
-    ) {
-
-      return res.status(404).json({
-
-        ok: false,
-
-        error:
-          "API endpoint not found."
-
-      });
-
-    }
-
-    /* -------------------------------------------------------------------------- */
 /* DASHBOARD ACCESS                                                           */
 /* -------------------------------------------------------------------------- */
 
@@ -3757,9 +3547,6 @@ app.get(
 /* STATIC FRONTEND                                                            */
 /* -------------------------------------------------------------------------- */
 
-/*
- * login.html remains publicly accessible.
- */
 app.get(
   "/login.html",
   (req, res) => {
@@ -3776,18 +3563,11 @@ app.get(
 app.get(
   "/",
   (req, res) => {
-    /*
-     * If already authenticated, send dashboard.
-     */
     if (req.session?.gridv21Authenticated === true) {
       return res.sendFile(
         path.join(PUBLIC_DIR, "dashboard.html")
       );
     }
-
-    /*
-     * Otherwise send login.
-     */
     return res.sendFile(
       path.join(PUBLIC_DIR, "login.html")
     );
@@ -3806,10 +3586,7 @@ app.use(
         error: "API endpoint not found."
       });
     }
-
-    return res.status(404).send(
-      "GRIDV21 — Page not found."
-    );
+    return res.status(404).send("GRIDV21 — Page not found.");
   }
 );
 
@@ -3819,18 +3596,13 @@ app.use(
 
 app.use(
   (error, req, res, next) => {
-    console.error(
-      "[SERVER ERROR]",
-      error
-    );
+    console.error("[SERVER ERROR]", error);
 
     if (res.headersSent) {
       return next(error);
     }
 
-    return res.status(
-      error.status || 500
-    ).json({
+    return res.status(error.status || 500).json({
       ok: false,
       error: IS_PRODUCTION
         ? "Internal server error."
