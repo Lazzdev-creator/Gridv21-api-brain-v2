@@ -3536,7 +3536,7 @@ app.get(
         version
           VERSION,
 
-        user {
+        user 
 
           id
             req.session?.userId ||
