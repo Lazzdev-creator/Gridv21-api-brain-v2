@@ -3037,24 +3037,29 @@ app.post(
           }
 
           /*
-           * SERVER-SIDE AUTH STATE
-           */
+ * TENANT SESSION
+ *
+ * Email/password authentication is for tenants.
+ * It does NOT create an owner/admin session.
+ */
 
-          req.session.gridv21Authenticated =
-            true;
+req.session.gridv21Authenticated =
+  true;
 
-          req.session.userId =
-            data.user.id;
+req.session.authType =
+  "tenant";
 
-          req.session.userEmail =
-            data.user.email;
+req.session.userId =
+  data.user.id;
 
-          req.session.userRole =
-            data.user.user_metadata?.role ||
-            "admin";
+req.session.userEmail =
+  data.user.email;
 
-          req.session.authenticatedAt =
-            new Date().toISOString();
+req.session.userRole =
+  "tenant";
+
+req.session.authenticatedAt =
+  new Date().toISOString();
 
           /*
            * Save before responding.
