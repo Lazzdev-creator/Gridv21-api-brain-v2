@@ -3843,4 +3843,43 @@ app.use(
 /* START SERVER                                                               */
 /* -------------------------------------------------------------------------- */
 
-async function 
+async function startServer() {
+  try {
+    app.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log("");
+        console.log("==================================================");
+        console.log("GRIDV21 BRAIN ENTERPRISE");
+        console.log(`Version: ${VERSION}`);
+        console.log(`Port: ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+        console.log("Authentication: Supabase + server session");
+        console.log("Dashboard authentication: ENABLED");
+        console.log("==================================================");
+      }
+    );
+  } catch (error) {
+    console.error("[STARTUP] Fatal error:", error);
+    process.exit(1);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* PROCESS ERROR HANDLERS                                                     */
+/* -------------------------------------------------------------------------- */
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[PROCESS] Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[PROCESS] Uncaught exception:", error);
+});
+
+/* -------------------------------------------------------------------------- */
+/* START                                                                      */
+/* -------------------------------------------------------------------------- */
+
+startServer();
