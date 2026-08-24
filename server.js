@@ -3509,7 +3509,6 @@ app.get(
   }
 );
 
-
 /* -------------------------------------------------------------------------- */
 /* DASHBOARD ACCESS                                                           */
 /* -------------------------------------------------------------------------- */
@@ -3719,166 +3718,129 @@ app.use(
 
     }
 
-    return res.status(404).send(
-      "GRIDV21 — Page not found."
-    );
+    /* -------------------------------------------------------------------------- */
+/* DASHBOARD ACCESS                                                           */
+/* -------------------------------------------------------------------------- */
 
+app.get(
+  "/dashboard.html",
+  requireAuth,
+  (req, res) => {
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "dashboard.html")
+    );
   }
 );
 
+/* -------------------------------------------------------------------------- */
+/* CURRENT USER                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/me",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      authenticated: true,
+      authType: req.session?.authType || null,
+      user: {
+        id: req.session?.userId || null,
+        email: req.session?.userEmail || null,
+        role: req.session?.userRole || "admin"
+      }
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * login.html remains publicly accessible.
+ */
+app.get(
+  "/login.html",
+  (req, res) => {
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* ROOT                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+    /*
+     * If already authenticated, send dashboard.
+     */
+    if (req.session?.gridv21Authenticated === true) {
+      return res.sendFile(
+        path.join(PUBLIC_DIR, "dashboard.html")
+      );
+    }
+
+    /*
+     * Otherwise send login.
+     */
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* 404 HANDLER                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({
+        ok: false,
+        error: "API endpoint not found."
+      });
+    }
+
+    return res.status(404).send(
+      "GRIDV21 — Page not found."
+    );
+  }
+);
 
 /* -------------------------------------------------------------------------- */
 /* GLOBAL ERROR HANDLER                                                       */
 /* -------------------------------------------------------------------------- */
 
 app.use(
-  (
-    error,
-    req,
-    res,
-    next
-  ) => {
-
+  (error, req, res, next) => {
     console.error(
       "[SERVER ERROR]",
       error
     );
 
-    if (
-      res.headersSent
-    ) {
-
-      return next(
-        error
-      );
-
+    if (res.headersSent) {
+      return next(error);
     }
 
     return res.status(
-      error.status ||
-      500
+      error.status || 500
     ).json({
-
       ok: false,
-
-      error:
-        IS_PRODUCTION
-          ? "Internal server error."
-          : (
-              error.message ||
-              "Internal server error."
-            )
-
+      error: IS_PRODUCTION
+        ? "Internal server error."
+        : (error.message || "Internal server error.")
     });
-
   }
 );
-
 
 /* -------------------------------------------------------------------------- */
 /* START SERVER                                                               */
 /* -------------------------------------------------------------------------- */
 
-async function startServer() {
-
-  try {
-
-    /*
-     * Session middleware must already have been
-     * configured before this point.
-     */
-
-    app.listen(
-      PORT,
-      "0.0.0.0",
-      () => {
-
-        console.log("");
-        console.log(
-          "=================================================="
-        );
-
-        console.log(
-          "GRIDV21 BRAIN ENTERPRISE"
-        );
-
-        console.log(
-          `Version: ${VERSION}`
-        );
-
-        console.log(
-          `Port: ${PORT}`
-        );
-
-        console.log(
-          `Environment: ${
-            process.env.NODE_ENV ||
-            "development"
-          }`
-        );
-
-        console.log(
-          "Authentication: Supabase + server session"
-        );
-
-        console.log(
-          "Dashboard authentication: ENABLED"
-        );
-
-        console.log(
-          "=================================================="
-        );
-
-      }
-    );
-
-  } catch (error) {
-
-    console.error(
-      "[STARTUP] Fatal error:",
-      error
-    );
-
-    process.exit(
-      1
-    );
-
-  }
-
-}
-
-
-/* -------------------------------------------------------------------------- */
-/* PROCESS ERROR HANDLERS                                                     */
-/* -------------------------------------------------------------------------- */
-
-process.on(
-  "unhandledRejection",
-  (reason) => {
-
-    console.error(
-      "[PROCESS] Unhandled rejection:",
-      reason
-    );
-
-  }
-);
-
-process.on(
-  "uncaughtException",
-  (error) => {
-
-    console.error(
-      "[PROCESS] Uncaught exception:",
-      error
-    );
-
-  }
-);
-
-
-/* -------------------------------------------------------------------------- */
-/* START                                                                      */
-/* -------------------------------------------------------------------------- */
-
-startServer();
+async function 
