@@ -3099,17 +3099,18 @@ req.session.authenticatedAt =
                   "Authentication successful.",
 
                 user: {
+  id:
+    data.user.id,
 
-                  id:
-                    data.user.id,
+  email:
+    data.user.email,
 
-                  email:
-                    data.user.email,
+  role:
+    "tenant"
+},
 
-                  role:
-                    data.user.user_metadata?.role ||
-                    "admin"
-
+authType:
+  "tenant"
                 }
 
               });
