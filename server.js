@@ -3533,7 +3533,7 @@ app.get(
         authenticated
           true,
 
-        version:
+        version
           VERSION,
 
         user: {
