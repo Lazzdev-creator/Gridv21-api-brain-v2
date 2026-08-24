@@ -3111,8 +3111,7 @@ req.session.authenticatedAt =
 
 authType:
   "tenant"
-                }
-
+                
               });
 
             }
