@@ -81,45 +81,64 @@ function getAdminKey(req) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* AUTHENTICATION MIDDLEWARE                                                  */
+/* OWNER / ADMIN AUTHENTICATION                                               */
 /* -------------------------------------------------------------------------- */
+
+/*
+ * GRIDV21 has TWO separate authentication systems:
+ *
+ * 1. TENANT:
+ *    email + password → Supabase → tenant session
+ *
+ * 2. OWNER:
+ *    ADMIN_KEY → admin session → Brain Control
+ *
+ * A tenant session MUST NEVER satisfy this middleware.
+ */
 
 function requireAdmin(req, res, next) {
 
   /*
-   * A successful GRIDV21/Supabase login creates a server-side session.
-   *
-   * This means login.html does NOT need the ADMIN_KEY.
-   *
-   * The existing ADMIN_KEY authentication remains supported as a
-   * legacy/admin access method.
+   * Only an ADMIN_KEY-created session is accepted.
    */
-
-  if (req.session?.gridv21Authenticated === true) {
+  if (
+    req.session?.gridv21Authenticated === true &&
+    req.session?.authType === "admin_key"
+  ) {
 
     req.isAdmin = true;
 
     return next();
   }
 
-  const supplied = getAdminKey(req);
+
+  /*
+   * Allow the ADMIN_KEY directly as a header.
+   *
+   * This also supports existing API clients.
+   */
+  const supplied =
+    getAdminKey(req);
 
   const expected =
     process.env.ADMIN_KEY ||
     ADMIN_KEY ||
     "";
 
+
   if (!expected) {
 
     console.error(
-      "[SECURITY] ADMIN_KEY is not set in environment"
+      "[SECURITY] ADMIN_KEY is not configured."
     );
 
     return res.status(500).json({
       ok: false,
+      authenticated: false,
       error: "Server misconfiguration"
     });
   }
+
 
   if (
     !supplied ||
@@ -130,22 +149,34 @@ function requireAdmin(req, res, next) {
   ) {
 
     console.warn(
-      `[SECURITY] Invalid admin key attempt from ${req.ip} on ${req.method} ${req.originalUrl}`
+      `[SECURITY] Invalid owner/admin access attempt from ${req.ip} on ${req.method} ${req.originalUrl}`
     );
 
     return res.status(401).json({
       ok: false,
       authenticated: false,
-      error: "Authentication required"
+      error: "Admin key required"
     });
   }
 
+
+  /*
+   * Direct ADMIN_KEY access is valid.
+   */
   req.isAdmin = true;
 
-  next();
+  return next();
 }
 
-const requireAuth = requireAdmin;
+
+/*
+ * All existing Brain Control endpoints use requireAuth.
+ *
+ * Keep this alias so the rest of the backend does not need
+ * to be rewritten.
+ */
+const requireAuth =
+  requireAdmin;
 
 const requireAdminKey =
   requireAdmin;
