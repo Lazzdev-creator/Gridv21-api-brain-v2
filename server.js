@@ -3536,42 +3536,42 @@ app.get(
         version
           VERSION,
 
-        user: {
+        user {
 
-          id:
+          id
             req.session?.userId ||
             null,
 
-          email:
+          email
             req.session?.userEmail ||
             null,
 
-          role:
+          role
             req.session?.userRole ||
             "admin"
 
         },
 
-        engine: {
+        engine {
 
-          running:
+          running
             ENGINE.running,
 
-          scanning:
+          scanning
             ENGINE.scanning,
 
-          lastScan:
+          lastScan
             ENGINE.lastScan,
 
-          permitsFound:
+          permitsFound
             ENGINE.permitsFound,
 
-          errors:
+          errors
             ENGINE.errors
 
         },
 
-        osModules:
+        osModules
           OS_MODULES
 
       });
