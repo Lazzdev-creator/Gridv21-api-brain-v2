@@ -3516,13 +3516,18 @@ app.get(
 /* -------------------------------------------------------------------------- */
 
 app.get(
-  "/api/dashboard",
-  requireAuth,
-  async (req, res) => {
+  "/dashboard.html",
+  (req, res) => {
 
-    try {
+    return res.sendFile(
+      path.join(
+        PUBLIC_DIR,
+        "dashboard.html"
+      )
+    );
 
-      return res.json({
+  }
+);
 
         ok: true,
 
