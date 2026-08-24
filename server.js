@@ -3530,7 +3530,7 @@ app.get(
 
         ok: true,
 
-        authenticated:
+        authenticated
           true,
 
         version:
