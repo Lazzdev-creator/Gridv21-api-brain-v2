@@ -3628,7 +3628,7 @@ app.get(
  * login.html remains publicly accessible.
  */
 
-app.get(
+   .get(
   "/login.html",
   (req, res) => {
 
