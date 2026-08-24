@@ -3572,7 +3572,6 @@ app.get(
         osModules
           OS_MODULES
 
-      });
 
     } catch (error) {
 
