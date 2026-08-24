@@ -3310,53 +3310,36 @@ app.post(
 /* -------------------------------------------------------------------------- */
 
 app.get(
-  "/api/auth/session",
+  "/api/auth/me",
+  requireAuth,
   (req, res) => {
 
-    if (
-      req.session?.gridv21Authenticated ===
-      true
-    ) {
+    return res.json({
 
-      return res.json({
-
-        ok: true,
-
-        authenticated:
-          true,
-
-        user: {
-
-          id:
-            req.session.userId ||
-            null,
-
-          email:
-            req.session.userEmail ||
-            null,
-
-          role:
-            req.session.userRole ||
-            "admin"
-
-        }
-
-      });
-
-    }
-
-    return res.status(401).json({
-
-      ok: true,
+      ok:
+        true,
 
       authenticated:
-        false
+        true,
 
+      authType:
+        "admin_key",
+
+      user: {
+
+        id:
+          null,
+
+        email:
+          null,
+
+        role:
+          "owner"
+      }
     });
 
   }
 );
-
 
 /* -------------------------------------------------------------------------- */
 /* AUTH LOGOUT                                                               */
