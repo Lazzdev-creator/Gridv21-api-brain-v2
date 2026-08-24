@@ -3573,7 +3573,7 @@ app.get(
           OS_MODULES
 
 
-    } catch (error) {
+    catch (error) {
 
       console.error(
         "[DASHBOARD]",
