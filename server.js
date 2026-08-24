@@ -3550,9 +3550,8 @@ app.get(
             req.session?.userRole ||
             "admin"
 
-        },
 
-        engine {
+        engine 
 
           running
             ENGINE.running,
@@ -3569,7 +3568,6 @@ app.get(
           errors
             ENGINE.errors
 
-        },
 
         osModules
           OS_MODULES
