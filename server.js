@@ -3048,4 +3048,761 @@ app.post(
 
       }
 
+      /*       * Regenerate the session after successful authentication.
+       *
+       * This prevents session fixation.
+       */
+
+      req.session.regenerate(
+        (sessionError) => {
+
+          if (sessionError) {
+
+            console.error(
+              "[AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure session."
+            });
+
+          }
+
+          /*
+ * TENANT SESSION
+ *
+ * Email/password authentication is for tenants.
+ * It does NOT create an owner/admin session.
+ */
+
+req.session.gridv21Authenticated =
+  true;
+
+req.session.authType =
+  "tenant";
+
+req.session.userId =
+  data.user.id;
+
+req.session.userEmail =
+  data.user.email;
+
+req.session.userRole =
+  "tenant";
+
+req.session.authenticatedAt =
+  new Date().toISOString();
+
+          /*
+           * Save before responding.
+           */
+
+          req.session.save(
+            (saveError) => {
+
+              if (saveError) {
+
+                console.error(
+                  "[AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save authentication session."
+                });
+
+              }
+
+              console.log(
+                `[AUTH] Successful GRIDV21 login: ${data.user.email}`
+              );
+
+              return res.json({
+
+                ok: true,
+
+                authenticated:
+                  true,
+
+                message:
+                  "Authentication successful.",
+
+                user: {
+  id:
+    data.user.id,
+
+  email:
+    data.user.email,
+
+  role:
+    "tenant"
+},
+
+authType:
+  "tenant"
+                
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[AUTH] Login exception:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        authenticated:
+          false,
+
+        error:
+          "Authentication service unavailable."
+
+      });
+
+    }
+
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* OWNER ADMIN-KEY VERIFICATION                                               */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * This endpoint is ONLY for the GRIDV21 owner/admin.
+ *
+ * It is completely separate from tenant email/password authentication.
+ */
+
+app.post(
+  "/api/auth/verify",
+  authLimiter,
+  (req, res) => {
+
+    try {
+
+      const supplied =
+        getAdminKey(req);
+
+      const expected =
+        process.env.ADMIN_KEY ||
+        ADMIN_KEY ||
+        "";
+
+
+      if (!expected) {
+
+        console.error(
+          "[ADMIN AUTH] ADMIN_KEY is missing."
+        );
+
+        return res.status(500).json({
+          ok: false,
+          authenticated: false,
+          error: "Server misconfiguration"
+        });
+      }
+
+
+      if (
+        !supplied ||
+        !safeCompare(
+          supplied,
+          expected
+        )
+      ) {
+
+        console.warn(
+          `[ADMIN AUTH] Invalid admin key attempt from ${req.ip}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error: "Invalid admin key"
+        });
+      }
+
+
       /*
+       * Regenerate the session so the owner session
+       * cannot inherit a previous tenant session.
+       */
+      req.session.regenerate(
+        sessionError => {
+
+          if (sessionError) {
+
+            console.error(
+              "[ADMIN AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure admin session."
+            });
+          }
+
+
+          /*
+           * OWNER SESSION
+           */
+          req.session.gridv21Authenticated =
+            true;
+
+          req.session.authType =
+            "admin_key";
+
+          req.session.userId =
+            null;
+
+          req.session.userEmail =
+            null;
+
+          req.session.userRole =
+            "owner";
+
+          req.session.authenticatedAt =
+            new Date().toISOString();
+
+
+          req.session.save(
+            saveError => {
+
+              if (saveError) {
+
+                console.error(
+                  "[ADMIN AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save admin session."
+                });
+              }
+
+
+              console.log(
+                "[ADMIN AUTH] Owner session established."
+              );
+
+
+              return res.json({
+                ok: true,
+                authenticated: true,
+                authType: "admin_key",
+                role: "owner",
+                message:
+                  "GRIDV21 owner authentication successful."
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[ADMIN AUTH] Verification exception:",
+        error
+      );
+
+      return res.status(500).json({
+        ok: false,
+        authenticated: false,
+        error:
+          "Admin authentication service unavailable."
+      });
+    }
+  }
+);
+/* -------------------------------------------------------------------------- */
+/* AUTH SESSION CHECK                                                         */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/me",
+  requireAuth,
+  (req, res) => {
+
+    return res.json({
+
+      ok:
+        true,
+
+      authenticated:
+        true,
+
+      authType:
+        "admin_key",
+
+      user: {
+
+        id:
+          null,
+
+        email:
+          null,
+
+        role:
+          "owner"
+      }
+    });
+
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH LOGOUT                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/logout",
+  (req, res) => {
+
+    req.session.destroy(
+      (error) => {
+
+        if (error) {
+
+          console.error(
+            "[AUTH] Logout error:",
+            error
+          );
+
+          return res.status(500).json({
+            ok: false,
+            error:
+              "Logout failed."
+          });
+
+        }
+
+        res.clearCookie(
+          "gridv21.sid"
+        );
+
+        return res.json({
+
+          ok: true,
+
+          authenticated:
+            false,
+
+          message:
+            "Logged out successfully."
+
+        });
+
+      }
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* AUTH STATUS                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/status",
+  (req, res) => {
+
+    return res.json({
+
+      ok: true,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      user:
+        req.session?.gridv21Authenticated ===
+        true
+          ? {
+              id:
+                req.session.userId ||
+                null,
+
+              email:
+                req.session.userEmail ||
+                null,
+
+              role:
+                req.session.userRole ||
+                "admin"
+            }
+          : null
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* HEALTH                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/health",
+  async (req, res) => {
+
+    let database =
+      "unknown";
+
+    try {
+
+      const {
+        error
+      } =
+        await supabase
+          .from("permits")
+          .select("id")
+          .limit(1);
+
+      database =
+        error
+          ? "error"
+          : "connected";
+
+    } catch (
+      error
+    ) {
+
+      database =
+        "error";
+
+    }
+
+    return res.json({
+
+      ok: true,
+
+      status:
+        "online",
+
+      version:
+        VERSION,
+
+      database,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      uptime:
+        Math.floor(
+          (
+            Date.now() -
+            ENGINE.uptime
+          ) / 1000
+        ),
+
+      engine: {
+
+        running:
+          ENGINE.running,
+
+        scanning:
+          ENGINE.scanning,
+
+        permitsFound:
+          ENGINE.permitsFound,
+
+        errors:
+          ENGINE.errors
+
+      }
+
+    });
+
+  }
+);
+/* -------------------------------------------------------------------------- */
+/* SOUTH AFRICA INTELLIGENCE API                                              */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/sa-intelligence/sources",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      version: SA_INTELLIGENCE.version,
+      sources: SA_INTELLIGENCE.sources.map(source => ({
+        ...source,
+        endpoint: source.endpoint || null
+      }))
+    });
+  }
+);
+
+app.get(
+  "/api/sa-intelligence/status",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      version: SA_INTELLIGENCE.version,
+      running: SA_INTELLIGENCE.state.running,
+      lastRun: SA_INTELLIGENCE.state.lastRun,
+      lastError: SA_INTELLIGENCE.state.lastError,
+      stats: SA_INTELLIGENCE.state.stats
+    });
+  }
+);
+
+app.post(
+  "/api/sa-intelligence/scan",
+  requireAuth,
+  async (req, res) => {
+    const sourceIds =
+      Array.isArray(req.body?.source_ids)
+        ? req.body.source_ids.map(String)
+        : null;
+
+    const result = await SA_INTELLIGENCE.scan({
+      sourceIds,
+      runType: "manual"
+    });
+
+    return res
+      .status(result.ok ? 200 : 500)
+      .json(result);
+  }
+);
+
+app.get(
+  "/api/sa-intelligence/opportunities",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const data = await SA_INTELLIGENCE.opportunities({
+        limit: req.query.limit || 50,
+        minScore: req.query.min_score || 0,
+        municipality: req.query.municipality || null,
+        tier: req.query.tier || null
+      });
+
+      return res.json({
+        ok: true,
+        country: "ZA",
+        count: data.length,
+        opportunities: data
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Could not load South Africa opportunities."
+      });
+    }
+  }
+);
+
+/* Tenant-safe opportunity feed: tenant identity only, never owner/global controls. */
+app.get(
+  "/api/tenant/opportunities",
+  requireTenant,
+  async (req, res) => {
+    try {
+      const data = await SA_INTELLIGENCE.tenantOpportunities(
+        req.session.userId,
+        { limit: req.query.limit || 25 }
+      );
+
+      return res.json({
+        ok: true,
+        country: "ZA",
+        tenant_id: req.session.userId,
+        count: data.length,
+        opportunities: data
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Could not load tenant opportunities."
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* DASHBOARD ACCESS                                                           */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/dashboard.html",
+  requireAuth,
+  (req, res) => {
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "dashboard.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* CURRENT USER                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/me",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      authenticated: true,
+      authType: req.session?.authType || null,
+      user: {
+        id: req.session?.userId || null,
+        email: req.session?.userEmail || null,
+        role: req.session?.userRole || "admin"
+      }
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/login.html",
+  (req, res) => {
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* ROOT                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+    if (req.session?.gridv21Authenticated === true) {
+      return res.sendFile(
+        path.join(PUBLIC_DIR, "dashboard.html")
+      );
+    }
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* 404 HANDLER                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({
+        ok: false,
+        error: "API endpoint not found."
+      });
+    }
+    return res.status(404).send("GRIDV21 — Page not found.");
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* GLOBAL ERROR HANDLER                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (error, req, res, next) => {
+    console.error("[SERVER ERROR]", error);
+
+    if (res.headersSent) {
+      return next(error);
+    }
+
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: IS_PRODUCTION
+        ? "Internal server error."
+        : (error.message || "Internal server error.")
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* START SERVER                                                               */
+/* -------------------------------------------------------------------------- */
+
+async function startServer() {
+  try {
+    try {
+      await SA_INTELLIGENCE.ensureSources();
+      console.log("[SA] South Africa acquisition source registry synchronized.");
+    } catch (error) {
+      console.warn(`[SA] Source registry sync skipped: ${error.message}`);
+    }
+
+    app.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log("");
+        console.log("==================================================");
+        console.log("GRIDV21 BRAIN ENTERPRISE");
+        console.log(`Version: ${VERSION}`);
+        console.log(`Port: ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+        console.log("Authentication: Supabase + server session");
+        console.log("Dashboard authentication: ENABLED");
+        console.log("==================================================");
+      }
+    );
+  } catch (error) {
+    console.error("[STARTUP] Fatal error:", error);
+    process.exit(1);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* PROCESS ERROR HANDLERS                                                     */
+/* -------------------------------------------------------------------------- */
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[PROCESS] Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[PROCESS] Uncaught exception:", error);
+});
+
+/* -------------------------------------------------------------------------- */
+/* START                                                                      */
+/* -------------------------------------------------------------------------- */
+
+startServer();
