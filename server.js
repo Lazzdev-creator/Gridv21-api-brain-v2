@@ -766,3 +766,764 @@ app.use(
     next();
   }
 );
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+
+app.use(
+  compression()
+);
+
+app.use(
+  morgan(
+    ":id :method :url :status :response-time ms"
+  )
+);
+
+app.use(
+  cors({
+    origin:
+      process.env.FRONTEND_URL,
+    credentials: true
+  })
+);
+
+app.use(
+  express.json({
+    limit: "20mb"
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: true
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  "/dashboard",
+  express.static(DASHBOARD_DIR)
+);
+
+app.use(
+  express.static(DASHBOARD_DIR)
+);
+
+app.get(
+  "/dashboard",
+  (req, res) => {
+    res.redirect(
+      308,
+      "/dashboard/"
+    );
+  }
+);
+
+app.get(
+  "/",
+  (req, res) => {
+    res.redirect(
+      "/dashboard/"
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* API RATE LIMIT                                                             */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  "/api",
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
+
+    max:
+      500,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* SERVER SESSION                                                             */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  session({
+    store:
+      sessionStore,
+
+    secret:
+      process.env.SESSION_SECRET,
+
+    resave:
+      false,
+
+    saveUninitialized:
+      false,
+
+    cookie: {
+      httpOnly:
+        true,
+
+      secure:
+        IS_PRODUCTION,
+
+      sameSite:
+        "lax",
+
+      maxAge:
+        24 * 60 * 60 * 1000
+    }
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* PASSPORT                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  passport.initialize()
+);
+
+app.use(
+  passport.session()
+);
+
+passport.serializeUser(
+  (user, done) =>
+    done(null, user)
+);
+
+passport.deserializeUser(
+  (user, done) =>
+    done(null, user)
+);
+
+if (
+  process.env.GOOGLE_CLIENT_ID &&
+  process.env.GOOGLE_CLIENT_SECRET
+) {
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID:
+          process.env.GOOGLE_CLIENT_ID,
+
+        clientSecret:
+          process.env.GOOGLE_CLIENT_SECRET,
+
+        callbackURL:
+          process.env.GOOGLE_CALLBACK_URL ||
+          `${process.env.FRONTEND_URL}/auth/google/callback`
+      },
+
+      async (
+        accessToken,
+        refreshToken,
+        profile,
+        done
+      ) => {
+
+        done(
+          null,
+          {
+            id:
+              profile.id,
+
+            displayName:
+              profile.displayName,
+
+            email:
+              profile.emails?.[0]?.value ||
+              null
+          }
+        );
+      }
+    )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function pick(
+  obj,
+  keys
+) {
+
+  for (
+    const key
+    of keys
+  ) {
+
+    if (
+      obj?.[key] !==
+        undefined &&
+
+      obj?.[key] !==
+        null &&
+
+      String(
+        obj[key]
+      ).trim() !== ""
+    ) {
+
+      return obj[key];
+    }
+  }
+
+  return null;
+}
+
+function numberValue(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const n =
+    Number(
+      String(value)
+        .replace(
+          /[$,]/g,
+          ""
+        )
+        .replace(
+          /[^0-9.-]/g,
+          ""
+        )
+    );
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+}
+
+function dateValue(
+  value
+) {
+
+  if (!value) {
+    return null;
+  }
+
+  const d =
+    new Date(value);
+
+  return Number.isNaN(
+    d.getTime()
+  )
+    ? null
+    : d.toISOString();
+}
+
+function normalizeText(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const result =
+    String(value).trim();
+
+  return result || null;
+}
+
+function sleep(
+  ms
+) {
+
+  return new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        ms
+      )
+  );
+}
+
+function safeNumber(
+  value,
+  fallback = 0
+) {
+
+  const n =
+    Number(value);
+
+  return Number.isFinite(n)
+    ? n
+    : fallback;
+}
+
+function safeJson(
+  value
+) {
+
+  try {
+
+    return value == null
+      ? {}
+      : JSON.parse(
+          JSON.stringify(value)
+        );
+
+  } catch (_) {
+
+    return {};
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* LEAD SCORING                                                               */
+/* -------------------------------------------------------------------------- */
+
+function scoreLead(
+  permit
+) {
+
+  let score =
+    50;
+
+  const type =
+    String(
+      permit.permit_type ||
+      ""
+    ).toLowerCase();
+
+  const work =
+    String(
+      permit.work_type ||
+      ""
+    ).toLowerCase();
+
+  const description =
+    String(
+      permit.work_description ||
+      ""
+    ).toLowerCase();
+
+  const value =
+    Number(
+      permit.estimated_value ||
+      0
+    );
+
+  const text =
+    `${type} ${work} ${description}`;
+
+  if (
+    text.includes(
+      "commercial"
+    )
+  ) {
+    score += 25;
+  }
+
+  if (
+    text.includes(
+      "building"
+    ) ||
+    text.includes(
+      "construction"
+    )
+  ) {
+    score += 10;
+  }
+
+  if (
+    text.includes(
+      "remodel"
+    ) ||
+    text.includes(
+      "renovation"
+    ) ||
+    text.includes(
+      "alteration"
+    )
+  ) {
+    score += 8;
+  }
+
+  if (
+    text.includes(
+      "restaurant"
+    ) ||
+    text.includes(
+      "retail"
+    ) ||
+    text.includes(
+      "office"
+    )
+  ) {
+    score += 5;
+  }
+
+  if (
+    value >= 1000000
+  ) {
+    score += 20;
+
+  } else if (
+    value >= 500000
+  ) {
+    score += 15;
+
+  } else if (
+    value >= 100000
+  ) {
+    score += 10;
+  }
+
+  return Math.min(
+    100,
+    score
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* ADDRESS NORMALISATION                                                      */
+/* -------------------------------------------------------------------------- */
+
+function addressFromRaw(
+  city,
+  raw
+) {
+
+  if (
+    city ===
+    "Chicago"
+  ) {
+
+    const number =
+      pick(
+        raw,
+        [
+          "street_number"
+        ]
+      );
+
+    const direction =
+      pick(
+        raw,
+        [
+          "street_direction"
+        ]
+      );
+
+    const street =
+      pick(
+        raw,
+        [
+          "street_name"
+        ]
+      );
+
+    const type =
+      pick(
+        raw,
+        [
+          "street_type"
+        ]
+      );
+
+    const zip =
+      pick(
+        raw,
+        [
+          "zip_code",
+          "zipcode",
+          "zip"
+        ]
+      );
+
+    const base =
+      [
+        number,
+        direction,
+        street,
+        type
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+    return [
+      base,
+      zip
+    ]
+      .filter(Boolean)
+      .join(", ") ||
+      null;
+  }
+
+  if (
+    city ===
+    "Austin"
+  ) {
+
+    return [
+      pick(
+        raw,
+        [
+          "original_address1",
+          "address",
+          "street_number"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "original_address2",
+          "street_name"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "zip",
+          "zipcode",
+          "zip_code"
+        ]
+      )
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+      null;
+  }
+
+  return normalizeText(
+    pick(
+      raw,
+      [
+        "address",
+        "site_address",
+        "address_line1",
+        "property_address",
+        "address_line_1",
+        "street_address"
+      ]
+    )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* PERMIT MAPPING                                                             */
+/* -------------------------------------------------------------------------- */
+
+function mapPermitData(
+  cityName,
+  raw
+) {
+
+  const permitId =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_",
+          "permit_id",
+          "permit_num",
+          "permit_number",
+          "permitnum",
+          "id",
+          "permit",
+          "record_id"
+        ]
+      )
+    );
+
+  const permitType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_type_definition",
+          "permit_type_desc",
+          "permit_type",
+          "permit_type_name",
+          "type",
+          "work_type"
+        ]
+      )
+    );
+
+  const status =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_status",
+          "status_current",
+          "status",
+          "current_status"
+        ]
+      )
+    );
+
+  const issuedDate =
+    dateValue(
+      pick(
+        raw,
+        [
+          "issue_date",
+          "issued_date",
+          "Issue Date",
+          "issued",
+          "application_date"
+        ]
+      )
+    );
+
+  const applicationDate =
+    dateValue(
+      pick(
+        raw,
+        [
+          "application_start_date",
+          "application_date",
+          "application_date_start"
+        ]
+      )
+    );
+
+  const valuation =
+    numberValue(
+      pick(
+        raw,
+        [
+          "reported_cost",
+          "estimated_value",
+          "estimated_cost",
+          "total_job_valuation",
+          "valuation",
+          "job_value",
+          "declared_valuation"
+        ]
+      )
+    );
+
+  const address =
+    addressFromRaw(
+      cityName,
+      raw
+    );
+
+  const workDescription =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "work_description",
+          "description",
+          "work_desc",
+          "project_description"
+        ]
+      )
+    );
+
+  const workType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "work_type",
+          "construction_type",
+          "job_type"
+        ]
+      )
+    );
+
+  const reviewType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "review_type"
+        ]
+      )
+    );
+
+  const milestone =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_milestone"
+        ]
+      )
+    );
+
+  const condition =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_condition"
+        ]
+      )
+    );
+
+  const contractorName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "contractor_name",
+          "contact_1_name",
+          "contact_2_name"
+        ]
+      )
+    );
+
+  const applicantName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "applicant_name",
+          "applicant"
+        ]
+      )
+    );
+
+  const ownerName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "owner_name",
+          "owner"
+        ]
+      )
+    );
+
+  const contractorLicense =
+    normalizeText(
