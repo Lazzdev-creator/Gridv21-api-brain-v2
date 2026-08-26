@@ -1085,6 +1085,1244 @@ function jsonError(
   extra = {}
 ) {
 
+
   return res.status(
     status
   ).json({
+    ok: false,
+    error: message,
+    ...extra
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* ENGINE LOGGING                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function logEngineError(
+  requestId,
+  error
+) {
+
+  const message =
+    error?.message ||
+    String(error);
+
+  ENGINE.errors += 1;
+
+  ENGINE.lastError =
+    message;
+
+  await logger.error(
+    requestId,
+    message
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* END OF PART 1                                                              */
+/* -------------------------------------------------------------------------- */
+
+/* -------------------------------------------------------------------------- */
+/* NEXT SECTION CONTINUES AT LINE 762                                         */
+/* -------------------------------------------------------------------------- */
+
+Part 1 ends at line 761. The next section starts at line 762, so nothing should be inserted between the two parts.
+
+When you're ready, I will give you STEP 1 — server.js PART 2/5, lines 762–1522.
+
+Ready
+STEP 1 — server.js
+PART 2 OF 5 — Lines 762–1522
+
+Continue immediately after Part 1. Do not add or remove anything between the parts.
+
+/* -------------------------------------------------------------------------- */
+/* SOURCE NORMALIZATION                                                       */
+/* -------------------------------------------------------------------------- */
+
+function normalizePermitRecord(
+  raw,
+  source
+) {
+
+  const permitId =
+    safeText(
+      pick(
+        raw,
+        [
+          "permit_number",
+          "permitnumber",
+          "permit_id",
+          "permitid",
+          "application_number",
+          "applicationnumber",
+          "case_number",
+          "casenumber",
+          "id"
+        ]
+      )
+    );
+
+  const address =
+    safeText(
+      pick(
+        raw,
+        [
+          "address",
+          "site_address",
+          "property_address",
+          "street_address",
+          "location"
+        ]
+      )
+    );
+
+  const city =
+    safeText(
+      pick(
+        raw,
+        [
+          "city",
+          "municipality",
+          "town",
+          "jurisdiction"
+        ]
+      )
+    ) ||
+    source?.name ||
+    null;
+
+  const region =
+    safeText(
+      pick(
+        raw,
+        [
+          "region",
+          "county",
+          "province",
+          "state"
+        ]
+      )
+    );
+
+  const tradeType =
+    safeText(
+      pick(
+        raw,
+        [
+          "trade_type",
+          "permit_type",
+          "permit_type_description",
+          "work_type",
+          "project_type",
+          "description"
+        ]
+      )
+    );
+
+  const status =
+    safeText(
+      pick(
+        raw,
+        [
+          "status",
+          "permit_status",
+          "application_status",
+          "case_status"
+        ]
+      )
+    ) ||
+    "unknown";
+
+  const valueEstimate =
+    numberValue(
+      pick(
+        raw,
+        [
+          "value_estimate",
+          "estimated_value",
+          "job_value",
+          "project_value",
+          "valuation",
+          "declared_valuation"
+        ]
+      )
+    );
+
+  const latitude =
+    numberValue(
+      pick(
+        raw,
+        [
+          "latitude",
+          "lat",
+          "y"
+        ]
+      )
+    );
+
+  const longitude =
+    numberValue(
+      pick(
+        raw,
+        [
+          "longitude",
+          "lon",
+          "lng",
+          "x"
+        ]
+      )
+    );
+
+  const receivedDate =
+    parseDate(
+      pick(
+        raw,
+        [
+          "received_date",
+          "application_date",
+          "submitted_date",
+          "issue_date",
+          "created_date"
+        ]
+      )
+    );
+
+  const sourceRecord =
+    JSON.stringify(
+      raw
+    );
+
+  const externalId =
+    permitId ||
+    hashValue(
+      [
+        city,
+        address,
+        tradeType,
+        receivedDate,
+        sourceRecord
+      ].join("|")
+    );
+
+  return {
+
+    source:
+      source?.name ||
+      null,
+
+    external_id:
+      externalId,
+
+    permit_id:
+      permitId,
+
+    address,
+
+    city,
+
+    region,
+
+    trade_type:
+      tradeType,
+
+    status,
+
+    value_estimate:
+      valueEstimate,
+
+    latitude,
+
+    longitude,
+
+    received_date:
+      receivedDate,
+
+    raw_data:
+      raw
+
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* SOURCE REQUEST                                                             */
+/* -------------------------------------------------------------------------- */
+
+async function fetchSource(
+  source,
+  requestId
+) {
+
+  const started =
+    Date.now();
+
+  try {
+
+    logger.info(
+      requestId,
+      `Fetching source ${source.name}`
+    );
+
+    const response =
+      await axios.get(
+        source.url,
+        {
+          timeout:
+            SCAN_SETTINGS.requestTimeout,
+
+          responseType:
+            source.type === "csv"
+              ? "text"
+              : "json",
+
+          headers: {
+            "User-Agent":
+              "GRIDV21-BRAIN/6.4.0"
+          }
+        }
+      );
+
+    let records = [];
+
+    if (
+      source.type ===
+      "csv"
+    ) {
+
+      const parsed =
+        Papa.parse(
+          response.data,
+          {
+            header:
+              true,
+
+            skipEmptyLines:
+              true,
+
+            dynamicTyping:
+              true
+          }
+        );
+
+      records =
+        parsed.data ||
+        [];
+
+    } else if (
+      Array.isArray(
+        response.data
+      )
+    ) {
+
+      records =
+        response.data;
+
+    } else if (
+      Array.isArray(
+        response.data?.data
+      )
+    ) {
+
+      records =
+        response.data.data;
+
+    } else if (
+      Array.isArray(
+        response.data?.results
+      )
+    ) {
+
+      records =
+        response.data.results;
+
+    } else {
+
+      records =
+        response.data
+          ? [response.data]
+          : [];
+    }
+
+    const duration =
+      Date.now() -
+      started;
+
+    logger.info(
+      requestId,
+      `Source ${source.name} returned ${records.length} records in ${duration}ms`
+    );
+
+    return records;
+
+  } catch (
+    error
+  ) {
+
+    await logEngineError(
+      requestId,
+      error
+    );
+
+    logger.warn(
+      requestId,
+      `Source ${source.name} failed: ${error.message}`
+    );
+
+    return [];
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* SCAN DATABASE HELPERS                                                      */
+/* -------------------------------------------------------------------------- */
+
+async function insertPermit(
+  record,
+  requestId
+) {
+
+  try {
+
+    const {
+      data,
+      error
+    } =
+      await supabase
+        .from("permits")
+        .upsert(
+          {
+            source:
+              record.source,
+
+            permit_id:
+              record.permit_id,
+
+            address:
+              record.address,
+
+            city:
+              record.city,
+
+            region:
+              record.region,
+
+            trade_type:
+              record.trade_type,
+
+            status:
+              record.status,
+
+            value_estimate:
+              record.value_estimate,
+
+            latitude:
+              record.latitude,
+
+            longitude:
+              record.longitude,
+
+            received_date:
+              record.received_date,
+
+            raw_data:
+              record.raw_data
+          },
+          {
+            onConflict:
+              "source,permit_id"
+          }
+        )
+        .select()
+        .maybeSingle();
+
+    if (error) {
+
+      await logger.error(
+        requestId,
+        `Permit insert failed: ${error.message}`
+      );
+
+      return {
+        success:
+          false,
+
+        error:
+          error.message
+      };
+    }
+
+    return {
+      success:
+        true,
+
+      data
+    };
+
+  } catch (
+    error
+  ) {
+
+    await logEngineError(
+      requestId,
+      error
+    );
+
+    return {
+      success:
+        false,
+
+      error:
+        error.message
+    };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* SCAN ENGINE                                                                */
+/* -------------------------------------------------------------------------- */
+
+export async function runScan(
+  options = {}
+) {
+
+  const requestId =
+    options.requestId ||
+    crypto.randomUUID();
+
+  if (
+    ENGINE.scanning
+  ) {
+
+    return {
+      success:
+        false,
+
+      alreadyRunning:
+        true,
+
+      message:
+        "Scan already running",
+
+      requestId
+    };
+  }
+
+  if (
+    ENGINE.emergencyStopped
+  ) {
+
+    return {
+      success:
+        false,
+
+      emergencyStopped:
+        true,
+
+      message:
+        "Acquisition engine emergency stopped",
+
+      requestId
+    };
+  }
+
+  ENGINE.scanning =
+    true;
+
+  const started =
+    Date.now();
+
+  let permitsFound =
+    0;
+
+  let inserted =
+    0;
+
+  let failed =
+    0;
+
+  try {
+
+    logger.info(
+      requestId,
+      "Starting acquisition scan"
+    );
+
+    for (
+      const source
+      of CITIES
+    ) {
+
+      if (
+        ENGINE.emergencyStopped
+      ) {
+
+        break;
+      }
+
+      const records =
+        await fetchSource(
+          source,
+          requestId
+        );
+
+      permitsFound +=
+        records.length;
+
+      for (
+        const raw
+        of records
+      ) {
+
+        if (
+          ENGINE.emergencyStopped
+        ) {
+
+          break;
+        }
+
+        const normalized =
+          normalizePermitRecord(
+            raw,
+            source
+          );
+
+        const result =
+          await insertPermit(
+            normalized,
+            requestId
+          );
+
+        if (
+          result.success
+        ) {
+
+          inserted +=
+            1;
+
+        } else {
+
+          failed +=
+            1;
+        }
+
+        if (
+          SCAN_SETTINGS.requestDelay
+        ) {
+
+          await new Promise(
+            resolve =>
+              setTimeout(
+                resolve,
+                SCAN_SETTINGS.requestDelay
+              )
+          );
+        }
+      }
+    }
+
+    ENGINE.permitsFound =
+      permitsFound;
+
+    ENGINE.lastScan =
+      new Date().toISOString();
+
+    ENGINE.lastScanDuration =
+      Date.now() -
+      started;
+
+    logger.info(
+      requestId,
+      `Acquisition scan completed. Found=${permitsFound}, inserted=${inserted}, failed=${failed}`
+    );
+
+    return {
+
+      success:
+        true,
+
+      requestId,
+
+      permitsFound,
+
+      inserted,
+
+      failed,
+
+      duration:
+        ENGINE.lastScanDuration,
+
+      timestamp:
+        ENGINE.lastScan
+
+    };
+
+  } catch (
+    error
+  ) {
+
+    await logEngineError(
+      requestId,
+      error
+    );
+
+    return {
+
+      success:
+        false,
+
+      requestId,
+
+      error:
+        error.message,
+
+      permitsFound,
+
+      inserted,
+
+      failed,
+
+      duration:
+        Date.now() -
+        started
+
+    };
+
+  } finally {
+
+    ENGINE.scanning =
+      false;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* ACQUISITION CRON                                                           */
+/* -------------------------------------------------------------------------- */
+
+cron.schedule(
+  SCAN_SETTINGS.cron,
+  async () => {
+
+    if (
+      ENGINE.scanning ||
+      ENGINE.emergencyStopped
+    ) {
+
+      return;
+    }
+
+    try {
+
+      await runScan({
+        requestId:
+          crypto.randomUUID()
+      });
+
+    } catch (
+      error
+    ) {
+
+      await logEngineError(
+        crypto.randomUUID(),
+        error
+      );
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* HEALTH                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/health",
+  async (
+    req,
+    res
+  ) => {
+
+    return res.json({
+
+      ok:
+        true,
+
+      version:
+        VERSION,
+
+      engine:
+        ENGINE.running,
+
+      scanning:
+        ENGINE.scanning,
+
+      emergencyStopped:
+        ENGINE.emergencyStopped,
+
+      uptime:
+        Date.now() -
+        ENGINE.uptime,
+
+      timestamp:
+        new Date().toISOString()
+
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* TEST                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/test",
+  requireAuth,
+  (
+    req,
+    res
+  ) => {
+
+    res.json({
+
+      success:
+        true,
+
+      version:
+        VERSION,
+
+      engine:
+        "GRIDV21 BRAIN ENTERPRISE",
+
+      authentication:
+        "owner",
+
+      os_modules:
+        OS_MODULES.length,
+
+      timestamp:
+        new Date().toISOString()
+
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH — CURRENT USER                                                        */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/me",
+  requireAuth,
+  (
+    req,
+    res
+  ) => {
+
+    res.json({
+
+      authenticated:
+        true,
+
+      authType:
+        "admin_key",
+
+      role:
+        "owner",
+
+      userId:
+        "owner",
+
+      email:
+        null
+
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH — OWNER LOGIN                                                         */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/admin",
+  (
+    req,
+    res
+  ) => {
+
+    const supplied =
+      String(
+        req.body?.admin_key ||
+        req.body?.key ||
+        ""
+      ).trim();
+
+    const expected =
+      process.env.ADMIN_KEY ||
+      "";
+
+    if (
+      !expected ||
+      !supplied ||
+      !safeCompare(
+        supplied,
+        expected
+      )
+    ) {
+
+      return res.status(
+        401
+      ).json({
+
+        success:
+          false,
+
+        authenticated:
+          false,
+
+        error:
+          "Invalid admin key"
+
+      });
+    }
+
+    req.session.regenerate(
+      sessionError => {
+
+        if (
+          sessionError
+        ) {
+
+          return res.status(
+            500
+          ).json({
+
+            success:
+              false,
+
+            error:
+              "Unable to create session"
+
+          });
+        }
+
+        req.session.gridv21Authenticated =
+          true;
+
+        req.session.authType =
+          "admin_key";
+
+        req.session.userRole =
+          "owner";
+
+        req.session.userId =
+          "owner";
+
+        req.session.save(
+          saveError => {
+
+            if (
+              saveError
+            ) {
+
+              return res.status(
+                500
+              ).json({
+
+                success:
+                  false,
+
+                error:
+                  "Unable to save session"
+
+              });
+            }
+
+            return res.json({
+
+              success:
+                true,
+
+              authenticated:
+                true,
+
+              authType:
+                "admin_key",
+
+              role:
+                "owner"
+
+            });
+          }
+        );
+      }
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH — TENANT LOGIN                                                        */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/login",
+  async (
+    req,
+    res
+  ) => {
+
+    const email =
+      safeText(
+        req.body?.email
+      );
+
+    const password =
+      String(
+        req.body?.password ||
+        ""
+      );
+
+    if (
+      !email ||
+      !password
+    ) {
+
+      return res.status(
+        400
+      ).json({
+
+        success:
+          false,
+
+        authenticated:
+          false,
+
+        error:
+          "Email and password are required"
+
+      });
+    }
+
+    if (
+      !SUPABASE_ANON_KEY
+    ) {
+
+      return res.status(
+        500
+      ).json({
+
+        success:
+          false,
+
+        authenticated:
+          false,
+
+        error:
+          "SUPABASE_ANON_KEY is not configured"
+
+      });
+    }
+
+    try {
+
+      const {
+        data,
+        error
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (
+        error ||
+        !data?.user
+      ) {
+
+        console.warn(
+          `[AUTH] Login failed for ${email}: ${error?.message || "Invalid credentials"}`
+        );
+
+        return res.status(
+          401
+        ).json({
+
+          success:
+            false,
+
+          authenticated:
+            false,
+
+          error:
+            error?.message ||
+            "Invalid email or password"
+
+        });
+      }
+
+      const user =
+        data.user;
+
+      /*
+       * Tenant sessions are intentionally distinct from owner sessions.
+       */
+
+      req.session.regenerate(
+        sessionError => {
+
+          if (
+            sessionError
+          ) {
+
+            console.error(
+              `[AUTH] Session regeneration failed: ${sessionError.message}`
+            );
+
+            return res.status(
+              500
+            ).json({
+
+              success:
+                false,
+
+              authenticated:
+                false,
+
+              error:
+                "Unable to create session"
+
+            });
+          }
+
+          req.session.gridv21Authenticated =
+            true;
+
+          req.session.authType =
+            "tenant";
+
+          req.session.userRole =
+            "tenant";
+
+          req.session.userId =
+            user.id;
+
+          req.session.email =
+            user.email;
+
+          req.session.save(
+            saveError => {
+
+              if (
+                saveError
+              ) {
+
+                console.error(
+                  `[AUTH] Session save failed: ${saveError.message}`
+                );
+
+                return res.status(
+                  500
+                ).json({
+
+                  success:
+                    false,
+
+                  authenticated:
+                    false,
+
+                  error:
+                    "Unable to save session"
+
+                });
+              }
+
+              return res.json({
+
+                success:
+                  true,
+
+                authenticated:
+                  true,
+
+                authType:
+                  "tenant",
+
+                role:
+                  "tenant",
+
+                userId:
+                  user.id,
+
+                email:
+                  user.email
+
+              });
+            }
+          );
+        }
+      );
+
+    } catch (
+      error
+    ) {
+
+      console.error(
+        `[AUTH] Unexpected login error: ${error.message}`
+      );
+
+      return res.status(
+        500
+      ).json({
+
+        success:
+          false,
+
+        authenticated:
+          false,
+
+        error:
+          "Authentication service error"
+
+      });
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH — TENANT CURRENT USER                                                 */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/tenant/me",
+  requireTenant,
+  async (
+    req,
+    res
+  ) => {
+
+    return res.json({
+
+      success:
+        true,
+
+      authenticated:
+        true,
+
+      authType:
+        "tenant",
+
+      role:
+        "tenant",
+
+      userId:
+        req.session.userId,
+
+      email:
+        req.session.email ||
+        null
+
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* AUTH — LOGOUT               
