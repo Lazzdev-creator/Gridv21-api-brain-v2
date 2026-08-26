@@ -209,7 +209,29 @@ function requireTenant(req, res, next) {
     error: "Tenant authentication required"
   });
 }
+/*
+ * Accept either tenant or owner session.
+ * Used for /api/auth/me and shared identity endpoints.
+ * Must NEVER be used for Brain Control / admin-only APIs.
+ */
+function requireAnyAuth(req, res, next) {
+  if (req.session?.gridv21Authenticated === true) {
+    if (req.session.authType === "tenant" && req.session.userId) {
+      req.isTenant = true;
+      return next();
+    }
+    if (req.session.authType === "admin_key") {
+      req.isAdmin = true;
+      return next();
+    }
+  }
 
+  return res.status(401).json({
+    ok: false,
+    authenticated: false,
+    error: "Authentication required"
+  });
+    }
 /* -------------------------------------------------------------------------- */
 /* ES MODULE PATHS                                                            */
 /* -------------------------------------------------------------------------- */
