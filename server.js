@@ -3675,23 +3675,42 @@ app.get(
 );
 
 /* -------------------------------------------------------------------------- */
-/* CURRENT USER                                                               */
+/* TENANT DASHBOARD                                                           */
 /* -------------------------------------------------------------------------- */
 
 app.get(
-  "/api/auth/me",
-  requireAuth,
+  "/tenant-dashboard.html",
   (req, res) => {
-    return res.json({
-      ok: true,
-      authenticated: true,
-      authType: req.session?.authType || null,
-      user: {
-        id: req.session?.userId || null,
-        email: req.session?.userEmail || null,
-        role: req.session?.userRole || "admin"
-      }
-    });
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
+
+    const candidates = [
+      path.join(PUBLIC_DIR, "tenant-dashboard.html"),
+      path.join(__dirname, "tenant-dashboard.html"),
+      path.join(DASHBOARD_DIR, "tenant-dashboard.html")
+    ];
+    const file = candidates.find(p => fs.existsSync(p));
+    if (!file) {
+      return res.status(404).send("GRIDV21 — Tenant dashboard not found.");
+    }
+    return res.sendFile(file);
+  }
+);
+
+app.get(
+  "/tenant",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    return res.redirect("/login.html");
   }
 );
 
@@ -3702,6 +3721,18 @@ app.get(
 app.get(
   "/login.html",
   (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
     return res.sendFile(
       path.join(PUBLIC_DIR, "login.html")
     );
@@ -3715,7 +3746,16 @@ app.get(
 app.get(
   "/",
   (req, res) => {
-    if (req.session?.gridv21Authenticated === true) {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
       return res.sendFile(
         path.join(PUBLIC_DIR, "dashboard.html")
       );
