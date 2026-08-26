@@ -3366,34 +3366,21 @@ app.post(
 /* -------------------------------------------------------------------------- */
 
 app.get(
-  "/api/auth/me",
-  requireAuth,
+  "/",
   (req, res) => {
-
-    return res.json({
-
-      ok:
-        true,
-
-      authenticated:
-        true,
-
-      authType:
-        "admin_key",
-
-      user: {
-
-        id:
-          null,
-
-        email:
-          null,
-
-        role:
-          "owner"
-      }
-    });
-
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
+    return res.redirect("/login.html");
   }
 );
 
