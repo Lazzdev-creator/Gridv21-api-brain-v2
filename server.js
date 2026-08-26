@@ -2288,3 +2288,764 @@ async function insertNewPermits(
   let skipped =
     0;
           
+  let updated =
+    0;
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i += SCAN_SETTINGS.batchSize
+  ) {
+
+    const batch =
+      rows.slice(
+        i,
+        i +
+          SCAN_SETTINGS.batchSize
+      );
+
+    for (
+      const permit
+      of batch
+    ) {
+
+      try {
+
+        const {
+          data:
+            existing,
+          error:
+            lookupError
+        } =
+          await supabase
+            .from("permits")
+            .select("id")
+            .eq(
+              "permit_id",
+              permit.permit_id
+            )
+            .maybeSingle();
+
+        if (
+          lookupError
+        ) {
+
+          throw lookupError;
+
+        }
+
+        if (
+          existing?.id
+        ) {
+
+          const {
+            error:
+              updateError
+          } =
+            await supabase
+              .from("permits")
+              .update(
+                permit
+              )
+              .eq(
+                "id",
+                existing.id
+              );
+
+          if (
+            updateError
+          ) {
+
+            throw updateError;
+
+          }
+
+          updated++;
+
+        } else {
+
+          const {
+            error:
+              insertError
+          } =
+            await supabase
+              .from("permits")
+              .insert(
+                permit
+              );
+
+          if (
+            insertError
+          ) {
+
+            /*
+             * Ignore duplicate races.
+             */
+
+            if (
+              /duplicate|unique/i.test(
+                insertError.message ||
+                ""
+              )
+            ) {
+
+              skipped++;
+
+            } else {
+
+              throw insertError;
+
+            }
+
+          } else {
+
+            inserted++;
+
+          }
+
+        }
+
+      } catch (
+        error
+      ) {
+
+        skipped++;
+
+        console.warn(
+          `[PERMIT] Failed ${permit.permit_id}: ${error.message}`
+        );
+
+      }
+
+    }
+
+  }
+
+  return {
+
+    inserted,
+
+    skipped,
+
+    updated
+
+  };
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* PARSE SOURCE DATA                                                          */
+/* -------------------------------------------------------------------------- */
+
+function parseSourceData(
+  city,
+  raw
+) {
+
+  if (
+    city === "Denver"
+  ) {
+
+    try {
+
+      const parsed =
+        Papa.parse(
+          raw,
+          {
+            header:
+              true,
+
+            skipEmptyLines:
+              true
+          }
+        );
+
+      return (
+        parsed.data ||
+        []
+      );
+
+    } catch (
+      error
+    ) {
+
+      throw new Error(
+        `CSV parsing failed: ${error.message}`
+      );
+
+    }
+
+  }
+
+  if (
+    typeof raw ===
+    "string"
+  ) {
+
+    try {
+
+      return JSON.parse(
+        raw
+      );
+
+    } catch (
+      error
+    ) {
+
+      throw new Error(
+        `JSON parsing failed for ${city}: ${error.message}`
+      );
+
+    }
+
+  }
+
+  return (
+    raw || []
+  );
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* CITY SCANNER                                                               */
+/* -------------------------------------------------------------------------- */
+
+async function scanCity(
+  city,
+  requestId,
+  signal
+) {
+
+  const started =
+    Date.now();
+
+  try {
+
+    const raw =
+      await axiosWithAbort(
+        city.url,
+        requestId,
+        signal
+      );
+
+    const sourceRows =
+      parseSourceData(
+        city.name,
+        raw
+      );
+
+    const rows =
+      sourceRows
+        .map(
+          item =>
+            mapPermitData(
+              city.name,
+              item
+            )
+        )
+        .filter(
+          permit =>
+            permit &&
+            permit.permit_id
+        );
+
+    const result =
+      await insertNewPermits(
+        rows
+      );
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "city_scan",
+
+      message:
+        `${city.name}: ${rows.length} permits processed`,
+
+      status:
+        "success",
+
+      city:
+        city.name,
+
+      metadata: {
+
+        source_rows:
+          sourceRows.length,
+
+        processed:
+          rows.length,
+
+        inserted:
+          result.inserted,
+
+        updated:
+          result.updated,
+
+        skipped:
+          result.skipped,
+
+        duration_ms:
+          Date.now() -
+          started
+
+      }
+
+    });
+
+    return {
+
+      city:
+        city.name,
+
+      fetched:
+        sourceRows.length,
+
+      processed:
+        rows.length,
+
+      inserted:
+        result.inserted,
+
+      updated:
+        result.updated,
+
+      skipped:
+        result.skipped
+
+    };
+
+  } catch (
+    error
+  ) {
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "city_scan_error",
+
+      message:
+        `${city.name}: ${error.message}`,
+
+      status:
+        "error",
+
+      city:
+        city.name,
+
+      metadata: {
+
+        request_id:
+          requestId
+
+      }
+
+    });
+
+    throw error;
+
+  }
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* SCAN ALL CITIES                                                            */
+/* -------------------------------------------------------------------------- */
+
+let scanPromise =
+  null;
+
+let currentScanAbortController =
+  null;
+
+async function scanAllCities(
+  requestId =
+    crypto.randomUUID()
+) {
+
+  if (
+    ENGINE.scanning
+  ) {
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        "Scan already running"
+
+    };
+
+  }
+
+  if (
+    ENGINE.emergencyStopped
+  ) {
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        "Emergency stop is active"
+
+    };
+
+  }
+
+  ENGINE.scanning =
+    true;
+
+  ENGINE.lastError =
+    null;
+
+  const started =
+    Date.now();
+
+  currentScanAbortController =
+    new AbortController();
+
+  const signal =
+    currentScanAbortController
+      .signal;
+
+  try {
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_started",
+
+      message:
+        "GRIDV21 scanner started",
+
+      metadata: {
+
+        request_id:
+          requestId,
+
+        cities:
+          CITIES.map(
+            city =>
+              city.name
+          )
+
+      }
+
+    });
+
+    const results =
+      [];
+
+    for (
+      const city
+      of CITIES
+    ) {
+
+      if (
+        signal.aborted
+      ) {
+
+        throw new Error(
+          "Scan aborted"
+        );
+
+      }
+
+      if (
+        ENGINE.emergencyStopped
+      ) {
+
+        throw new Error(
+          "Emergency stop is active"
+        );
+
+      }
+
+      try {
+
+        const result =
+          await scanCity(
+            city,
+            requestId,
+            signal
+          );
+
+        results.push(
+          result
+        );
+
+      } catch (
+        error
+      ) {
+
+        ENGINE.errors++;
+
+        ENGINE.lastError =
+          error.message;
+
+        console.error(
+          `[SCAN] ${city.name}: ${error.message}`
+        );
+
+      }
+
+      await sleep(
+        SCAN_SETTINGS.requestDelay
+      );
+
+    }
+
+    ENGINE.lastScan =
+      new Date().toISOString();
+
+    ENGINE.lastScanDuration =
+      Date.now() -
+      started;
+
+    ENGINE.permitsFound =
+      results.reduce(
+        (
+          total,
+          item
+        ) =>
+          total +
+          safeNumber(
+            item.processed
+          ),
+        0
+      );
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_completed",
+
+      message:
+        `GRIDV21 scanner completed: ${ENGINE.permitsFound} permits processed`,
+
+      status:
+        "success",
+
+      metadata: {
+
+        request_id:
+          requestId,
+
+        duration_ms:
+          ENGINE.lastScanDuration,
+
+        results
+
+      }
+
+    });
+
+    return {
+
+      ok:
+        true,
+
+      results,
+
+      permits_found:
+        ENGINE.permitsFound,
+
+      duration:
+        ENGINE.lastScanDuration
+
+    };
+
+  } catch (
+    error
+  ) {
+
+    ENGINE.errors++;
+
+    ENGINE.lastError =
+      error.message;
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_failed",
+
+      message:
+        error.message,
+
+      status:
+        "error",
+
+      metadata: {
+
+        request_id:
+          requestId
+
+      }
+
+    });
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        error.message
+
+    };
+
+  } finally {
+
+    ENGINE.scanning =
+      false;
+
+    currentScanAbortController =
+      null;
+
+  }
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* END OF THIS CONTINUATION                                                   */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* FINAL AUTH + SERVER STARTUP                                                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * IMPORTANT:
+ * This section completes the GRIDV21 authentication flow.
+ *
+ * Login:
+ *   login.html
+ *        ↓
+ *   POST /api/auth/login
+ *        ↓
+ *   Supabase Auth
+ *        ↓
+ *   Server session created
+ *        ↓
+ *   Dashboard access
+ */
+
+/* -------------------------------------------------------------------------- */
+/* AUTH LOGIN                                                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* AUTHENTICATION RATE LIMITER                                                */
+/* -------------------------------------------------------------------------- */
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+
+  max: 10,
+
+  standardHeaders: true,
+
+  legacyHeaders: false,
+
+  message: {
+    ok: false,
+    authenticated: false,
+    error:
+      "Too many login attempts. Please try again later."
+  }
+});
+
+app.post(
+  "/api/auth/login",
+  authLimiter,
+  async (req, res) => {
+
+    try {
+
+      const email =
+        String(
+          req.body?.email ||
+          ""
+        )
+        .trim()
+        .toLowerCase();
+
+      const password =
+        String(
+          req.body?.password ||
+          ""
+        );
+
+      if (
+        !email ||
+        !password
+      ) {
+
+        return res.status(400).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Email and password are required."
+        });
+
+      }
+
+      /*
+       * Authenticate directly against Supabase.
+       */
+
+      const {
+        data,
+        error
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (error) {
+
+        console.warn(
+          `[AUTH] Login failed for ${email}: ${error.message}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Invalid email or password."
+        });
+
+      }
+
+      if (
+        !data ||
+        !data.user
+      ) {
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Authentication failed."
+        });
+
+      }
+
+      /*
