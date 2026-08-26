@@ -905,14 +905,21 @@ loginForm.addEventListener(
          
          The server-side session cookie handles
          authentication.
+
+         Tenant email/password → tenant dashboard
+         Owner admin key → Brain Control dashboard
          --------------------------------------------------- */
 
+      const destination =
+        result.authType === "tenant"
+          ? "/tenant-dashboard.html"
+          : "/dashboard/";
 
       setTimeout(
         function () {
 
           window.location.href =
-            "/dashboard/";
+            destination;
 
         },
         500
@@ -994,12 +1001,16 @@ loginForm.addEventListener(
         "success"
       );
 
+      const destination =
+        result.authType === "tenant"
+          ? "/tenant-dashboard.html"
+          : "/dashboard/";
 
       setTimeout(
         function () {
 
           window.location.href =
-            "/dashboard/";
+            destination;
 
         },
         300
@@ -1018,7 +1029,7 @@ loginForm.addEventListener(
 
 })();
 
-      </script>
+</script>
 
 </body>
-</html>
+      </html>
