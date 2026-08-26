@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GRIDV21 — Tenant Opportunities</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --card: #121a2b;
+      --border: #243049;
+      --text: #e8eefc;
+      --muted: #9aa8c7;
+      --accent: #3b82f6;
+      --high: #22c55e;
+      --medium: #eab308;
+      --low: #94a3b8;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2744 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(11, 18, 32, 0.85);
+      backdrop-filter: blur(8px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .brand { font-weight: 700; letter-spacing: 0.02em; }
+    .brand span { color: var(--accent); }
+    .user { color: var(--muted); font-size: 0.9rem; }
+    .user strong { color: var(--text); }
+    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: end;
+      margin-bottom: 1.25rem;
+    }
+    h1 { margin: 0 0 0.35rem; font-size: 1.5rem; }
+    p.lead { margin: 0; color: var(--muted); }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    button, .btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.55rem 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    button.secondary, .btn.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.9rem 1rem;
+    }
+    .stat .label { color: var(--muted); font-size: 0.8rem; }
+    .stat .value { font-size: 1.4rem; font-weight: 700; margin-top: 0.2rem; }
+    .list { display: grid; gap: 0.75rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.1rem;
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      align-items: start;
+      margin-bottom: 0.5rem;
+    }
+    .title { font-weight: 650; }
+    .meta { color: var(--muted); font-size: 0.88rem; margin-top: 0.2rem; }
+    .tier {
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.5rem;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .tier.HIGH { background: rgba(34,197,94,0.15); color: var(--high); }
+    .tier.MEDIUM { background: rgba(234,179,8,0.15); color: var(--medium); }
+    .tier.LOW { background: rgba(148,163,184,0.15); color: var(--low); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.5rem 1rem;
+      margin-top: 0.65rem;
+      font-size: 0.9rem;
+    }
+    .k { color: var(--muted); }
+    .empty, .error, .loading {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      background: rgba(18,26,43,0.5);
+    }
+    .error { color: #fecaca; border-color: rgba(239,68,68,0.35); }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      padding: 2rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">GRIDV21 <span>Tenant</span></div>
+    <div class="user">Signed in as <strong id="userEmail">—</strong></div>
+  </header>
+
+  <main>
+    <div class="hero">
+      <div>
+        <h1>Your matched opportunities</h1>
+        <p class="lead">South Africa construction opportunities matched to your account.</p>
+      </div>
+      <div class="actions">
+        <button id="refreshBtn" type="button">Refresh</button>
+        <button id="logoutBtn" class="secondary" type="button">Log out</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="label">Matched</div><div class="value" id="statCount">0</div></div>
+      <div class="stat"><div class="label">High tier</div><div class="value" id="statHigh">0</div></div>
+      <div class="stat"><div class="label">Medium tier</div><div class="value" id="statMedium">0</div></div>
+    </div>
+
+    <div id="content" class="loading">Loading opportunities…</div>
+  </main>
+
+  <footer>GRIDV21 · Tenant Opportunity Feed · Phase 1</footer>
+
+  <script>
+    const content = document.getElementById("content");
+    const userEmail = document.getElementById("userEmail");
+
+    async function api(path, options = {}) {
+      const res = await fetch(path, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.error || res.statusText || "Request failed");
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
+      return data;
+    }
+
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderCards(items) {
+      if (!items.length) {
+        content.className = "empty";
+        content.innerHTML = "No opportunities have been matched to your account yet.<br/>Your admin will match relevant SA leads to you.";
+        return;
+      }
+      content.className = "list";
+      content.innerHTML = items.map((o) => {
+        const tier = o.tier || "LOW";
+        const title = o.project_type || o.application_type || o.permit_type || o.source_category || "Opportunity";
+        const place = [o.address, o.suburb, o.town || o.municipality].filter(Boolean).join(", ");
+        return `
+          <article class="card">
+            <div class="card-top">
+              <div>
+                <div class="title">${esc(title)}</div>
+                <div class="meta">${esc(place || o.municipality || "South Africa")}</div>
+              </div>
+              <span class="tier ${esc(tier)}">${esc(tier)} · ${esc(o.score ?? "—")}</span>
+            </div>
+            <div class="grid">
+              <div><span class="k">Municipality</span><br>${esc(o.municipality || "—")}</div>
+              <div><span class="k">Status</span><br>${esc(o.status || "—")}</div>
+              <div><span class="k">Zoning</span><br>${esc(o.zoning || "—")}</div>
+              <div><span class="k">Match score</span><br>${esc(o.match_score ?? "—")}</div>
+              <div><span class="k">Erf / Parcel</span><br>${esc(o.erf_number || o.parcel_number || "—")}</div>
+              <div><span class="k">Category</span><br>${esc(o.source_category || "—")}</div>
+            </div>
+            ${o.ai_summary ? `<p class="meta" style="margin-top:0.75rem">${esc(o.ai_summary)}</p>` : ""}
+            ${o.match_reason ? `<p class="meta">Match reason: ${esc(o.match_reason)}</p>` : ""}
+          </article>
+        `;
+      }).join("");
+    }
+
+    async function loadMe() {
+      try {
+        const me = await api("/api/auth/me");
+        if (me.authType !== "tenant") {
+          window.location.href = "/dashboard/";
+          return false;
+        }
+        userEmail.textContent = me.user?.email || me.user?.id || "Tenant";
+        return true;
+      } catch (e) {
+        if (e.status === 401) {
+          window.location.href = "/login.html";
+          return false;
+        }
+        throw e;
+      }
+    }
+
+    async function loadOpportunities() {
+      content.className = "loading";
+      content.textContent = "Loading opportunities…";
+      try {
+        const data = await api("/api/tenant/opportunities?limit=50");
+        const items = data.opportunities || [];
+        document.getElementById("statCount").textContent = String(items.length);
+        document.getElementById("statHigh").textContent = String(items.filter(i => i.tier === "HIGH").length);
+        document.getElementById("statMedium").textContent = String(items.filter(i => i.tier === "MEDIUM").length);
+        renderCards(items);
+      } catch (e) {
+        content.className = "error";
+        content.textContent = e.message || "Could not load opportunities.";
+      }
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", loadOpportunities);
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      try { await api("/api/auth/logout", { method: "POST" }); } catch (_) {}
+      window.location.href = "/login.html";
+    });
+
+    (async () => {
+      const ok = await loadMe();
+      if (ok) await loadOpportunities();
+    })();
+  </script>
+</body>
+  </html>
