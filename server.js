@@ -673,4 +673,679 @@ export const SCAN_SETTINGS = {
   concurrency:
     3
 };
-    
+    /* -------------------------------------------------------------------------- */
+/* SOURCES                                                                    */
+/* -------------------------------------------------------------------------- */
+
+export const CITIES = [
+
+  {
+    name:
+      "Austin",
+
+    url:
+      "https://data.austintexas.gov/resource/3syk-w9eu.json?$limit=1000",
+
+    type:
+      "json"
+  },
+
+  {
+    name:
+      "Chicago",
+
+    url:
+      "https://data.cityofchicago.org/resource/ydr8-5enu.json?$limit=1000&$order=issue_date%20DESC",
+
+    type:
+      "json"
+  },
+
+  {
+    name:
+      "Denver",
+
+    url:
+      "https://www.denvergov.org/media/gis/DataCatalog/building_permits/csv/building_permits.csv",
+
+    type:
+      "csv"
+  }
+
+];
+
+/* -------------------------------------------------------------------------- */
+/* END OF PART 1                                                              */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* LOGGING                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const logger = {
+  info(id, msg) {
+    console.log(
+      `[INFO ${id} ${new Date().toISOString()}] ${msg}`
+    );
+  },
+
+  warn(id, msg) {
+    console.warn(
+      `[WARN ${id} ${new Date().toISOString()}] ${msg}`
+    );
+  },
+
+  async error(id, msg) {
+    console.error(
+      `[ERROR ${id} ${new Date().toISOString()}] ${msg}`
+    );
+
+    try {
+      await supabase.from("audit_logs").insert({
+        level: "error",
+        message: String(msg).slice(0, 5000),
+        request_id: id,
+        timestamp: new Date().toISOString()
+      });
+    } catch (_) {}
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* SOUTH AFRICA CONSTRUCTION OPPORTUNITY INTELLIGENCE - PHASE 1              */
+/* -------------------------------------------------------------------------- */
+
+export const SA_INTELLIGENCE =
+  createSouthAfricaIntelligence({
+    supabase,
+    logger
+  });
+
+morgan.token(
+  "id",
+  req => req.id || "no-id"
+);
+
+/* -------------------------------------------------------------------------- */
+/* MIDDLEWARE                                                                 */
+/* -------------------------------------------------------------------------- */
+
+app.set(
+  "trust proxy",
+  1
+);
+
+app.use(
+  (req, res, next) => {
+    req.id =
+      crypto.randomUUID();
+
+    res.setHeader(
+      "X-Request-ID",
+      req.id
+    );
+
+    next();
+  }
+);
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false
+  })
+);
+
+app.use(
+  compression()
+);
+
+app.use(
+  morgan(
+    ":id :method :url :status :response-time ms"
+  )
+);
+
+app.use(
+  cors({
+    origin:
+      process.env.FRONTEND_URL,
+    credentials: true
+  })
+);
+
+app.use(
+  express.json({
+    limit: "20mb"
+  })
+);
+
+app.use(
+  express.urlencoded({
+    extended: true
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  "/dashboard",
+  express.static(DASHBOARD_DIR)
+);
+
+app.use(
+  express.static(DASHBOARD_DIR)
+);
+
+app.get(
+  "/dashboard",
+  (req, res) => {
+    res.redirect(
+      308,
+      "/dashboard/"
+    );
+  }
+);
+
+// Early unconditional root redirect removed — auth-aware / handlers below
+// app.get("/", (req, res) => res.redirect("/dashboard/"));
+
+/* -------------------------------------------------------------------------- */
+/* API RATE LIMIT                                                             */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  "/api",
+  rateLimit({
+    windowMs:
+      15 * 60 * 1000,
+
+    max:
+      500,
+
+    standardHeaders:
+      true,
+
+    legacyHeaders:
+      false
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* SERVER SESSION                                                             */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  session({
+    store:
+      sessionStore,
+
+    secret:
+      process.env.SESSION_SECRET,
+
+    resave:
+      false,
+
+    saveUninitialized:
+      false,
+
+    cookie: {
+      httpOnly:
+        true,
+
+      secure:
+        IS_PRODUCTION,
+
+      sameSite:
+        "lax",
+
+      maxAge:
+        24 * 60 * 60 * 1000
+    }
+  })
+);
+
+/* -------------------------------------------------------------------------- */
+/* PASSPORT                                                                   */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  passport.initialize()
+);
+
+app.use(
+  passport.session()
+);
+
+passport.serializeUser(
+  (user, done) =>
+    done(null, user)
+);
+
+passport.deserializeUser(
+  (user, done) =>
+    done(null, user)
+);
+
+if (
+  process.env.GOOGLE_CLIENT_ID &&
+  process.env.GOOGLE_CLIENT_SECRET
+) {
+
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID:
+          process.env.GOOGLE_CLIENT_ID,
+
+        clientSecret:
+          process.env.GOOGLE_CLIENT_SECRET,
+
+        callbackURL:
+          process.env.GOOGLE_CALLBACK_URL ||
+          `${process.env.FRONTEND_URL}/auth/google/callback`
+      },
+
+      async (
+        accessToken,
+        refreshToken,
+        profile,
+        done
+      ) => {
+
+        done(
+          null,
+          {
+            id:
+              profile.id,
+
+            displayName:
+              profile.displayName,
+
+            email:
+              profile.emails?.[0]?.value ||
+              null
+          }
+        );
+      }
+    )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* HELPERS                                                                    */
+/* -------------------------------------------------------------------------- */
+
+function pick(
+  obj,
+  keys
+) {
+
+  for (
+    const key
+    of keys
+  ) {
+
+    if (
+      obj?.[key] !==
+        undefined &&
+
+      obj?.[key] !==
+        null &&
+
+      String(
+        obj[key]
+      ).trim() !== ""
+    ) {
+
+      return obj[key];
+    }
+  }
+
+  return null;
+}
+
+function numberValue(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return null;
+  }
+
+  const n =
+    Number(
+      String(value)
+        .replace(
+          /[$,]/g,
+          ""
+        )
+        .replace(
+          /[^0-9.-]/g,
+          ""
+        )
+    );
+
+  return Number.isFinite(n)
+    ? n
+    : null;
+}
+
+function dateValue(
+  value
+) {
+
+  if (!value) {
+    return null;
+  }
+
+  const d =
+    new Date(value);
+
+  return Number.isNaN(
+    d.getTime()
+  )
+    ? null
+    : d.toISOString();
+}
+
+function normalizeText(
+  value
+) {
+
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const result =
+    String(value).trim();
+
+  return result || null;
+}
+
+function sleep(
+  ms
+) {
+
+  return new Promise(
+    resolve =>
+      setTimeout(
+        resolve,
+        ms
+      )
+  );
+}
+
+function safeNumber(
+  value,
+  fallback = 0
+) {
+
+  const n =
+    Number(value);
+
+  return Number.isFinite(n)
+    ? n
+    : fallback;
+}
+
+function safeJson(
+  value
+) {
+
+  try {
+
+    return value == null
+      ? {}
+      : JSON.parse(
+          JSON.stringify(value)
+        );
+
+  } catch (_) {
+
+    return {};
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* LEAD SCORING                                                               */
+/* -------------------------------------------------------------------------- */
+
+function scoreLead(
+  permit
+) {
+
+  let score =
+    50;
+
+  const type =
+    String(
+      permit.permit_type ||
+      ""
+    ).toLowerCase();
+
+  const work =
+    String(
+      permit.work_type ||
+      ""
+    ).toLowerCase();
+
+  const description =
+    String(
+      permit.work_description ||
+      ""
+    ).toLowerCase();
+
+  const value =
+    Number(
+      permit.estimated_value ||
+      0
+    );
+
+  const text =
+    `${type} ${work} ${description}`;
+
+  if (
+    text.includes(
+      "commercial"
+    )
+  ) {
+    score += 25;
+  }
+
+  if (
+    text.includes(
+      "building"
+    ) ||
+    text.includes(
+      "construction"
+    )
+  ) {
+    score += 10;
+  }
+
+  if (
+    text.includes(
+      "remodel"
+    ) ||
+    text.includes(
+      "renovation"
+    ) ||
+    text.includes(
+      "alteration"
+    )
+  ) {
+    score += 8;
+  }
+
+  if (
+    text.includes(
+      "restaurant"
+    ) ||
+    text.includes(
+      "retail"
+    ) ||
+    text.includes(
+      "office"
+    )
+  ) {
+    score += 5;
+  }
+
+  if (
+    value >= 1000000
+  ) {
+    score += 20;
+
+  } else if (
+    value >= 500000
+  ) {
+    score += 15;
+
+  } else if (
+    value >= 100000
+  ) {
+    score += 10;
+  }
+
+  return Math.min(
+    100,
+    score
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* ADDRESS NORMALISATION                                                      */
+/* -------------------------------------------------------------------------- */
+
+function addressFromRaw(
+  city,
+  raw
+) {
+
+  if (
+    city ===
+    "Chicago"
+  ) {
+
+    const number =
+      pick(
+        raw,
+        [
+          "street_number"
+        ]
+      );
+
+    const direction =
+      pick(
+        raw,
+        [
+          "street_direction"
+        ]
+      );
+
+    const street =
+      pick(
+        raw,
+        [
+          "street_name"
+        ]
+      );
+
+    const type =
+      pick(
+        raw,
+        [
+          "street_type"
+        ]
+      );
+
+    const zip =
+      pick(
+        raw,
+        [
+          "zip_code",
+          "zipcode",
+          "zip"
+        ]
+      );
+
+    const base =
+      [
+        number,
+        direction,
+        street,
+        type
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+    return [
+      base,
+      zip
+    ]
+      .filter(Boolean)
+      .join(", ") ||
+      null;
+  }
+
+  if (
+    city ===
+    "Austin"
+  ) {
+
+    return [
+      pick(
+        raw,
+        [
+          "original_address1",
+          "address",
+          "street_number"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "original_address2",
+          "street_name"
+        ]
+      ),
+
+      pick(
+        raw,
+        [
+          "zip",
+          "zipcode",
+          "zip_code"
+        ]
+      )
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+      null;
+  }
+
+  return normalizeText(
+    pick(
+      raw,
+      [
+        "address",
+        "site_address",
+        "address_line1",
+        "property_address",
+        "address_line_1",
+        "street_address"
+      ]
+    )
+  );
+}
+
+/* -------------------------------------------------------------------------- */
