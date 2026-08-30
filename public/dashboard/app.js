@@ -3,174 +3,249 @@
 
   const VERSION = "6.3.7";
 
+  /* ========================================================================
+   * API ENDPOINTS
+   * ====================================================================== */
+
   const API = {
     health: "/api/health",
+
     authVerify: "/api/auth/verify",
+    authMe: "/api/auth/me",
+    authLogout: "/api/auth/logout",
+
     dashboard: "/api/dashboard",
     osModules: "/api/os-modules",
     permits: "/api/permits",
+
     scrapeNow: "/api/scrape-now",
     scanStatus: "/api/scan-status",
     scanStop: "/api/brain/scan-stop",
+
     brainPause: "/api/brain/pause",
     brainResume: "/api/brain/resume",
     emergencyStop: "/api/brain/emergency-stop",
-    osToggle: id => `/api/os-toggle/${encodeURIComponent(id)}`,
+
+    osToggle: id =>
+      `/api/os-toggle/${encodeURIComponent(id)}`,
+
     forecast: "/api/forecast",
     integrations: "/api/integrations",
+
     auditLogs: "/api/system-events",
     systemEvents: "/api/system-events"
   };
 
+
+  /* ========================================================================
+   * APPLICATION STATE
+   * ====================================================================== */
+
   const state = {
     adminKey: "",
+
+    /*
+     * IMPORTANT:
+     * authenticated refers to Executive/Admin access.
+     * Tenant login is handled separately by verifySession().
+     */
     authenticated: false,
+
     connected: false,
+
     dashboard: null,
+
     osModules: [],
     permits: [],
     leads: [],
+
     integrations: [],
     auditLogs: [],
     systemEvents: [],
+
     refreshTimer: null,
     requestInFlight: false,
+
     mobileSidebarOpen: false
   };
+
+
+  /* ========================================================================
+   * ENTERPRISE OS MODULE DEFINITIONS
+   * ====================================================================== */
 
   const OS_MODULES = [
     {
       id: 1,
       name: "Executive Intelligence",
-      description: "Strategy and executive decision intelligence.",
+      description:
+        "Strategy and executive decision intelligence.",
       layer: "Strategy",
       kpis_count: 12,
       agents_count: 4
     },
+
     {
       id: 2,
       name: "Revenue Intelligence",
-      description: "Revenue performance, forecasting and monetisation.",
+      description:
+        "Revenue performance, forecasting and monetisation.",
       layer: "Finance",
       kpis_count: 14,
       agents_count: 5
     },
+
     {
       id: 3,
       name: "Sales & CRM",
-      description: "Sales pipeline, prospects and customer relationship intelligence.",
+      description:
+        "Sales pipeline, prospects and customer relationship intelligence.",
       layer: "Sales",
       kpis_count: 16,
       agents_count: 6
     },
+
     {
       id: 4,
       name: "Marketing",
-      description: "Growth, campaigns, audiences and acquisition intelligence.",
+      description:
+        "Growth, campaigns, audiences and acquisition intelligence.",
       layer: "Growth",
       kpis_count: 15,
       agents_count: 5
     },
+
     {
       id: 5,
       name: "Operations",
-      description: "Operational performance and process intelligence.",
+      description:
+        "Operational performance and process intelligence.",
       layer: "Operations",
       kpis_count: 14,
       agents_count: 5
     },
+
     {
       id: 6,
       name: "Finance",
-      description: "Accounting, cash flow and financial intelligence.",
+      description:
+        "Accounting, cash flow and financial intelligence.",
       layer: "Accounting",
       kpis_count: 13,
       agents_count: 4
     },
+
     {
       id: 7,
       name: "Human Capital",
-      description: "People, workforce and organisational intelligence.",
+      description:
+        "People, workforce and organisational intelligence.",
       layer: "People",
       kpis_count: 11,
       agents_count: 4
     },
+
     {
       id: 8,
       name: "Project Management",
-      description: "Projects, delivery, milestones and resource intelligence.",
+      description:
+        "Projects, delivery, milestones and resource intelligence.",
       layer: "Projects",
       kpis_count: 13,
       agents_count: 4
     },
+
     {
       id: 9,
       name: "Knowledge Intelligence",
-      description: "Enterprise knowledge and institutional intelligence.",
+      description:
+        "Enterprise knowledge and institutional intelligence.",
       layer: "Knowledge",
       kpis_count: 10,
       agents_count: 3
     },
+
     {
       id: 10,
       name: "Legal & Compliance",
-      description: "Risk, regulatory and compliance intelligence.",
+      description:
+        "Risk, regulatory and compliance intelligence.",
       layer: "Compliance",
       kpis_count: 12,
       agents_count: 4
     },
+
     {
       id: 11,
       name: "Supply Chain",
-      description: "Suppliers, logistics and procurement intelligence.",
+      description:
+        "Suppliers, logistics and procurement intelligence.",
       layer: "Supply",
       kpis_count: 13,
       agents_count: 4
     },
+
     {
       id: 12,
       name: "Acquisition Intelligence",
-      description: "Lead discovery, permit intelligence and acquisition.",
+      description:
+        "Lead discovery, permit intelligence and acquisition.",
       layer: "Lead Generation",
       kpis_count: 18,
       agents_count: 7
     },
+
     {
       id: 13,
       name: "Customer Success",
-      description: "Customer health, retention and expansion intelligence.",
+      description:
+        "Customer health, retention and expansion intelligence.",
       layer: "Customer",
       kpis_count: 12,
       agents_count: 4
     },
+
     {
       id: 14,
       name: "IT & Security",
-      description: "Technology, infrastructure and security intelligence.",
+      description:
+        "Technology, infrastructure and security intelligence.",
       layer: "Technology",
       kpis_count: 15,
       agents_count: 5
     },
+
     {
       id: 15,
       name: "Analytics & BI",
-      description: "Enterprise analytics, reporting and business intelligence.",
+      description:
+        "Enterprise analytics, reporting and business intelligence.",
       layer: "Analytics",
       kpis_count: 20,
       agents_count: 6
     }
   ];
 
+
+  /* ========================================================================
+   * DOM HELPERS
+   * ====================================================================== */
+
   function byId(id) {
     return document.getElementById(id);
   }
 
+
   function $$(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
+    return Array.from(
+      root.querySelectorAll(selector)
+    );
   }
 
+
   function text(id, value) {
-    const element = byId(id);
+    const element =
+      byId(id);
 
     if (!element) {
       return;
@@ -184,15 +259,19 @@
         : String(value);
   }
 
+
   function html(id, value) {
-    const element = byId(id);
+    const element =
+      byId(id);
 
     if (!element) {
       return;
     }
 
-    element.innerHTML = value ?? "";
+    element.innerHTML =
+      value ?? "";
   }
+
 
   function escapeHTML(value) {
     return String(value ?? "")
@@ -203,13 +282,13 @@
       .replace(/'/g, "&#039;");
   }
 
-  function safeArray(value) {
-    if (Array.isArray(value)) {
-      return value;
-    }
 
-    return [];
+  function safeArray(value) {
+    return Array.isArray(value)
+      ? value
+      : [];
   }
+
 
   function safeObject(value) {
     if (
@@ -223,22 +302,35 @@
     return {};
   }
 
-  function safeNumber(value, fallback = 0) {
-    const numberValue = Number(value);
 
-    return Number.isFinite(numberValue)
+  function safeNumber(
+    value,
+    fallback = 0
+  ) {
+    const numberValue =
+      Number(value);
+
+    return Number.isFinite(
+      numberValue
+    )
       ? numberValue
       : fallback;
   }
+
 
   function dateTime(value) {
     if (!value) {
       return "—";
     }
 
-    const date = new Date(value);
+    const date =
+      new Date(value);
 
-    if (Number.isNaN(date.getTime())) {
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
       return String(value);
     }
 
@@ -251,10 +343,8 @@
     );
   }
 
-  function money(value) {
-    const numberValue =
-      safeNumber(value, 0);
 
+  function money(value) {
     return new Intl.NumberFormat(
       "en-GB",
       {
@@ -262,8 +352,11 @@
         currency: "USD",
         maximumFractionDigits: 2
       }
-    ).format(numberValue);
+    ).format(
+      safeNumber(value, 0)
+    );
   }
+
 
   function number(value) {
     return new Intl.NumberFormat(
@@ -273,11 +366,13 @@
     );
   }
 
+
   function bool(value) {
     return value
       ? "YES"
       : "NO";
   }
+
 
   function formatDuration(value) {
     if (
@@ -291,7 +386,9 @@
     const seconds =
       safeNumber(value, NaN);
 
-    if (!Number.isFinite(seconds)) {
+    if (
+      !Number.isFinite(seconds)
+    ) {
       return String(value);
     }
 
@@ -300,23 +397,30 @@
     }
 
     const minutes =
-      Math.floor(seconds / 60);
+      Math.floor(
+        seconds / 60
+      );
 
     const remainingSeconds =
-      Math.round(seconds % 60);
+      Math.round(
+        seconds % 60
+      );
 
     if (minutes < 60) {
       return `${minutes}m ${remainingSeconds}s`;
     }
 
     const hours =
-      Math.floor(minutes / 60);
+      Math.floor(
+        minutes / 60
+      );
 
     const remainingMinutes =
       minutes % 60;
 
     return `${hours}h ${remainingMinutes}m`;
   }
+
 
   function formatUptime(value) {
     if (
@@ -330,12 +434,16 @@
     const seconds =
       safeNumber(value, NaN);
 
-    if (!Number.isFinite(seconds)) {
+    if (
+      !Number.isFinite(seconds)
+    ) {
       return String(value);
     }
 
     const days =
-      Math.floor(seconds / 86400);
+      Math.floor(
+        seconds / 86400
+      );
 
     const hours =
       Math.floor(
@@ -358,6 +466,11 @@
     return `${minutes}m`;
   }
 
+
+  /* ========================================================================
+   * TOAST
+   * ====================================================================== */
+
   function showToast(
     message,
     type = "info"
@@ -375,7 +488,9 @@
     toast.className =
       `toast toast-${type}`;
 
-    toast.classList.add("show");
+    toast.classList.add(
+      "show"
+    );
 
     clearTimeout(
       showToast.timer
@@ -392,6 +507,11 @@
       );
   }
 
+
+  /* ========================================================================
+   * GLOBAL CONNECTION STATUS
+   * ====================================================================== */
+
   function setGlobalStatus(
     connected,
     message
@@ -403,10 +523,14 @@
       byId("global-status");
 
     const textElement =
-      byId("global-status-text");
+      byId(
+        "global-status-text"
+      );
 
     const dot =
-      byId("global-status-dot");
+      byId(
+        "global-status-dot"
+      );
 
     if (textElement) {
       textElement.textContent =
@@ -419,403 +543,280 @@
     }
 
     if (badge) {
+
       badge.classList.toggle(
         "badge-success",
-        connected
+        Boolean(connected)
       );
 
       badge.classList.toggle(
         "badge-muted",
-        !connected
+        !Boolean(connected)
       );
     }
 
     if (dot) {
+
       dot.classList.toggle(
         "status-online",
-        connected
+        Boolean(connected)
       );
     }
   }
 
-/* ========================================================================
- * ADMIN AUTHENTICATION
- * ====================================================================== */
 
-const ADMIN_STORAGE_KEY =
-  "GRIDV21_ADMIN_KEY";
+  /* ========================================================================
+   * ADMIN AUTHENTICATION
+   * ====================================================================== */
+
+  const ADMIN_STORAGE_KEY =
+    "GRIDV21_ADMIN_KEY";
 
 
-/* ------------------------------------------------------------------------
- * API FETCH
- * ---------------------------------------------------------------------- */
+  class APIError extends Error {
 
-class APIError extends Error {
-  constructor(message, status = 0, payload = null) {
-    super(message || "Request failed");
-    this.name = "APIError";
-    this.status = status;
-    this.payload = payload;
-  }
-}
+    constructor(
+      message,
+      status = 0,
+      payload = null
+    ) {
+      super(
+        message ||
+        "Request failed"
+      );
 
-async function apiFetch(
-  url,
-  options = {}
-) {
+      this.name =
+        "APIError";
 
-  const requestOptions = {
-    ...options,
+      this.status =
+        status;
 
-    credentials:
-      "include",
-
-    cache:
-      options.cache ||
-      "no-store",
-
-    headers: {
-      "Accept":
-        "application/json",
-
-      ...(options.body
-        ? {
-            "Content-Type":
-              "application/json"
-          }
-        : {}),
-
-      ...(options.headers || {})
+      this.payload =
+        payload;
     }
-  };
-
-
-  /*
-   * Send ADMIN_KEY as a header.
-   *
-   * The server can then validate it directly,
-   * or use the authenticated owner session.
-   */
-  if (state.adminKey) {
-
-    requestOptions.headers[
-      "x-admin-key"
-    ] =
-      state.adminKey;
   }
 
 
-  let response;
+  /* ========================================================================
+   * API FETCH
+   * ====================================================================== */
 
-  try {
-
-    response =
-      await fetch(
-        url,
-        requestOptions
-      );
-
-  } catch (error) {
-
-    throw new APIError(
-      "Unable to connect to GRIDV21 server.",
-      0,
-      null
-    );
-  }
-
-
-  const payload =
-    await response
-      .json()
-      .catch(
-        () => ({})
-      );
-
-
-  if (!response.ok) {
-
-    throw new APIError(
-      payload.error ||
-      payload.message ||
-      `Request failed (${response.status})`,
-      response.status,
-      payload
-    );
-  }
-
-
-  return payload;
-}
-
-
-/* ------------------------------------------------------------------------
- * LOAD ADMIN KEY
- * ---------------------------------------------------------------------- */
-
-function loadAdminKey() {
-
-  try {
-
-    state.adminKey =
-      localStorage.getItem(
-        ADMIN_STORAGE_KEY
-      ) ||
-      "";
-
-  } catch (error) {
-
-    console.warn(
-      "[GRIDV21] Unable to read admin key:",
-      error
-    );
-
-    state.adminKey =
-      "";
-  }
-
-
-  const input =
-    byId(
-      "adminKeyInput"
-    );
-
-
-  if (
-    input &&
-    state.adminKey
+  async function apiFetch(
+    url,
+    options = {}
   ) {
 
-    input.value =
-      state.adminKey;
-  }
+    const requestOptions = {
+      ...options,
 
+      credentials:
+        "include",
 
-  return state.adminKey;
-}
+      cache:
+        options.cache ||
+        "no-store",
 
+      headers: {
 
-/* ------------------------------------------------------------------------
- * SAVE ADMIN KEY
- * ---------------------------------------------------------------------- */
+        "Accept":
+          "application/json",
 
-function saveAdminKey(
-  key
-) {
+        ...(options.body !== undefined
+          ? {
+              "Content-Type":
+                "application/json"
+            }
+          : {}),
 
-  const value =
-    String(
-      key ??
-      ""
-    ).trim();
-
-
-  if (!value) {
-
-    return false;
-  }
-
-
-  state.adminKey =
-    value;
-
-
-  try {
-
-    localStorage.setItem(
-      ADMIN_STORAGE_KEY,
-      value
-    );
-
-  } catch (error) {
-
-    console.warn(
-      "[GRIDV21] Unable to persist admin key:",
-      error
-    );
-  }
-
-
-  return true;
-}
-
-
-/* ------------------------------------------------------------------------
- * CLEAR ADMIN KEY
- * ---------------------------------------------------------------------- */
-
-async function clearAdminKey() {
-
-  state.adminKey =
-    "";
-
-  state.authenticated =
-    false;
-
-
-  try {
-
-    localStorage.removeItem(
-      ADMIN_STORAGE_KEY
-    );
-
-  } catch (_) {}
-
-
-  /*
-   * Destroy the OWNER server session.
-   */
-  try {
-
-    await fetch(
-      "/api/auth/logout",
-      {
-        method:
-          "POST",
-
-        credentials:
-          "include",
-
-        headers: {
-          "Accept":
-            "application/json"
-        }
+        ...(options.headers || {})
       }
-    );
-
-  } catch (error) {
-
-    console.warn(
-      "[GRIDV21] Admin logout request failed:",
-      error
-    );
-  }
+    };
 
 
-  setAuthUI(
-    false
-  );
-
-  setControlsEnabled(
-    false
-  );
-
-  setGlobalStatus(
-    false,
-    "Admin key required"
-  );
-
-
-  const input =
-    byId(
-      "adminKeyInput"
-    );
-
-  if (input) {
-
-    input.value =
-      "";
-  }
-
-
-  const status =
-    byId(
-      "keyStatus"
-    );
-
-  if (status) {
-
-    status.textContent =
-      "Admin key cleared";
-  }
-
-
-  showToast(
-    "Admin access cleared.",
-    "success"
-  );
-}
-
-
-/* ------------------------------------------------------------------------
- * VERIFY ADMIN KEY
- * ---------------------------------------------------------------------- */
-
-async function verifyAdminKey() {
-
-  const key =
-    String(
-      state.adminKey ||
-      ""
-    ).trim();
-
-
-  if (!key) {
-
-    setAuthUI(
-      false
-    );
-
-    setControlsEnabled(
-      false
-    );
-
-    return false;
-  }
-
-
-  try {
-
-    const payload =
-      await apiFetch(
-        API.authVerify,
-        {
-          method:
-            "POST",
-
-          headers: {
-            "x-admin-key":
-              key
-          }
-        }
-      );
-
+    /*
+     * Executive/Admin key.
+     *
+     * Tenant authentication still uses
+     * the normal authenticated session cookie.
+     */
 
     if (
-      payload.ok !== true ||
-      payload.authenticated !== true
+      state.adminKey
     ) {
 
+      requestOptions.headers[
+        "x-admin-key"
+      ] =
+        state.adminKey;
+    }
+
+
+    let response;
+
+    try {
+
+      response =
+        await fetch(
+          url,
+          requestOptions
+        );
+
+    } catch (error) {
+
       throw new APIError(
-        "Invalid admin key.",
-        401,
+        "Unable to connect to GRIDV21 server.",
+        0,
+        null
+      );
+    }
+
+
+    const payload =
+      await response
+        .json()
+        .catch(
+          () => ({})
+        );
+
+
+    if (!response.ok) {
+
+      throw new APIError(
+        payload.error ||
+        payload.message ||
+        `Request failed (${response.status})`,
+        response.status,
         payload
       );
     }
 
 
-    state.authenticated =
-      true;
+    return payload;
+  }
 
 
-    state.connected =
-      true;
+  /* ========================================================================
+   * LOAD ADMIN KEY
+   * ====================================================================== */
+
+  function loadAdminKey() {
+
+    try {
+
+      state.adminKey =
+        localStorage.getItem(
+          ADMIN_STORAGE_KEY
+        ) ||
+        "";
+
+    } catch (error) {
+
+      console.warn(
+        "[GRIDV21] Unable to read admin key:",
+        error
+      );
+
+      state.adminKey =
+        "";
+    }
 
 
-    setGlobalStatus(
-      true,
-      "Admin authenticated"
-    );
+    const input =
+      byId(
+        "adminKeyInput"
+      );
 
 
-    setAuthUI(
-      true
-    );
+    if (
+      input &&
+      state.adminKey
+    ) {
+
+      input.value =
+        state.adminKey;
+    }
 
 
-    setControlsEnabled(
-      true
-    );
+    return state.adminKey;
+  }
+
+
+  /* ========================================================================
+   * SAVE ADMIN KEY
+   * ====================================================================== */
+
+  function saveAdminKey(
+    key
+  ) {
+
+    const value =
+      String(
+        key ?? ""
+      ).trim();
+
+
+    if (!value) {
+
+      const status =
+        byId(
+          "keyStatus"
+        );
+
+      if (status) {
+        status.textContent =
+          "Admin key required";
+      }
+
+      showToast(
+        "Please enter the Executive Dashboard key.",
+        "error"
+      );
+
+      return false;
+    }
+
+
+    /*
+     * Store in application state immediately.
+     */
+
+    state.adminKey =
+      value;
+
+
+    /*
+     * Persist locally.
+     */
+
+    try {
+
+      localStorage.setItem(
+        ADMIN_STORAGE_KEY,
+        value
+      );
+
+    } catch (error) {
+
+      console.warn(
+        "[GRIDV21] Unable to save admin key:",
+        error
+      );
+    }
+
+
+    /*
+     * Keep the input synchronised.
+     */
+
+    const input =
+      byId(
+        "adminKeyInput"
+      );
+
+    if (input) {
+      input.value =
+        value;
+    }
 
 
     const status =
@@ -824,181 +825,53 @@ async function verifyAdminKey() {
       );
 
     if (status) {
-
       status.textContent =
-        "Owner authenticated";
+        "Admin key saved — verifying...";
     }
 
 
-    return true;
+    showToast(
+      "Executive Dashboard key saved.",
+      "success"
+    );
 
-  } catch (error) {
+
+    return true;
+  }
+
+
+  /* ========================================================================
+   * CLEAR ADMIN KEY
+   * ====================================================================== */
+
+  async function clearAdminKey() {
+
+    state.adminKey =
+      "";
 
     state.authenticated =
       false;
 
 
-    setAuthUI(
-      false
-    );
+    try {
 
-
-    setControlsEnabled(
-      false
-    );
-
-
-    setGlobalStatus(
-      false,
-      "Admin key rejected"
-    );
-
-
-    const status =
-      byId(
-        "keyStatus"
+      localStorage.removeItem(
+        ADMIN_STORAGE_KEY
       );
 
-    if (status) {
-
-      status.textContent =
-        error.status === 401
-          ? "Invalid admin key"
-          : "Verification failed";
-    }
+    } catch (_) {}
 
 
-    console.error(
-      "[GRIDV21 ADMIN AUTH]",
-      error
-    );
+    try {
 
-
-    return false;
-  }
-}
-
-
-/* ------------------------------------------------------------------------
- * ADMIN UI
- * ---------------------------------------------------------------------- */
-
-function setAuthUI(
-  authenticated
-) {
-
-  const input =
-    byId(
-      "adminKeyInput"
-    );
-
-  const saveButton =
-    byId(
-      "saveKeyBtn"
-    );
-
-  const status =
-    byId(
-      "keyStatus"
-    );
-
-
-  if (input) {
-
-    input.disabled =
-      Boolean(authenticated);
-  }
-
-
-  if (saveButton) {
-
-    saveButton.disabled =
-      Boolean(authenticated);
-  }
-
-
-  if (status) {
-
-    status.textContent =
-      authenticated
-        ? "Owner authenticated"
-        : "Admin key required";
-  }
-
-
-  setControlsEnabled(
-    Boolean(authenticated)
-  );
-}
-
-
-/* ------------------------------------------------------------------------
- * SESSION CHECK
- *
- * IMPORTANT:
- * We intentionally DO NOT use the tenant Supabase session here.
- *
- * The Brain Control dashboard is ADMIN_KEY protected.
- * ---------------------------------------------------------------------- */
-
-async function verifyAdminSession() {
-
-  try {
-
-    const payload =
-      await apiFetch(
-        "/api/auth/me"
-      );
-
-
-    if (
-      payload.authenticated === true &&
-      payload.authType === "admin_key"
-    ) {
-
-      state.authenticated =
-        true;
-
-      setAuthUI(
-        true
-      );
-
-      setGlobalStatus(
-        true,
-        "Admin authenticated"
-      );
-
-      return true;
-    }
-
-  } catch (_) {
-
-    /*
-     * Expected when there is no owner session.
-     */
-  }
-
-
-  return false;
-}
-
-/* ============================================================
- * SESSION AUTHENTICATION
- * ============================================================ */
-
-async function verifySession() {
-
-  try {
-
-    const response =
       await fetch(
-        "/api/auth/me",
+        API.authLogout,
         {
-          method: "GET",
+          method:
+            "POST",
 
-          credentials: "include",
-
-          cache: "no-store",
+          credentials:
+            "include",
 
           headers: {
             "Accept":
@@ -1007,198 +880,352 @@ async function verifySession() {
         }
       );
 
-    const payload =
-      await response
-        .json()
-        .catch(() => ({}));
+    } catch (error) {
 
-    if (
-      !response.ok ||
-      payload.authenticated !== true
-    ) {
+      console.warn(
+        "[GRIDV21] Admin logout request failed:",
+        error
+      );
+    }
 
-      state.authenticated = false;
 
-      setGlobalStatus(
-        false,
-        "Login required"
+    setAuthUI(
+      false
+    );
+
+    setControlsEnabled(
+      false
+    );
+
+
+    setGlobalStatus(
+      false,
+      "Admin key required"
+    );
+
+
+    const input =
+      byId(
+        "adminKeyInput"
       );
 
-      window.location.replace(
-        "/login.html"
+    if (input) {
+
+      input.value =
+        "";
+
+      input.disabled =
+        false;
+    }
+
+
+    const saveButton =
+      byId(
+        "saveKeyBtn"
+      );
+
+    if (saveButton) {
+
+      saveButton.disabled =
+        false;
+    }
+
+
+    const status =
+      byId(
+        "keyStatus"
+      );
+
+    if (status) {
+
+      status.textContent =
+        "Admin key cleared";
+    }
+
+
+    showToast(
+      "Executive Dashboard access cleared.",
+      "success"
+    );
+  }
+
+
+  /* ========================================================================
+   * VERIFY ADMIN KEY
+   * ====================================================================== */
+
+  async function verifyAdminKey() {
+
+    const key =
+      String(
+        state.adminKey ||
+        ""
+      ).trim();
+
+
+    if (!key) {
+
+      setAuthUI(
+        false
+      );
+
+      setControlsEnabled(
+        false
       );
 
       return false;
     }
 
-    state.authenticated = true;
 
-    setGlobalStatus(
-      true,
-      "Authenticated"
-    );
+    try {
 
-    setAuthUI(true);
+      const payload =
+        await apiFetch(
+          API.authVerify,
+          {
+            method:
+              "POST",
 
-    return true;
+            headers: {
+              "x-admin-key":
+                key
+            }
+          }
+        );
 
-  } catch (error) {
 
-    console.error(
-      "[GRIDV21 SESSION]",
-      error
-    );
+      if (
+        payload.ok !== true ||
+        payload.authenticated !== true
+      ) {
 
-    state.authenticated = false;
+        throw new APIError(
+          "Invalid admin key.",
+          401,
+          payload
+        );
+      }
 
-    setGlobalStatus(
-      false,
-      "Authentication error"
-    );
 
-    window.location.replace(
-      "/login.html"
-    );
+      state.adminKey =
+        key;
 
-    return false;
+      state.authenticated =
+        true;
+
+      state.connected =
+        true;
+
+
+      /*
+       * Persist only after successful
+       * server verification.
+       */
+
+      try {
+
+        localStorage.setItem(
+          ADMIN_STORAGE_KEY,
+          key
+        );
+
+      } catch (_) {}
+
+
+      setGlobalStatus(
+        true,
+        "Admin authenticated"
+      );
+
+
+      setAuthUI(
+        true
+      );
+
+
+      setControlsEnabled(
+        true
+      );
+
+
+      const status =
+        byId(
+          "keyStatus"
+        );
+
+      if (status) {
+
+        status.textContent =
+          "Owner authenticated";
+      }
+
+
+      showToast(
+        "Executive Dashboard access granted.",
+        "success"
+      );
+
+
+      return true;
+
+    } catch (error) {
+
+      state.authenticated =
+        false;
+
+
+      setAuthUI(
+        false
+      );
+
+      setControlsEnabled(
+        false
+      );
+
+
+      setGlobalStatus(
+        false,
+        "Admin key rejected"
+      );
+
+
+      const status =
+        byId(
+          "keyStatus"
+        );
+
+      if (status) {
+
+        status.textContent =
+          error.status === 401
+            ? "Invalid admin key"
+            : "Verification failed";
+      }
+
+
+      console.error(
+        "[GRIDV21 ADMIN AUTH]",
+        error
+      );
+
+
+      return false;
+    }
   }
-}
 
-/* ========================================================================
- * AUTH FAILURE HANDLER
- * ====================================================================== */
 
-function handleAuthFailure(
-  error
-) {
-  if (
-    error instanceof APIError &&
-    error.status === 401
+  /* ========================================================================
+   * ADMIN UI
+   * ====================================================================== */
+
+  function setAuthUI(
+    authenticated
   ) {
-    state.authenticated =
-      false;
 
-    setGlobalStatus(
-      false,
-      "Authentication required"
+    const input =
+      byId(
+        "adminKeyInput"
+      );
+
+    const saveButton =
+      byId(
+        "saveKeyBtn"
+      );
+
+    const status =
+      byId(
+        "keyStatus"
+      );
+
+
+    if (input) {
+
+      /*
+       * Only Executive authentication
+       * controls this field.
+       *
+       * Tenant login does NOT disable it.
+       */
+
+      input.disabled =
+        Boolean(authenticated);
+    }
+
+
+    if (saveButton) {
+
+      /*
+       * Keep Save enabled until the key
+       * has actually been verified.
+       */
+
+      saveButton.disabled =
+        false;
+    }
+
+
+    if (status) {
+
+      status.textContent =
+        authenticated
+          ? "Owner authenticated"
+          : "Admin key required";
+    }
+
+
+    setControlsEnabled(
+      Boolean(authenticated)
     );
-
-    showToast(
-      "GRIDV21 rejected the admin key.",
-      "error"
-    );
-
-    return true;
   }
 
-  return false;
-}
 
-/* ========================================================================
- * EXPOSE CORE FUNCTIONS
- * ====================================================================== */
+  /* ========================================================================
+   * EXECUTIVE / ADMIN SESSION CHECK
+   * ====================================================================== */
 
-window.GRIDV21 = {
-  VERSION,
-  API,
-  state,
+  async function verifyAdminSession() {
 
-  apiFetch,
-  verifyAdminKey,
-  saveAdminKey,
-  clearAdminKey,
+    try {
 
-  showToast
-};
-
-/* ==========================================================================
- * GRIDV21 BRAIN ENTERPRISE — DASHBOARD APP
- * VERSION: 6.3.7
- *
- * PART 2 / 4
- * - Dashboard API loading
- * - OS module loading
- * - Permit / lead loading
- * - Runtime telemetry
- * - Metrics rendering
- * - AI recommendation rendering
- * - OS overview rendering
- * ========================================================================== */
+      const payload =
+        await apiFetch(
+          API.authMe
+        );
 
 
-/* ========================================================================
- * NORMALISE DASHBOARD RESPONSE
- * ====================================================================== */
+      if (
+        payload.authenticated === true &&
+        payload.authType === "admin_key"
+      ) {
 
-function normaliseDashboard(payload) {
-  const data =
-    safeObject(payload);
+        state.authenticated =
+          true;
 
-  /*
-   * The backend may return the dashboard directly,
-   * or wrap it inside { data: ... }.
-   */
+        state.connected =
+          true;
 
-  const source =
-    safeObject(
-      data.data || data.dashboard || data
-    );
 
-  return {
-    engine:
-      safeObject(
-        source.engine ||
-        source.runtime ||
-        source.telemetry
-      ),
+        setAuthUI(
+          true
+        );
 
-    metrics:
-      safeObject(
-        source.metrics
-      ),
 
-    revenue:
-      safeObject(
-        source.revenue
-      ),
+        setGlobalStatus(
+          true,
+          "Admin authenticated"
+        );
 
-    leads:
-      safeArray(
-        source.leads ||
-        source.topLeads
-      ),
 
-    permits:
-      safeArray(
-        source.permits
-      ),
+        return true;
+      }
 
-    osModules:
-      safeArray(
-        source.osModules ||
-        source.modules ||
-        source.os
-      ),
+    } catch (error) {
 
-    activity:
-      safeArray(
-        source.activity ||
-        source.events ||
-        source.latestEvents
-      ),
+      /*
+       * No Executive session is not
+       * considered a tenant logout.
+       */
 
-    recommendation:
-      source.recommendation ||
-      source.aiRecommendation ||
-      source.brainSignal ||
-      null
-  };
-}
-
-/* ========================================================================
- * LOAD DASHBOARD
- * ====================================================================== */
-
-async function loadDashboard() {
-  if (!state.authenticated) {
-    se
+      console.info(
+        "[GRIDV21] No existing Executive session."
+      )
