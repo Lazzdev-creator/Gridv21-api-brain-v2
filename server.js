@@ -3375,4 +3375,677 @@ app.get(
     return res.redirect("/login.html");
   }
 );
-  
+  /* -------------------------------------------------------------------------- */
+/* AUTH LOGOUT                                                               */
+/* -------------------------------------------------------------------------- */
+
+app.post(
+  "/api/auth/logout",
+  (req, res) => {
+
+    req.session.destroy(
+      (error) => {
+
+        if (error) {
+
+          console.error(
+            "[AUTH] Logout error:",
+            error
+          );
+
+          return res.status(500).json({
+            ok: false,
+            error:
+              "Logout failed."
+          });
+
+        }
+
+        res.clearCookie(
+          "gridv21.sid"
+        );
+
+        return res.json({
+
+          ok: true,
+
+          authenticated:
+            false,
+
+          message:
+            "Logged out successfully."
+
+        });
+
+      }
+    );
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* AUTH STATUS                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/auth/status",
+  (req, res) => {
+
+    return res.json({
+
+      ok: true,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      user:
+        req.session?.gridv21Authenticated ===
+        true
+          ? {
+              id:
+                req.session.userId ||
+                null,
+
+              email:
+                req.session.userEmail ||
+                null,
+
+              role:
+                req.session.userRole ||
+                "admin"
+            }
+          : null
+
+    });
+
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* HEALTH                                                                     */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/health",
+  async (req, res) => {
+
+    let database =
+      "unknown";
+
+    try {
+
+      const {
+        error
+      } =
+        await supabase
+          .from("permits")
+          .select("id")
+          .limit(1);
+
+      database =
+        error
+          ? "error"
+          : "connected";
+
+    } catch (
+      error
+    ) {
+
+      database =
+        "error";
+
+    }
+
+    return res.json({
+
+      ok: true,
+
+      status:
+        "online",
+
+      version:
+        VERSION,
+
+      database,
+
+      authenticated:
+        req.session?.gridv21Authenticated ===
+        true,
+
+      uptime:
+        Math.floor(
+          (
+            Date.now() -
+            ENGINE.uptime
+          ) / 1000
+        ),
+
+      engine: {
+
+        running:
+          ENGINE.running,
+
+        scanning:
+          ENGINE.scanning,
+
+        permitsFound:
+          ENGINE.permitsFound,
+
+        errors:
+          ENGINE.errors
+
+      }
+
+    });
+
+  }
+);
+/* -------------------------------------------------------------------------- */
+/* SOUTH AFRICA INTELLIGENCE API                                              */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/api/sa-intelligence/sources",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      version: SA_INTELLIGENCE.version,
+      sources: SA_INTELLIGENCE.sources.map(source => ({
+        ...source,
+        endpoint: source.endpoint || null
+      }))
+    });
+  }
+);
+
+app.get(
+  "/api/sa-intelligence/status",
+  requireAuth,
+  (req, res) => {
+    return res.json({
+      ok: true,
+      version: SA_INTELLIGENCE.version,
+      running: SA_INTELLIGENCE.state.running,
+      lastRun: SA_INTELLIGENCE.state.lastRun,
+      lastError: SA_INTELLIGENCE.state.lastError,
+      stats: SA_INTELLIGENCE.state.stats
+    });
+  }
+);
+
+app.post(
+  "/api/sa-intelligence/scan",
+  requireAuth,
+  async (req, res) => {
+    const sourceIds =
+      Array.isArray(req.body?.source_ids)
+        ? req.body.source_ids.map(String)
+        : null;
+
+    const result = await SA_INTELLIGENCE.scan({
+      sourceIds,
+      runType: "manual"
+    });
+
+    return res
+      .status(result.ok ? 200 : 500)
+      .json(result);
+  }
+);
+
+app.get(
+  "/api/sa-intelligence/opportunities",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const data = await SA_INTELLIGENCE.opportunities({
+        limit: req.query.limit || 50,
+        minScore: req.query.min_score || 0,
+        municipality: req.query.municipality || null,
+        tier: req.query.tier || null
+      });
+
+      return res.json({
+        ok: true,
+        country: "ZA",
+        count: data.length,
+        opportunities: data
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Could not load South Africa opportunities."
+      });
+    }
+  }
+);
+
+/* Tenant-safe opportunity feed: tenant identity only, never owner/global controls. */
+app.get(
+  "/api/tenant/opportunities",
+  requireTenant,
+  async (req, res) => {
+    try {
+      const data = await SA_INTELLIGENCE.tenantOpportunities(
+        req.session.userId,
+        { limit: req.query.limit || 25 }
+      );
+
+      return res.json({
+        ok: true,
+        country: "ZA",
+        tenant_id: req.session.userId,
+        count: data.length,
+        opportunities: data
+      });
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        error: "Could not load tenant opportunities."
+      });
+    }
+  }
+);
+
+
+/* -------------------------------------------------------------------------- */
+/* BRAIN CONTROL APIs (Parts 2–5 — dashboard + engine + permits)              */
+/* -------------------------------------------------------------------------- */
+
+app.get("/api/dashboard", requireAuth, async (req, res) => {
+  try {
+    let permitCount = 0;
+    let leadCount = 0;
+    try {
+      const { count } = await supabase
+        .from("permits")
+        .select("id", { count: "exact", head: true });
+      permitCount = count || 0;
+    } catch (_) {}
+
+    try {
+      const { count } = await supabase
+        .from("permits")
+        .select("id", { count: "exact", head: true })
+        .gte("ai_score", 70);
+      leadCount = count || 0;
+    } catch (_) {}
+
+    return res.json({
+      ok: true,
+      version: VERSION,
+      engine: {
+        running: ENGINE.running,
+        scanning: ENGINE.scanning,
+        emergencyStopped: ENGINE.emergencyStopped,
+        lastScan: ENGINE.lastScan,
+        lastScanDuration: ENGINE.lastScanDuration,
+        permitsFound: ENGINE.permitsFound,
+        errors: ENGINE.errors,
+        uptime: Math.floor((Date.now() - ENGINE.uptime) / 1000),
+        lastError: ENGINE.lastError
+      },
+      modules: OS_MODULES,
+      stats: {
+        permits: permitCount,
+        leads: leadCount,
+        revenue: 0
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/os-modules", requireAuth, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("os_modules")
+      .select("*")
+      .order("id", { ascending: true });
+
+    if (error || !data?.length) {
+      return res.json({ ok: true, modules: OS_MODULES });
+    }
+
+    return res.json({ ok: true, modules: data });
+  } catch (error) {
+    return res.json({ ok: true, modules: OS_MODULES });
+  }
+});
+
+app.get("/api/permits", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const { data, error } = await supabase
+      .from("permits")
+      .select("*")
+      .order("issued_date", { ascending: false, nullsFirst: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    return res.json({
+      ok: true,
+      count: (data || []).length,
+      permits: data || []
+    });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message, permits: [] });
+  }
+});
+
+app.get("/api/scan-status", requireAuth, (req, res) => {
+  return res.json({
+    ok: true,
+    running: ENGINE.running,
+    scanning: ENGINE.scanning,
+    emergencyStopped: ENGINE.emergencyStopped,
+    lastScan: ENGINE.lastScan,
+    lastScanDuration: ENGINE.lastScanDuration,
+    permitsFound: ENGINE.permitsFound,
+    errors: ENGINE.errors,
+    uptime: Math.floor((Date.now() - ENGINE.uptime) / 1000),
+    lastError: ENGINE.lastError
+  });
+});
+
+app.post("/api/scrape-now", requireAuth, async (req, res) => {
+  try {
+    if (ENGINE.scanning) {
+      return res.status(409).json({ ok: false, error: "Scan already running" });
+    }
+    // Fire and forget so the UI gets an immediate response
+    scanAllCities(req.id || crypto.randomUUID()).catch(err => {
+      console.error("[SCAN]", err.message);
+    });
+    return res.json({ ok: true, scanning: true, message: "Scan started" });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.post("/api/brain/pause", requireAuth, (req, res) => {
+  ENGINE.running = false;
+  ENGINE.scanning = false;
+  if (currentScanAbortController) {
+    try { currentScanAbortController.abort(); } catch (_) {}
+  }
+  return res.json({ ok: true, running: false, scanning: false });
+});
+
+app.post("/api/brain/resume", requireAuth, (req, res) => {
+  ENGINE.running = true;
+  ENGINE.emergencyStopped = false;
+  return res.json({ ok: true, running: true });
+});
+
+app.post("/api/brain/emergency-stop", requireAuth, (req, res) => {
+  ENGINE.running = false;
+  ENGINE.scanning = false;
+  ENGINE.emergencyStopped = true;
+  if (currentScanAbortController) {
+    try { currentScanAbortController.abort(); } catch (_) {}
+  }
+  return res.json({
+    ok: true,
+    running: false,
+    scanning: false,
+    emergencyStopped: true
+  });
+});
+
+app.post("/api/brain/scan-stop", requireAuth, (req, res) => {
+  ENGINE.scanning = false;
+  if (currentScanAbortController) {
+    try { currentScanAbortController.abort(); } catch (_) {}
+  }
+  return res.json({ ok: true, scanning: false });
+});
+
+app.get("/api/system-events", requireAuth, async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const rows = await getActivity(limit);
+    return res.json({ ok: true, events: rows, count: rows.length });
+  } catch (error) {
+    return res.json({ ok: true, events: [], count: 0 });
+  }
+});
+
+app.get("/api/forecast", requireAuth, (req, res) => {
+  return res.json({
+    ok: true,
+    forecast: {
+      projected_revenue: 0,
+      pipeline_value: 0,
+      confidence: 0.5
+    }
+  });
+});
+
+app.get("/api/integrations", requireAuth, (req, res) => {
+  return res.json({
+    ok: true,
+    integrations: [
+      { id: "supabase", name: "Supabase", status: "connected" },
+      { id: "stripe", name: "Stripe", status: stripe ? "connected" : "disabled" },
+      { id: "redis", name: "Redis", status: redisClient ? "connected" : "memory" }
+    ]
+  });
+});
+
+app.post("/api/os-toggle/:id", requireAuth, async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const enabled = req.body?.enabled !== false;
+    const { error } = await supabase
+      .from("os_modules")
+      .update({ enabled })
+      .eq("id", id);
+    if (error) throw error;
+    return res.json({ ok: true, id, enabled });
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+
+/* -------------------------------------------------------------------------- */
+/* DASHBOARD ACCESS                                                           */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/dashboard.html",
+  requireAuth,
+  (req, res) => {
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "dashboard.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* TENANT DASHBOARD                                                           */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/tenant-dashboard.html",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
+
+    const candidates = [
+      path.join(PUBLIC_DIR, "tenant-dashboard.html"),
+      path.join(__dirname, "tenant-dashboard.html"),
+      path.join(DASHBOARD_DIR, "tenant-dashboard.html")
+    ];
+    const file = candidates.find(p => fs.existsSync(p));
+    if (!file) {
+      return res.status(404).send("GRIDV21 — Tenant dashboard not found.");
+    }
+    return res.sendFile(file);
+  }
+);
+
+app.get(
+  "/tenant",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    return res.redirect("/login.html");
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* STATIC FRONTEND                                                            */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/login.html",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* ROOT                                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.sendFile(
+        path.join(PUBLIC_DIR, "dashboard.html")
+      );
+    }
+    return res.sendFile(
+      path.join(PUBLIC_DIR, "login.html")
+    );
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* 404 HANDLER                                                                */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({
+        ok: false,
+        error: "API endpoint not found."
+      });
+    }
+    return res.status(404).send("GRIDV21 — Page not found.");
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* GLOBAL ERROR HANDLER                                                       */
+/* -------------------------------------------------------------------------- */
+
+app.use(
+  (error, req, res, next) => {
+    console.error("[SERVER ERROR]", error);
+
+    if (res.headersSent) {
+      return next(error);
+    }
+
+    return res.status(error.status || 500).json({
+      ok: false,
+      error: IS_PRODUCTION
+        ? "Internal server error."
+        : (error.message || "Internal server error.")
+    });
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* START SERVER                                                               */
+/* -------------------------------------------------------------------------- */
+
+async function startServer() {
+  try {
+    try {
+      await SA_INTELLIGENCE.ensureSources();
+      console.log("[SA] South Africa acquisition source registry synchronized.");
+    } catch (error) {
+      console.warn(`[SA] Source registry sync skipped: ${error.message}`);
+    }
+
+    app.listen(
+      PORT,
+      "0.0.0.0",
+      () => {
+        console.log("");
+        console.log("==================================================");
+        console.log("GRIDV21 BRAIN ENTERPRISE");
+        console.log(`Version: ${VERSION}`);
+        console.log(`Port: ${PORT}`);
+        console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+        console.log("Authentication: Supabase + server session");
+        console.log("Dashboard authentication: ENABLED");
+        console.log("==================================================");
+      }
+    );
+  } catch (error) {
+    console.error("[STARTUP] Fatal error:", error);
+    process.exit(1);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* PROCESS ERROR HANDLERS                                                     */
+/* -------------------------------------------------------------------------- */
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[PROCESS] Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[PROCESS] Uncaught exception:", error);
+});
+
+/* -------------------------------------------------------------------------- */
+/* START                                                                      */
+/* -------------------------------------------------------------------------- */
+
+startServer();
