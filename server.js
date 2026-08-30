@@ -1349,3 +1349,679 @@ function addressFromRaw(
 }
 
 /* -------------------------------------------------------------------------- */
+/* PERMIT MAPPING                                                             */
+/* -------------------------------------------------------------------------- */
+
+function mapPermitData(
+  cityName,
+  raw
+) {
+
+  const permitId =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_",
+          "permit_id",
+          "permit_num",
+          "permit_number",
+          "permitnum",
+          "id",
+          "permit",
+          "record_id"
+        ]
+      )
+    );
+
+  const permitType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_type_definition",
+          "permit_type_desc",
+          "permit_type",
+          "permit_type_name",
+          "type",
+          "work_type"
+        ]
+      )
+    );
+
+  const status =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_status",
+          "status_current",
+          "status",
+          "current_status"
+        ]
+      )
+    );
+
+  const issuedDate =
+    dateValue(
+      pick(
+        raw,
+        [
+          "issue_date",
+          "issued_date",
+          "Issue Date",
+          "issued",
+          "application_date"
+        ]
+      )
+    );
+
+  const applicationDate =
+    dateValue(
+      pick(
+        raw,
+        [
+          "application_start_date",
+          "application_date",
+          "application_date_start"
+        ]
+      )
+    );
+
+  const valuation =
+    numberValue(
+      pick(
+        raw,
+        [
+          "reported_cost",
+          "estimated_value",
+          "estimated_cost",
+          "total_job_valuation",
+          "valuation",
+          "job_value",
+          "declared_valuation"
+        ]
+      )
+    );
+
+  const address =
+    addressFromRaw(
+      cityName,
+      raw
+    );
+
+  const workDescription =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "work_description",
+          "description",
+          "work_desc",
+          "project_description"
+        ]
+      )
+    );
+
+  const workType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "work_type",
+          "construction_type",
+          "job_type"
+        ]
+      )
+    );
+
+  const reviewType =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "review_type"
+        ]
+      )
+    );
+
+  const milestone =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_milestone"
+        ]
+      )
+    );
+
+  const condition =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "permit_condition"
+        ]
+      )
+    );
+
+  const contractorName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "contractor_name",
+          "contact_1_name",
+          "contact_2_name"
+        ]
+      )
+    );
+
+  const applicantName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "applicant_name",
+          "applicant"
+        ]
+      )
+    );
+
+  const ownerName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "owner_name",
+          "owner"
+        ]
+      )
+    );
+
+  const contractorLicense =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "contractor_license",
+          "contact_1_license",
+          "license_number"
+        ]
+      )
+    );
+
+  const latitude =
+    numberValue(
+      pick(
+        raw,
+        [
+          "latitude",
+          "lat"
+        ]
+      )
+    );
+
+  const longitude =
+    numberValue(
+      pick(
+        raw,
+        [
+          "longitude",
+          "lon",
+          "lng"
+        ]
+      )
+    );
+
+  const processingTime =
+    numberValue(
+      pick(
+        raw,
+        [
+          "processing_time"
+        ]
+      )
+    );
+
+  const streetNumber =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "street_number"
+        ]
+      )
+    );
+
+  const streetDirection =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "street_direction"
+        ]
+      )
+    );
+
+  const streetName =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "street_name"
+        ]
+      )
+    );
+
+  const postalCode =
+    normalizeText(
+      pick(
+        raw,
+        [
+          "zip_code",
+          "zipcode",
+          "zip",
+          "postal_code"
+        ]
+      )
+    );
+
+  const stableSource =
+    JSON.stringify({
+      cityName,
+      permitId,
+      permitType,
+      status,
+      issuedDate,
+      applicationDate,
+      valuation,
+      address,
+      workDescription
+    });
+
+  const generatedId =
+    `${cityName.toLowerCase()}-${crypto
+      .createHash("sha1")
+      .update(stableSource)
+      .digest("hex")
+      .slice(0, 20)}`;
+
+  const base = {
+
+    city:
+      cityName,
+
+    permit_type:
+      permitType,
+
+    status,
+
+    issued_date:
+      issuedDate,
+
+    application_start_date:
+      applicationDate,
+
+    permit_id:
+      permitId ||
+      generatedId,
+
+    ai_confidence:
+      0,
+
+    ai_enriched:
+      false,
+
+    estimated_value:
+      valuation,
+
+    ai_score:
+      0,
+
+    address,
+
+    permit_milestone:
+      milestone,
+
+    review_type:
+      reviewType,
+
+    processing_time:
+      processingTime,
+
+    work_type:
+      workType,
+
+    work_description:
+      workDescription,
+
+    permit_condition:
+      condition,
+
+    contractor_name:
+      contractorName,
+
+    contractor_license:
+      contractorLicense,
+
+    applicant_name:
+      applicantName,
+
+    owner_name:
+      ownerName,
+
+    street_number:
+      streetNumber,
+
+    street_direction:
+      streetDirection,
+
+    street_name:
+      streetName,
+
+    postal_code:
+      postalCode,
+
+    latitude,
+
+    longitude,
+
+    source_url:
+      CITIES.find(
+        c =>
+          c.name ===
+          cityName
+      )?.url ||
+      null,
+
+    raw_data:
+      safeJson(raw)
+  };
+
+  const score =
+    scoreLead({
+      ...base,
+      estimated_value:
+        valuation || 0
+    });
+
+  return {
+    ...base,
+
+    ai_score:
+      score,
+
+    ai_confidence:
+      Number(
+        (
+          0.70 +
+          Math.min(
+            score,
+            100
+          ) /
+            333
+        ).toFixed(2)
+      ),
+
+    ai_enriched:
+      true
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* AI ENGINE                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const AI_ENGINE = {
+
+  async enrichPermit(
+    permit
+  ) {
+
+    const score =
+      scoreLead(
+        permit
+      );
+
+    return {
+      ...permit,
+
+      ai_enriched:
+        true,
+
+      ai_confidence:
+        Number(
+          (
+            0.70 +
+            Math.min(
+              score,
+              100
+            ) /
+              333
+          ).toFixed(2)
+        ),
+
+      ai_score:
+        score,
+
+      ai_note:
+        "GRIDV21 heuristic AI engine"
+    };
+  },
+
+  scoreLead,
+
+  predictRevenue(
+    permit
+  ) {
+
+    const value =
+      Number(
+        permit.estimated_value ||
+        0
+      );
+
+    return Number(
+      (
+        value *
+        0.03
+      ).toFixed(2)
+    );
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/* OS DATABASE SYNCHRONIZATION                                                */
+/* -------------------------------------------------------------------------- */
+
+async function syncOSModules() {
+
+  try {
+
+    const payload =
+      OS_MODULES.map(
+        module => ({
+          id:
+            module.id,
+
+          name:
+            module.name,
+
+          status:
+            "active",
+
+          kpis_count:
+            module.kpis_count,
+
+          agents_count:
+            module.agents_count,
+
+          layer:
+            module.layer,
+
+          enabled:
+            true
+        })
+      );
+
+    const {
+      error
+    } = await supabase
+      .from(
+        "os_modules"
+      )
+      .upsert(
+        payload,
+        {
+          onConflict:
+            "id"
+        }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    const {
+      error:
+        cleanupError
+    } = await supabase
+      .from(
+        "os_modules"
+      )
+      .delete()
+      .gt(
+        "id",
+        OS_MODULES.length
+      );
+
+    if (
+      cleanupError
+    ) {
+      throw cleanupError;
+    }
+
+    console.log(
+      `[OS] GRIDV21 synchronized ${OS_MODULES.length} canonical modules`
+    );
+
+  } catch (error) {
+
+    console.warn(
+      `[OS] Module synchronization skipped: ${error.message}`
+    );
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* ACTIVITY LOGGING                                                           */
+/* -------------------------------------------------------------------------- */
+
+async function logActivity({
+  eventType =
+    "system",
+
+  action =
+    "activity",
+
+  message =
+    "",
+
+  status =
+    "success",
+
+  permitId =
+    null,
+
+  city =
+    null,
+
+  metadata =
+    {}
+} = {}) {
+
+  try {
+
+    const {
+      error
+    } = await supabase
+      .from(
+        "os_activity_logs"
+      )
+      .insert({
+        event_type:
+          eventType,
+
+        action,
+
+        message:
+          String(
+            message
+          ).slice(
+            0,
+            5000
+          ),
+
+        status,
+
+        permit_id:
+          permitId,
+
+        city,
+
+        metadata:
+          safeJson(
+            metadata
+          )
+      });
+
+    if (error) {
+
+      if (
+        !/relation .*os_activity_logs.* does not exist/i.test(
+          error.message ||
+          ""
+        )
+      ) {
+
+        console.warn(
+          `[ACTIVITY] ${error.message}`
+        );
+      }
+
+      return false;
+    }
+
+    return true;
+
+  } catch (error) {
+
+    console.warn(
+      `[ACTIVITY] ${error.message}`
+    );
+
+    return false;
+  }
+}
+
+async function getActivity(
+  limit = 100
+) {
+
+  const primary =
+    await supabase
+      .from(
+        "os_activity_logs"
+      )
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending:
+            false
+        }
+      )
+      .limit(
+        limit
+      );
