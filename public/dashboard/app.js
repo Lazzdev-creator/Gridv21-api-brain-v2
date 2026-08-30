@@ -1229,3 +1229,1263 @@
       console.info(
         "[GRIDV21] No existing Executive session."
       )
+  /* ========================================================================
+   * NORMALISE DASHBOARD RESPONSE
+   * ====================================================================== */
+
+  function normaliseDashboard(payload) {
+
+    const data =
+      safeObject(payload);
+
+
+    /*
+     * Backend may return:
+     *
+     * { data: {...} }
+     *
+     * or:
+     *
+     * { dashboard: {...} }
+     *
+     * or the dashboard object directly.
+     */
+
+    const source =
+      safeObject(
+        data.data ||
+        data.dashboard ||
+        data
+      );
+
+
+    return {
+
+      engine:
+        safeObject(
+          source.engine ||
+          source.runtime ||
+          source.telemetry
+        ),
+
+      metrics:
+        safeObject(
+          source.metrics
+        ),
+
+      revenue:
+        safeObject(
+          source.revenue
+        ),
+
+      leads:
+        safeArray(
+          source.leads ||
+          source.topLeads
+        ),
+
+      permits:
+        safeArray(
+          source.permits
+        ),
+
+      osModules:
+        safeArray(
+          source.osModules ||
+          source.modules ||
+          source.os
+        ),
+
+      activity:
+        safeArray(
+          source.activity ||
+          source.events ||
+          source.latestEvents
+        ),
+
+      recommendation:
+        source.recommendation ||
+        source.aiRecommendation ||
+        source.brainSignal ||
+        null
+    };
+  }
+
+
+  /* ========================================================================
+   * LOAD DASHBOARD
+   * ====================================================================== */
+
+  async function loadDashboard() {
+
+    if (
+      !state.authenticated
+    ) {
+
+      throw new APIError(
+        "Executive authentication required.",
+        401
+      );
+    }
+
+
+    try {
+
+      const payload =
+        await apiFetch(
+          API.dashboard
+        );
+
+
+      const dashboard =
+        normaliseDashboard(
+          payload
+        );
+
+
+      /*
+       * Store dashboard data.
+       */
+
+      state.dashboard =
+        dashboard;
+
+
+      /*
+       * Preserve any useful arrays.
+       */
+
+      if (
+        dashboard.leads.length
+      ) {
+
+        state.leads =
+          dashboard.leads;
+      }
+
+
+      if (
+        dashboard.permits.length
+      ) {
+
+        state.permits =
+          dashboard.permits;
+      }
+
+
+      if (
+        dashboard.osModules.length
+      ) {
+
+        state.osModules =
+          dashboard.osModules;
+      }
+
+
+      /*
+       * Render the complete dashboard.
+       */
+
+      renderDashboard(
+        dashboard
+      );
+
+
+      if (
+        typeof renderPermitsTable ===
+        "function"
+      ) {
+
+        renderPermitsTable(
+          state.permits
+        );
+      }
+
+
+      if (
+        typeof renderTopLeads ===
+        "function"
+      ) {
+
+        renderTopLeads(
+          state.leads
+        );
+      }
+
+
+      return dashboard;
+
+    } catch (error) {
+
+      handleAuthFailure(
+        error
+      );
+
+
+      console.error(
+        "[GRIDV21] Dashboard load failed:",
+        error
+      );
+
+
+      renderDashboardError(
+        error
+      );
+
+
+      throw error;
+    }
+  }
+
+
+  /* ========================================================================
+   * LOAD OS MODULES
+   * ====================================================================== */
+
+  async function loadOSModules() {
+
+    try {
+
+      const payload =
+        await apiFetch(
+          API.osModules
+        );
+
+
+      const data =
+        safeObject(
+          payload
+        );
+
+
+      const modules =
+        safeArray(
+          data.modules ||
+          data.data ||
+          data.osModules ||
+          payload
+        );
+
+
+      if (
+        modules.length
+      ) {
+
+        state.osModules =
+          modules;
+      }
+
+
+      renderOSOverview(
+        state.osModules.length
+          ? state.osModules
+          : OS_MODULES
+      );
+
+
+      return state.osModules;
+
+    } catch (error) {
+
+      handleAuthFailure(
+        error
+      );
+
+
+      console.warn(
+        "[GRIDV21] OS module API failed:",
+        error
+      );
+
+
+      /*
+       * Keep the dashboard usable even
+       * if the OS endpoint is unavailable.
+       */
+
+      renderOSOverview(
+        state.osModules.length
+          ? state.osModules
+          : OS_MODULES
+      );
+
+
+      return state.osModules;
+    }
+  }
+
+
+  /* ========================================================================
+   * PERMITS TABLE
+   * ====================================================================== */
+
+  function renderPermitsTable(
+    permits
+  ) {
+
+    const body =
+      byId(
+        "permits-body"
+      );
+
+
+    if (!body) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(
+        permits
+      ).slice(
+        0,
+        100
+      );
+
+
+    if (!rows.length) {
+
+      body.innerHTML = `
+        <tr>
+          <td
+            colspan="5"
+            class="empty"
+          >
+            No permits found.
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    body.innerHTML =
+      rows
+        .map(
+          permit => {
+
+            const row =
+              safeObject(
+                permit
+              );
+
+
+            return `
+              <tr>
+
+                <td>
+                  ${escapeHTML(
+                    row.city ||
+                    "—"
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHTML(
+                    row.permit_type ||
+                    row.permit_id ||
+                    "—"
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHTML(
+                    row.status ||
+                    "—"
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHTML(
+                    row.ai_score ??
+                    "—"
+                  )}
+                </td>
+
+                <td>
+                  ${
+                    row.estimated_value != null &&
+                    row.estimated_value !== ""
+                      ? money(
+                          row.estimated_value
+                        )
+                      : "—"
+                  }
+                </td>
+
+              </tr>
+            `;
+          }
+        )
+        .join("");
+  }
+
+
+  /* ========================================================================
+   * LOAD PERMITS
+   * ====================================================================== */
+
+  async function loadPermits() {
+
+    try {
+
+      const payload =
+        await apiFetch(
+          API.permits
+        );
+
+
+      const data =
+        safeObject(
+          payload
+        );
+
+
+      const permits =
+        safeArray(
+          data.permits ||
+          data.data ||
+          payload
+        );
+
+
+      state.permits =
+        permits;
+
+
+      renderPermitsTable(
+        permits
+      );
+
+
+      return permits;
+
+    } catch (error) {
+
+      /*
+       * Some backend versions may not
+       * expose /api/permits.
+       *
+       * Do not break the dashboard.
+       */
+
+      if (
+        error.status !== 404
+      ) {
+
+        console.warn(
+          "[GRIDV21] Permit API failed:",
+          error
+        );
+      }
+
+
+      return state.permits;
+    }
+  }
+
+
+  /* ========================================================================
+   * REFRESH DASHBOARD
+   * ====================================================================== */
+
+  async function refreshDashboardData() {
+
+    if (
+      state.requestInFlight
+    ) {
+
+      return;
+    }
+
+
+    /*
+     * Executive authentication is required
+     * before protected dashboard requests.
+     */
+
+    if (
+      !state.authenticated
+    ) {
+
+      return;
+    }
+
+
+    state.requestInFlight =
+      true;
+
+
+    setRefreshState(
+      true
+    );
+
+
+    try {
+
+      /*
+       * Check backend health.
+       */
+
+      try {
+
+        await apiFetch(
+          API.health
+        );
+
+      } catch (healthError) {
+
+        console.warn(
+          "[GRIDV21] Health check failed:",
+          healthError
+        );
+      }
+
+
+      /*
+       * Dashboard is the primary request.
+       */
+
+      await loadDashboard();
+
+
+      /*
+       * Optional endpoints must not
+       * prevent the dashboard from loading.
+       */
+
+      await Promise.allSettled(
+        [
+          loadOSModules(),
+          loadPermits()
+        ]
+      );
+
+
+      setGlobalStatus(
+        true,
+        "Connected"
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[GRIDV21] Refresh failed:",
+        error
+      );
+
+
+      if (
+        error.status === 401
+      ) {
+
+        setGlobalStatus(
+          false,
+          "Authentication required"
+        );
+
+      } else {
+
+        setGlobalStatus(
+          false,
+          "API unavailable"
+        );
+      }
+
+    } finally {
+
+      state.requestInFlight =
+        false;
+
+
+      setRefreshState(
+        false
+      );
+    }
+  }
+
+
+  /* ========================================================================
+   * REFRESH BUTTON STATE
+   * ====================================================================== */
+
+  function setRefreshState(
+    loading
+  ) {
+
+    const button =
+      byId(
+        "refresh-btn"
+      );
+
+
+    if (!button) {
+      return;
+    }
+
+
+    button.disabled =
+      Boolean(loading);
+
+
+    if (loading) {
+
+      button.dataset.originalText =
+        button.textContent;
+
+
+      button.textContent =
+        "Refreshing...";
+
+    } else {
+
+      button.textContent =
+        button.dataset.originalText ||
+        "Refresh";
+    }
+  }
+
+
+  /* ========================================================================
+   * DASHBOARD RENDERER
+   * ====================================================================== */
+
+  function renderDashboard(
+    dashboard
+  ) {
+
+    const data =
+      safeObject(
+        dashboard
+      );
+
+
+    const engine =
+      safeObject(
+        data.engine
+      );
+
+
+    const metrics =
+      safeObject(
+        data.metrics
+      );
+
+
+    const revenue =
+      safeObject(
+        data.revenue
+      );
+
+
+    /* ----------------------------------------------------------------------
+     * ENGINE STATUS
+     * -------------------------------------------------------------------- */
+
+    const running =
+      engine.running ??
+      engine.isRunning ??
+      metrics.running ??
+      false;
+
+
+    const scanning =
+      engine.scanning ??
+      engine.isScanning ??
+      metrics.scanning ??
+      false;
+
+
+    text(
+      "metric-engine",
+      running
+        ? "Running"
+        : "Stopped"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      scanning
+        ? "Scanning"
+        : running
+          ? "Operational"
+          : "Idle"
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * ACTIVE OS
+     * -------------------------------------------------------------------- */
+
+    const activeOS =
+      safeNumber(
+        metrics.activeOS ??
+        metrics.activeOs ??
+        metrics.active_modules ??
+        safeArray(
+          data.osModules
+        ).length,
+        safeArray(
+          data.osModules
+        ).length
+      );
+
+
+    text(
+      "metric-os",
+      activeOS
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * LEADS
+     * -------------------------------------------------------------------- */
+
+    const leadCount =
+      safeNumber(
+        metrics.leads ??
+        metrics.leadCount ??
+        metrics.totalLeads ??
+        safeArray(
+          data.leads
+        ).length,
+        safeArray(
+          data.leads
+        ).length
+      );
+
+
+    text(
+      "metric-leads",
+      number(
+        leadCount
+      )
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * REVENUE
+     * -------------------------------------------------------------------- */
+
+    const revenueValue =
+      revenue.total ??
+      revenue.amount ??
+      metrics.revenue ??
+      metrics.totalRevenue ??
+      0;
+
+
+    text(
+      "metric-revenue",
+      money(
+        revenueValue
+      )
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * TELEMETRY
+     * -------------------------------------------------------------------- */
+
+    renderTelemetry(
+      engine
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * RECOMMENDATION
+     * -------------------------------------------------------------------- */
+
+    renderRecommendation(
+      data.recommendation
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * TOP LEADS
+     * -------------------------------------------------------------------- */
+
+    renderTopLeads(
+      data.leads.length
+        ? data.leads
+        : state.leads
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * LATEST EVENTS
+     * -------------------------------------------------------------------- */
+
+    renderLatestEvents(
+      data.activity
+    );
+
+
+    /* ----------------------------------------------------------------------
+     * OS OVERVIEW
+     * -------------------------------------------------------------------- */
+
+    renderOSOverview(
+      data.osModules.length
+        ? data.osModules
+        : (
+            state.osModules.length
+              ? state.osModules
+              : OS_MODULES
+          )
+    );
+  }
+
+
+  /* ========================================================================
+   * TELEMETRY
+   * ====================================================================== */
+
+  function renderTelemetry(
+    engine
+  ) {
+
+    const data =
+      safeObject(
+        engine
+      );
+
+
+    text(
+      "telemetry-running",
+      bool(
+        data.running ??
+        data.isRunning
+      )
+    );
+
+
+    text(
+      "telemetry-scanning",
+      bool(
+        data.scanning ??
+        data.isScanning
+      )
+    );
+
+
+    text(
+      "telemetry-permits",
+      number(
+        data.permitsFound ??
+        data.permits_found ??
+        data.totalPermits ??
+        0
+      )
+    );
+
+
+    text(
+      "telemetry-errors",
+      number(
+        data.errors ??
+        data.errorCount ??
+        0
+      )
+    );
+
+
+    text(
+      "telemetry-last-scan",
+      dateTime(
+        data.lastScan ??
+        data.last_scan
+      )
+    );
+
+
+    text(
+      "telemetry-duration",
+      formatDuration(
+        data.lastScanDuration ??
+        data.last_scan_duration ??
+        data.duration
+      )
+    );
+
+
+    text(
+      "telemetry-uptime",
+      formatUptime(
+        data.uptime
+      )
+    );
+
+
+    text(
+      "telemetry-emergency",
+      bool(
+        data.emergency ??
+        data.emergencyStop ??
+        data.emergency_stop
+      )
+    );
+
+
+    const status =
+      data.running
+        ? (
+            data.scanning
+              ? "Scanning"
+              : "Running"
+          )
+        : "Ready";
+
+
+    const statusElement =
+      byId(
+        "engine-runtime-status"
+      );
+
+
+    if (statusElement) {
+
+      statusElement.textContent =
+        status;
+    }
+  }
+
+
+  /* ========================================================================
+   * DASHBOARD ERROR STATE
+   * ====================================================================== */
+
+  function renderDashboardError(
+    error
+  ) {
+
+    const message =
+      error?.status === 401
+        ? "Authentication required"
+        : "Unable to load dashboard data";
+
+
+    text(
+      "metric-engine",
+      "Offline"
+    );
+
+
+    text(
+      "metric-engine-sub",
+      message
+    );
+
+
+    text(
+      "metric-os",
+      "—"
+    );
+
+
+    text(
+      "metric-leads",
+      "—"
+    );
+
+
+    text(
+      "metric-revenue",
+      "—"
+    );
+
+
+    const telemetryIds = [
+
+      "telemetry-running",
+
+      "telemetry-scanning",
+
+      "telemetry-permits",
+
+      "telemetry-errors",
+
+      "telemetry-last-scan",
+
+      "telemetry-duration",
+
+      "telemetry-uptime",
+
+      "telemetry-emergency"
+
+    ];
+
+
+    telemetryIds.forEach(
+      id => {
+
+        text(
+          id,
+          "—"
+        );
+
+      }
+    );
+
+
+    renderRecommendation(
+      null,
+      message
+    );
+
+
+    renderTopLeads(
+      []
+    );
+
+
+    renderLatestEvents(
+      []
+    );
+
+
+    renderOSOverview(
+      OS_MODULES
+    );
+  }
+
+
+  /* ========================================================================
+   * EXECUTIVE RECOMMENDATION
+   * ====================================================================== */
+
+  function renderRecommendation(
+    recommendation,
+    fallback = ""
+  ) {
+
+    const element =
+      byId(
+        "ai-recommendation"
+      ) ||
+      byId(
+        "recommendation-text"
+      ) ||
+      document.querySelector(
+        "[data-ai-recommendation]"
+      );
+
+
+    if (!element) {
+      return;
+    }
+
+
+    let message =
+      "";
+
+
+    if (
+      typeof recommendation ===
+      "string"
+    ) {
+
+      message =
+        recommendation;
+
+    } else if (
+      recommendation &&
+      typeof recommendation ===
+      "object"
+    ) {
+
+      message =
+        recommendation.message ||
+        recommendation.text ||
+        recommendation.recommendation ||
+        recommendation.action ||
+        "";
+    }
+
+
+    if (!message) {
+
+      message =
+        fallback ||
+        "No executive recommendation available.";
+    }
+
+
+    element.textContent =
+      message;
+  }
+
+
+  /* ========================================================================
+   * TOP LEADS
+   * ====================================================================== */
+
+  function renderTopLeads(
+    leads
+  ) {
+
+    const container =
+      byId(
+        "top-leads-body"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    let rows =
+      safeArray(
+        leads
+      ).slice(
+        0,
+        10
+      );
+
+
+    /*
+     * Fallback 1:
+     * application state.
+     */
+
+    if (
+      !rows.length
+    ) {
+
+      rows =
+        safeArray(
+          state.leads
+        ).slice(
+          0,
+          10
+        );
+    }
+
+
+    /*
+     * Fallback 2:
+     * highest-value permits.
+     */
+
+    if (
+      !rows.length
+    ) {
+
+      rows =
+        safeArray(
+          state.permits
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(
+              b.estimated_value ||
+              b.ai_score ||
+              0
+            ) -
+            Number(
+              a.estimated_value ||
+              a.ai_score ||
+              0
+            )
+        )
+        .slice(
+          0,
+          10
+        );
+    }
+
+
+    /*
+     * Fallback 3:
+     * dashboard permits.
+     */
+
+    if (
+      !rows.length &&
+      state.dashboard?.permits
+    ) {
+
+      rows =
+        safeArray(
+          state.dashboard.permits
+        )
+        .slice()
+        .sort(
+          (a, b) =>
+            Number(
+              b.estimated_value ||
+              b.ai_score ||
+              0
+            ) -
+            Number(
+              a.estimated_value ||
+              a.ai_score ||
+              0
+            )
+        )
+        .slice(
+          0,
+          10
+        );
+    }
+
+
+    if (
+      !rows.length
+    ) {
+
+      container.innerHTML = `
+        <tr>
+          <td
+            colspan="4"
+            class="empty"
+          >
+            No lead data available.
+          </td>
+        </tr>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows
+        .map(
+          item => {
+
+            const row =
+              safeObject(
+                item
+              );
+
+
+            const city =
+              row.city ||
+              row.region ||
+              row.location ||
+              "—";
+
+
+            const type =
+              row.type ||
+              row.permit_type ||
+              row.trade_type ||
+              row.project_type ||
+              "—";
+
+
+            const score =
+              row.score ??
+              row.ai_score ??
+              row.lead_score ??
+              "—";
+
+
+            const value =
+              row.estimated_value ??
+              ro
