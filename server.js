@@ -2025,3 +2025,678 @@ async function getActivity(
       .limit(
         limit
       );
+  if (
+    !primary.error
+  ) {
+
+    return (
+      primary.data ||
+      []
+    );
+  }
+
+  const fallback =
+    await supabase
+      .from(
+        "audit_logs"
+      )
+      .select("*")
+      .order(
+        "timestamp",
+        {
+          ascending:
+            false
+        }
+      )
+      .limit(
+        limit
+      );
+
+  if (
+    fallback.error
+  ) {
+
+    return [];
+  }
+
+  return (
+    fallback.data ||
+    []
+  ).map(
+    row => ({
+      id:
+        row.id,
+
+      event_type:
+        "audit",
+
+      action:
+        "error",
+
+          message:
+          row.message,
+
+        status:
+          row.level ||
+          "error",
+
+        created_at:
+          row.timestamp,
+
+        metadata: {
+          request_id:
+            row.request_id
+        }
+
+      }));
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* FETCH + SCANNER                                                            */
+/* -------------------------------------------------------------------------- */
+
+async function axiosWithAbort(
+  url,
+  reqId,
+  signal,
+  retries = 3
+) {
+
+  let lastError;
+
+  for (
+    let attempt = 1;
+    attempt <= retries;
+    attempt++
+  ) {
+
+    try {
+
+      const response =
+        await axios.get(
+          url,
+          {
+            signal,
+
+            timeout:
+              SCAN_SETTINGS.requestTimeout,
+
+            responseType:
+              "text",
+
+            headers: {
+
+              "User-Agent":
+                `GRIDV21-BRAIN/${VERSION}`,
+
+              Accept:
+                "application/json,text/csv,*/*"
+
+            },
+
+            validateStatus:
+              status =>
+                status >= 200 &&
+                status < 300
+          }
+        );
+
+      logger.info(
+        reqId,
+        `Fetched ${url} (${response.status})`
+      );
+
+      return response.data;
+
+    } catch (
+      error
+    ) {
+
+      lastError =
+        error;
+
+      if (
+        signal?.aborted
+      ) {
+
+        throw new Error(
+          "Scan aborted"
+        );
+
+      }
+
+      logger.warn(
+        reqId,
+        `Fetch attempt ${attempt}/${retries} failed: ${error.message}`
+      );
+
+      if (
+        attempt < retries
+      ) {
+
+        await sleep(
+          500 * attempt
+        );
+
+      }
+
+    }
+
+  }
+
+  throw lastError;
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* SUPABASE BATCH INSERT                                                      */
+/* -------------------------------------------------------------------------- */
+
+async function supabaseBatchInsert(
+  table,
+  rows
+) {
+
+  if (
+    !rows.length
+  ) {
+
+    return {
+
+      inserted:
+        0,
+
+      errors:
+        0
+
+    };
+
+  }
+
+  let inserted =
+    0;
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i += SCAN_SETTINGS.batchSize
+  ) {
+
+    const batch =
+      rows.slice(
+        i,
+        i +
+          SCAN_SETTINGS.batchSize
+      );
+
+    const {
+      error
+    } =
+      await supabase
+        .from(table)
+        .insert(batch);
+
+    if (
+      error
+    ) {
+
+      throw error;
+
+    }
+
+    inserted +=
+      batch.length;
+
+  }
+
+  return {
+
+    inserted,
+
+    errors:
+      0
+
+  };
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* INSERT NEW PERMITS                                                         */
+/* -------------------------------------------------------------------------- */
+
+async function insertNewPermits(
+  rows
+) {
+
+  if (
+    !rows.length
+  ) {
+
+    return {
+
+      inserted:
+        0,
+
+      skipped:
+        0,
+
+      updated:
+        0
+
+    };
+
+  }
+
+  /*
+   * Keep one record per source permit.
+   *
+   * Existing records are refreshed with the newly-normalized
+   * detailed fields.
+   */
+
+  let inserted =
+    0;
+
+  let skipped =
+    0;
+          
+  let updated =
+    0;
+
+  for (
+    let i = 0;
+    i < rows.length;
+    i += SCAN_SETTINGS.batchSize
+  ) {
+
+    const batch =
+      rows.slice(
+        i,
+        i +
+          SCAN_SETTINGS.batchSize
+      );
+
+    for (
+      const permit
+      of batch
+    ) {
+
+      try {
+
+        const {
+          data:
+            existing,
+          error:
+            lookupError
+        } =
+          await supabase
+            .from("permits")
+            .select("id")
+            .eq(
+              "permit_id",
+              permit.permit_id
+            )
+            .maybeSingle();
+
+        if (
+          lookupError
+        ) {
+
+          throw lookupError;
+
+        }
+
+        if (
+          existing?.id
+        ) {
+
+          const {
+            error:
+              updateError
+          } =
+            await supabase
+              .from("permits")
+              .update(
+                permit
+              )
+              .eq(
+                "id",
+                existing.id
+              );
+
+          if (
+            updateError
+          ) {
+
+            throw updateError;
+
+          }
+
+          updated++;
+
+        } else {
+
+          const {
+            error:
+              insertError
+          } =
+            await supabase
+              .from("permits")
+              .insert(
+                permit
+              );
+
+          if (
+            insertError
+          ) {
+
+            /*
+             * Ignore duplicate races.
+             */
+
+            if (
+              /duplicate|unique/i.test(
+                insertError.message ||
+                ""
+              )
+            ) {
+
+              skipped++;
+
+            } else {
+
+              throw insertError;
+
+            }
+
+          } else {
+
+            inserted++;
+
+          }
+
+        }
+
+      } catch (
+        error
+      ) {
+
+        skipped++;
+
+        console.warn(
+          `[PERMIT] Failed ${permit.permit_id}: ${error.message}`
+        );
+
+      }
+
+    }
+
+  }
+
+  return {
+
+    inserted,
+
+    skipped,
+
+    updated
+
+  };
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* PARSE SOURCE DATA                                                          */
+/* -------------------------------------------------------------------------- */
+
+function parseSourceData(
+  city,
+  raw
+) {
+
+  if (
+    city === "Denver"
+  ) {
+
+    try {
+
+      const parsed =
+        Papa.parse(
+          raw,
+          {
+            header:
+              true,
+
+            skipEmptyLines:
+              true
+          }
+        );
+
+      return (
+        parsed.data ||
+        []
+      );
+
+    } catch (
+      error
+    ) {
+
+      throw new Error(
+        `CSV parsing failed: ${error.message}`
+      );
+
+    }
+
+  }
+
+  if (
+    typeof raw ===
+    "string"
+  ) {
+
+    try {
+
+      return JSON.parse(
+        raw
+      );
+
+    } catch (
+      error
+    ) {
+
+      throw new Error(
+        `JSON parsing failed for ${city}: ${error.message}`
+      );
+
+    }
+
+  }
+
+  return (
+    raw || []
+  );
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* CITY SCANNER                                                               */
+/* -------------------------------------------------------------------------- */
+
+async function scanCity(
+  city,
+  requestId,
+  signal
+) {
+
+  const started =
+    Date.now();
+
+  try {
+
+    const raw =
+      await axiosWithAbort(
+        city.url,
+        requestId,
+        signal
+      );
+
+    const sourceRows =
+      parseSourceData(
+        city.name,
+        raw
+      );
+
+    const rows =
+      sourceRows
+        .map(
+          item =>
+            mapPermitData(
+              city.name,
+              item
+            )
+        )
+        .filter(
+          permit =>
+            permit &&
+            permit.permit_id
+        );
+
+    const result =
+      await insertNewPermits(
+        rows
+      );
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "city_scan",
+
+      message:
+        `${city.name}: ${rows.length} permits processed`,
+
+      status:
+        "success",
+
+      city:
+        city.name,
+
+      metadata: {
+
+        source_rows:
+          sourceRows.length,
+
+        processed:
+          rows.length,
+
+        inserted:
+          result.inserted,
+
+        updated:
+          result.updated,
+
+        skipped:
+          result.skipped,
+
+        duration_ms:
+          Date.now() -
+          started
+
+      }
+
+    });
+
+    return {
+
+      city:
+        city.name,
+
+      fetched:
+        sourceRows.length,
+
+      processed:
+        rows.length,
+
+      inserted:
+        result.inserted,
+
+      updated:
+        result.updated,
+
+      skipped:
+        result.skipped
+
+    };
+
+  } catch (
+    error
+  ) {
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "city_scan_error",
+
+      message:
+        `${city.name}: ${error.message}`,
+
+      status:
+        "error",
+
+      city:
+        city.name,
+
+      metadata: {
+
+        request_id:
+          requestId
+
+      }
+
+    });
+
+    throw error;
+
+  }
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* SCAN ALL CITIES                                                            */
+/* -------------------------------------------------------------------------- */
+
+let scanPromise =
+  null;
+
+let currentScanAbortController =
+  null;
+
+async function scanAllCities(
+  requestId =
+    crypto.randomUUID()
+) {
+
+  if (
+    ENGINE.scanning
+  ) {
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        "Scan already running"
+
+    };
+
+  }
+
+  if (
+    ENGINE.emergencyStopped
