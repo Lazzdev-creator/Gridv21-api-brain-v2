@@ -3463,7 +3463,18 @@ app.get(
   }
 );
 
-
+app.get("/api/auth/me", requireAnyAuth, (req, res) => {
+  return res.json({
+    ok: true,
+    authenticated: true,
+    authType: req.session.authType || null,
+    user: {
+      id: req.session.userId || null,
+      email: req.session.userEmail || null,
+      role: req.session.userRole || (req.session.authType === "admin_key" ? "owner" : "tenant")
+    }
+  });
+});
 /* -------------------------------------------------------------------------- */
 /* HEALTH                                                                     */
 /* -------------------------------------------------------------------------- */
