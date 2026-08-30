@@ -2700,3 +2700,679 @@ async function scanAllCities(
 
   if (
     ENGINE.emergencyStopped
+  ) {
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        "Emergency stop is active"
+
+    };
+
+  }
+
+  ENGINE.scanning =
+    true;
+
+  ENGINE.lastError =
+    null;
+
+  const started =
+    Date.now();
+
+  currentScanAbortController =
+    new AbortController();
+
+  const signal =
+    currentScanAbortController
+      .signal;
+
+  try {
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_started",
+
+      message:
+        "GRIDV21 scanner started",
+
+      metadata: {
+
+        request_id:
+          requestId,
+
+        cities:
+          CITIES.map(
+            city =>
+              city.name
+          )
+
+      }
+
+    });
+
+    const results =
+      [];
+
+    for (
+      const city
+      of CITIES
+    ) {
+
+      if (
+        signal.aborted
+      ) {
+
+        throw new Error(
+          "Scan aborted"
+        );
+
+      }
+
+      if (
+        ENGINE.emergencyStopped
+      ) {
+
+        throw new Error(
+          "Emergency stop is active"
+        );
+
+      }
+
+      try {
+
+        const result =
+          await scanCity(
+            city,
+            requestId,
+            signal
+          );
+
+        results.push(
+          result
+        );
+
+      } catch (
+        error
+      ) {
+
+        ENGINE.errors++;
+
+        ENGINE.lastError =
+          error.message;
+
+        console.error(
+          `[SCAN] ${city.name}: ${error.message}`
+        );
+
+      }
+
+      await sleep(
+        SCAN_SETTINGS.requestDelay
+      );
+
+    }
+
+    ENGINE.lastScan =
+      new Date().toISOString();
+
+    ENGINE.lastScanDuration =
+      Date.now() -
+      started;
+
+    ENGINE.permitsFound =
+      results.reduce(
+        (
+          total,
+          item
+        ) =>
+          total +
+          safeNumber(
+            item.processed
+          ),
+        0
+      );
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_completed",
+
+      message:
+        `GRIDV21 scanner completed: ${ENGINE.permitsFound} permits processed`,
+
+      status:
+        "success",
+
+      metadata: {
+
+        request_id:
+          requestId,
+
+        duration_ms:
+          ENGINE.lastScanDuration,
+
+        results
+
+      }
+
+    });
+
+    return {
+
+      ok:
+        true,
+
+      results,
+
+      permits_found:
+        ENGINE.permitsFound,
+
+      duration:
+        ENGINE.lastScanDuration
+
+    };
+
+  } catch (
+    error
+  ) {
+
+    ENGINE.errors++;
+
+    ENGINE.lastError =
+      error.message;
+
+    await logActivity({
+
+      eventType:
+        "scanner",
+
+      action:
+        "scan_failed",
+
+      message:
+        error.message,
+
+      status:
+        "error",
+
+      metadata: {
+
+        request_id:
+          requestId
+
+      }
+
+    });
+
+    return {
+
+      ok:
+        false,
+
+      error:
+        error.message
+
+    };
+
+  } finally {
+
+    ENGINE.scanning =
+      false;
+
+    currentScanAbortController =
+      null;
+
+  }
+
+}
+
+/* -------------------------------------------------------------------------- */
+/* END OF THIS CONTINUATION                                                   */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* FINAL AUTH + SERVER STARTUP                                                */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * IMPORTANT:
+ * This section completes the GRIDV21 authentication flow.
+ *
+ * Login:
+ *   login.html
+ *        ↓
+ *   POST /api/auth/login
+ *        ↓
+ *   Supabase Auth
+ *        ↓
+ *   Server session created
+ *        ↓
+ *   Dashboard access
+ */
+
+/* -------------------------------------------------------------------------- */
+/* AUTH LOGIN                                                                 */
+/* -------------------------------------------------------------------------- */
+/* -------------------------------------------------------------------------- */
+/* AUTHENTICATION RATE LIMITER                                                */
+/* -------------------------------------------------------------------------- */
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+
+  max: 10,
+
+  standardHeaders: true,
+
+  legacyHeaders: false,
+
+  message: {
+    ok: false,
+    authenticated: false,
+    error:
+      "Too many login attempts. Please try again later."
+  }
+});
+
+app.post(
+  "/api/auth/login",
+  authLimiter,
+  async (req, res) => {
+
+    try {
+
+      const email =
+        String(
+          req.body?.email ||
+          ""
+        )
+        .trim()
+        .toLowerCase();
+
+      const password =
+        String(
+          req.body?.password ||
+          ""
+        );
+
+      if (
+        !email ||
+        !password
+      ) {
+
+        return res.status(400).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Email and password are required."
+        });
+
+      }
+
+      /*
+       * Authenticate directly against Supabase.
+       */
+
+      const {
+        data,
+        error
+      } =
+        await supabaseAuth.auth.signInWithPassword({
+          email,
+          password
+        });
+
+      if (error) {
+
+        console.warn(
+          `[AUTH] Login failed for ${email}: ${error.message}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Invalid email or password."
+        });
+
+      }
+
+      if (
+        !data ||
+        !data.user
+      ) {
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error:
+            "Authentication failed."
+        });
+
+      }
+
+      /*       * Regenerate the session after successful authentication.
+       *
+       * This prevents session fixation.
+       */
+
+      req.session.regenerate(
+        (sessionError) => {
+
+          if (sessionError) {
+
+            console.error(
+              "[AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure session."
+            });
+
+          }
+
+          /*
+ * TENANT SESSION
+ *
+ * Email/password authentication is for tenants.
+ * It does NOT create an owner/admin session.
+ */
+
+req.session.gridv21Authenticated =
+  true;
+
+req.session.authType =
+  "tenant";
+
+req.session.userId =
+  data.user.id;
+
+req.session.userEmail =
+  data.user.email;
+
+req.session.userRole =
+  "tenant";
+
+req.session.authenticatedAt =
+  new Date().toISOString();
+
+          /*
+           * Save before responding.
+           */
+
+          req.session.save(
+            (saveError) => {
+
+              if (saveError) {
+
+                console.error(
+                  "[AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save authentication session."
+                });
+
+              }
+
+              console.log(
+                `[AUTH] Successful GRIDV21 login: ${data.user.email}`
+              );
+
+              return res.json({
+
+                ok: true,
+
+                authenticated:
+                  true,
+
+                message:
+                  "Authentication successful.",
+
+                user: {
+  id:
+    data.user.id,
+
+  email:
+    data.user.email,
+
+  role:
+    "tenant"
+},
+
+authType:
+  "tenant"
+                
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[AUTH] Login exception:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok: false,
+
+        authenticated:
+          false,
+
+        error:
+          "Authentication service unavailable."
+
+      });
+
+    }
+
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/* OWNER ADMIN-KEY VERIFICATION                                               */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * This endpoint is ONLY for the GRIDV21 owner/admin.
+ *
+ * It is completely separate from tenant email/password authentication.
+ */
+
+app.post(
+  "/api/auth/verify",
+  authLimiter,
+  (req, res) => {
+
+    try {
+
+      const supplied =
+        getAdminKey(req);
+
+      const expected =
+        process.env.ADMIN_KEY ||
+        ADMIN_KEY ||
+        "";
+
+
+      if (!expected) {
+
+        console.error(
+          "[ADMIN AUTH] ADMIN_KEY is missing."
+        );
+
+        return res.status(500).json({
+          ok: false,
+          authenticated: false,
+          error: "Server misconfiguration"
+        });
+      }
+
+
+      if (
+        !supplied ||
+        !safeCompare(
+          supplied,
+          expected
+        )
+      ) {
+
+        console.warn(
+          `[ADMIN AUTH] Invalid admin key attempt from ${req.ip}`
+        );
+
+        return res.status(401).json({
+          ok: false,
+          authenticated: false,
+          error: "Invalid admin key"
+        });
+      }
+
+
+      /*
+       * Regenerate the session so the owner session
+       * cannot inherit a previous tenant session.
+       */
+      req.session.regenerate(
+        sessionError => {
+
+          if (sessionError) {
+
+            console.error(
+              "[ADMIN AUTH] Session regeneration failed:",
+              sessionError
+            );
+
+            return res.status(500).json({
+              ok: false,
+              authenticated: false,
+              error:
+                "Could not create secure admin session."
+            });
+          }
+
+
+          /*
+           * OWNER SESSION
+           */
+          req.session.gridv21Authenticated =
+            true;
+
+          req.session.authType =
+            "admin_key";
+
+          req.session.userId =
+            null;
+
+          req.session.userEmail =
+            null;
+
+          req.session.userRole =
+            "owner";
+
+          req.session.authenticatedAt =
+            new Date().toISOString();
+
+
+          req.session.save(
+            saveError => {
+
+              if (saveError) {
+
+                console.error(
+                  "[ADMIN AUTH] Session save failed:",
+                  saveError
+                );
+
+                return res.status(500).json({
+                  ok: false,
+                  authenticated: false,
+                  error:
+                    "Could not save admin session."
+                });
+              }
+
+
+              console.log(
+                "[ADMIN AUTH] Owner session established."
+              );
+
+
+              return res.json({
+                ok: true,
+                authenticated: true,
+                authType: "admin_key",
+                role: "owner",
+                message:
+                  "GRIDV21 owner authentication successful."
+              });
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.error(
+        "[ADMIN AUTH] Verification exception:",
+        error
+      );
+
+      return res.status(500).json({
+        ok: false,
+        authenticated: false,
+        error:
+          "Admin authentication service unavailable."
+      });
+    }
+  }
+);
+/* -------------------------------------------------------------------------- */
+/* AUTH SESSION CHECK                                                         */
+/* -------------------------------------------------------------------------- */
+
+app.get(
+  "/",
+  (req, res) => {
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "tenant"
+    ) {
+      return res.redirect("/tenant-dashboard.html");
+    }
+    if (
+      req.session?.gridv21Authenticated === true &&
+      req.session?.authType === "admin_key"
+    ) {
+      return res.redirect("/dashboard/");
+    }
+    return res.redirect("/login.html");
+  }
+);
+  
