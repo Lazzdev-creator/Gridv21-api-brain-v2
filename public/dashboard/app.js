@@ -2487,5 +2487,1093 @@
 
 
             const value =
-              row.estimated_value ??
-              ro
+                            row.estimated_value ??
+              row.value_estimate ??
+              row.value ??
+              row.predicted_revenue ??
+              "";
+
+
+            return `
+              <tr>
+
+                <td>
+                  ${escapeHTML(
+                    city
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHTML(
+                    type
+                  )}
+                </td>
+
+                <td>
+                  ${escapeHTML(
+                    score
+                  )}
+                </td>
+
+                <td>
+                  ${
+                    value !== "" &&
+                    value !== null &&
+                    value !== undefined
+                      ? money(value)
+                      : "—"
+                  }
+                </td>
+
+              </tr>
+            `;
+          }
+        )
+        .join("");
+  }
+
+
+  /* ========================================================================
+   * LATEST EVENTS
+   * ====================================================================== */
+
+  function renderLatestEvents(
+    events
+  ) {
+
+    const container =
+      byId(
+        "dashboard-activity"
+      ) ||
+      byId(
+        "latest-events"
+      ) ||
+      byId(
+        "events-container"
+      ) ||
+      document.querySelector(
+        "[data-latest-events]"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(
+        events
+      ).slice(
+        0,
+        10
+      );
+
+
+    if (!rows.length) {
+
+      container.innerHTML = `
+        <div class="empty">
+          No recent activity.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows
+        .map(
+          event => {
+
+            const item =
+              safeObject(
+                event
+              );
+
+
+            const message =
+              item.message ||
+              item.action ||
+              item.event_type ||
+              item.eventType ||
+              "System event";
+
+
+            const created =
+              item.created_at ||
+              item.createdAt ||
+              item.timestamp;
+
+
+            return `
+              <div class="event-row">
+
+                <strong>
+                  ${escapeHTML(
+                    message
+                  )}
+                </strong>
+
+                <small>
+                  ${escapeHTML(
+                    dateTime(
+                      created
+                    )
+                  )}
+                </small>
+
+              </div>
+            `;
+          }
+        )
+        .join("");
+  }
+
+
+  /* ========================================================================
+   * OS OVERVIEW
+   * ====================================================================== */
+
+  function renderOSOverview(
+    modules
+  ) {
+
+    const container =
+      byId(
+        "os-overview-grid"
+      ) ||
+      byId(
+        "os-overview"
+      ) ||
+      byId(
+        "os-modules"
+      ) ||
+      document.querySelector(
+        "[data-os-overview]"
+      );
+
+
+    if (!container) {
+      return;
+    }
+
+
+    const rows =
+      safeArray(
+        modules
+      );
+
+
+    if (!rows.length) {
+
+      container.innerHTML = `
+        <div class="empty">
+          No operating-system modules available.
+        </div>
+      `;
+
+      return;
+    }
+
+
+    container.innerHTML =
+      rows
+        .map(
+          module => {
+
+            const item =
+              safeObject(
+                module
+              );
+
+
+            const id =
+              item.id ??
+              "";
+
+
+            const name =
+              item.name ||
+              `OS Module ${id}`;
+
+
+            const enabled =
+              item.enabled ??
+              item.active ??
+              item.status === "active";
+
+
+            const layer =
+              item.layer ||
+              "Enterprise OS";
+
+
+            return `
+              <div
+                class="os-module-row"
+                data-os-module="${escapeHTML(
+                  id
+                )}"
+              >
+
+                <div class="os-module-info">
+
+                  <strong>
+                    ${escapeHTML(
+                      name
+                    )}
+                  </strong>
+
+                  <small>
+                    ${escapeHTML(
+                      layer
+                    )}
+                  </small>
+
+                </div>
+
+
+                <button
+                  type="button"
+                  class="os-toggle ${
+                    enabled
+                      ? "active"
+                      : ""
+                  }"
+                  data-os-toggle="${escapeHTML(
+                    id
+                  )}"
+                  aria-pressed="${
+                    enabled
+                      ? "true"
+                      : "false"
+                  }"
+                >
+                  ${
+                    enabled
+                      ? "Active"
+                      : "Off"
+                  }
+                </button>
+
+              </div>
+            `;
+          }
+        )
+        .join("");
+  }
+
+
+  /* ========================================================================
+   * SCAN STATUS
+   * ====================================================================== */
+
+  async function loadScanStatus() {
+
+    if (!state.authenticated) {
+      return null;
+    }
+
+
+    try {
+
+      const payload =
+        await apiFetch(
+          API.scanStatus
+        );
+
+
+      const data =
+        safeObject(
+          payload
+        );
+
+
+      const status =
+        safeObject(
+          data.data ||
+          data.status ||
+          data
+        );
+
+
+      const running =
+        status.running ??
+        status.isRunning ??
+        false;
+
+
+      const scanning =
+        status.scanning ??
+        status.isScanning ??
+        false;
+
+
+      text(
+        "scan-status",
+        scanning
+          ? "Scanning"
+          : running
+            ? "Running"
+            : "Stopped"
+      );
+
+
+      text(
+        "scan-running",
+        bool(running)
+      );
+
+
+      text(
+        "scan-active",
+        bool(scanning)
+      );
+
+
+      return status;
+
+    } catch (error) {
+
+      if (
+        error.status !== 404
+      ) {
+
+        console.warn(
+          "[GRIDV21] Scan status failed:",
+          error
+        );
+      }
+
+
+      return null;
+    }
+  }
+
+
+  /* ========================================================================
+   * GENERIC CONTROL REQUEST
+   * ====================================================================== */
+
+  async function controlRequest(
+    url,
+    options = {}
+  ) {
+
+    if (!state.authenticated) {
+
+      showToast(
+        "Executive authentication required.",
+        "error"
+      );
+
+      return false;
+    }
+
+
+    try {
+
+      const payload =
+        await apiFetch(
+          url,
+          options
+        );
+
+
+      showToast(
+        payload.message ||
+        "Command completed successfully.",
+        "success"
+      );
+
+
+      return payload;
+
+    } catch (error) {
+
+      console.error(
+        "[GRIDV21 CONTROL]",
+        error
+      );
+
+
+      if (
+        handleAuthFailure(
+          error
+        )
+      ) {
+
+        return false;
+      }
+
+
+      showToast(
+        error.message ||
+        "Command failed.",
+        "error"
+      );
+
+
+      return false;
+    }
+  }
+
+
+  /* ========================================================================
+   * START / SCAN NOW
+   * ====================================================================== */
+
+  async function startScan() {
+
+    const button =
+      byId(
+        "scan-now-btn"
+      );
+
+
+    if (button) {
+      button.disabled = true;
+    }
+
+
+    try {
+
+      const result =
+        await controlRequest(
+          API.scrapeNow,
+          {
+            method: "POST"
+          }
+        );
+
+
+      if (result) {
+
+        await loadScanStatus();
+
+        await loadDashboard();
+      }
+
+
+      return result;
+
+    } finally {
+
+      if (button) {
+        button.disabled = false;
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * STOP SCAN
+   * ====================================================================== */
+
+  async function stopScan() {
+
+    const button =
+      byId(
+        "scan-stop-btn"
+      );
+
+
+    if (button) {
+      button.disabled = true;
+    }
+
+
+    try {
+
+      const result =
+        await controlRequest(
+          API.scanStop,
+          {
+            method: "POST"
+          }
+        );
+
+
+      if (result) {
+
+        await loadScanStatus();
+
+        await loadDashboard();
+      }
+
+
+      return result;
+
+    } finally {
+
+      if (button) {
+        button.disabled = false;
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * PAUSE BRAIN
+   * ====================================================================== */
+
+  async function pauseBrain() {
+
+    const result =
+      await controlRequest(
+        API.brainPause,
+        {
+          method: "POST"
+        }
+      );
+
+
+    if (result) {
+
+      await loadScanStatus();
+
+      await loadDashboard();
+    }
+
+
+    return result;
+  }
+
+
+  /* ========================================================================
+   * RESUME BRAIN
+   * ====================================================================== */
+
+  async function resumeBrain() {
+
+    const result =
+      await controlRequest(
+        API.brainResume,
+        {
+          method: "POST"
+        }
+      );
+
+
+    if (result) {
+
+      await loadScanStatus();
+
+      await loadDashboard();
+    }
+
+
+    return result;
+  }
+
+
+  /* ========================================================================
+   * EMERGENCY STOP
+   * ====================================================================== */
+
+  async function emergencyStop() {
+
+    const confirmed =
+      window.confirm(
+        "EMERGENCY STOP\n\nAre you sure you want to stop GRIDV21?"
+      );
+
+
+    if (!confirmed) {
+      return false;
+    }
+
+
+    const result =
+      await controlRequest(
+        API.emergencyStop,
+        {
+          method: "POST"
+        }
+      );
+
+
+    if (result) {
+
+      setGlobalStatus(
+        true,
+        "Emergency stop active"
+      );
+
+
+      await loadScanStatus();
+
+      await loadDashboard();
+    }
+
+
+    return result;
+  }
+
+
+  /* ========================================================================
+   * TOGGLE OS MODULE
+   * ====================================================================== */
+
+  async function toggleOSModule(
+    moduleId,
+    button = null
+  ) {
+
+    if (
+      moduleId === undefined ||
+      moduleId === null ||
+      moduleId === ""
+    ) {
+
+      showToast(
+        "Invalid OS module.",
+        "error"
+      );
+
+      return false;
+    }
+
+
+    if (!state.authenticated) {
+
+      showToast(
+        "Executive authentication required.",
+        "error"
+      );
+
+      return false;
+    }
+
+
+    if (button) {
+      button.disabled = true;
+    }
+
+
+    try {
+
+      const result =
+        await controlRequest(
+          API.osToggle(
+            moduleId
+          ),
+          {
+            method: "POST"
+          }
+        );
+
+
+      if (result) {
+
+        await loadOSModules();
+
+        await loadDashboard();
+      }
+
+
+      return result;
+
+    } finally {
+
+      if (button) {
+        button.disabled = false;
+      }
+    }
+  }
+
+
+  /* ========================================================================
+   * EXECUTIVE CONTROL BUTTON HANDLER
+   * ====================================================================== */
+
+  function bindExecutiveControls() {
+
+    document.addEventListener(
+      "click",
+      async event => {
+
+        const target =
+          event.target.closest(
+            "[data-action]"
+          );
+
+
+        if (!target) {
+          return;
+        }
+
+
+        const action =
+          target.dataset.action;
+
+
+        switch (action) {
+
+          case "refresh":
+            await refreshDashboardData();
+            break;
+
+
+          case "scan-now":
+            await startScan();
+            break;
+
+
+          case "scan-stop":
+            await stopScan();
+            break;
+
+
+          case "brain-pause":
+            await pauseBrain();
+            break;
+
+
+          case "brain-resume":
+            await resumeBrain();
+            break;
+
+
+          case "emergency-stop":
+            await emergencyStop();
+            break;
+
+
+          case "clear-admin-key":
+            await clearAdminKey();
+            break;
+
+
+          default:
+            break;
+        }
+      }
+    );
+
+
+    document.addEventListener(
+      "click",
+      async event => {
+
+        const button =
+          event.target.closest(
+            "[data-os-toggle]"
+          );
+
+
+        if (!button) {
+          return;
+        }
+
+
+        event.preventDefault();
+
+
+        const moduleId =
+          button.dataset.osToggle;
+
+
+        await toggleOSModule(
+          moduleId,
+          button
+        );
+      }
+    );
+  }
+
+
+  /* ========================================================================
+   * ADMIN KEY INPUT HANDLING
+   * ====================================================================== */
+
+  function bindAdminKeyControls() {
+
+    const input =
+      byId(
+        "adminKeyInput"
+      );
+
+
+    const saveButton =
+      byId(
+        "saveKeyBtn"
+      );
+
+
+    if (saveButton) {
+
+      saveButton.addEventListener(
+        "click",
+        async event => {
+
+          event.preventDefault();
+
+
+          if (
+            state.authenticated
+          ) {
+
+            showToast(
+              "Executive session is already authenticated.",
+              "info"
+            );
+
+            return;
+          }
+
+
+          const key =
+            input
+              ? input.value.trim()
+              : "";
+
+
+          if (!key) {
+
+            const status =
+              byId(
+                "keyStatus"
+              );
+
+
+            if (status) {
+
+              status.textContent =
+                "Enter your admin key";
+            }
+
+
+            showToast(
+              "Please enter the Executive admin key.",
+              "error"
+            );
+
+
+            return;
+          }
+
+
+          /*
+           * Save locally first.
+           */
+
+          saveAdminKey(
+            key
+          );
+
+
+          /*
+           * Then verify against
+           * the server.
+           */
+
+          const verified =
+            await verifyAdminKey();
+
+
+          if (!verified) {
+
+            /*
+             * Invalid key should not
+             * remain stored.
+             */
+
+            try {
+
+              localStorage.removeItem(
+                ADMIN_STORAGE_KEY
+              );
+
+            } catch (_) {}
+
+
+            state.adminKey =
+              "";
+
+
+            if (input) {
+              input.value = "";
+            }
+
+
+            return;
+          }
+
+
+          /*
+           * Successful authentication.
+           */
+
+          showToast(
+            "Executive access authenticated.",
+            "success"
+          );
+
+
+          await refreshDashboardData();
+        }
+      );
+    }
+
+
+    if (input) {
+
+      input.addEventListener(
+        "keydown",
+        event => {
+
+          if (
+            event.key ===
+            "Enter"
+          ) {
+
+            event.preventDefault();
+
+
+            if (saveButton) {
+              saveButton.click();
+            }
+          }
+        }
+      );
+    }
+  }
+
+
+  /* ========================================================================
+   * EXECUTIVE SESSION BOOTSTRAP
+   * ====================================================================== */
+
+  async function initialiseExecutiveDashboard() {
+
+    /*
+     * First check the normal authenticated
+     * tenant/owner session.
+     */
+
+    const sessionOK =
+      await verifySession();
+
+
+    if (!sessionOK) {
+      return false;
+    }
+
+
+    /*
+     * Load any previously stored
+     * Executive admin key.
+     */
+
+    loadAdminKey();
+
+
+    /*
+     * Check whether the server already
+     * has an Executive admin session.
+     */
+
+    const existingAdminSession =
+      await verifyAdminSession();
+
+
+    if (
+      existingAdminSession
+    ) {
+
+      await refreshDashboardData();
+
+      return true;
+    }
+
+
+    /*
+     * If there is a stored key,
+     * verify it automatically.
+     */
+
+    if (
+      state.adminKey
+    ) {
+
+      const verified =
+        await verifyAdminKey();
+
+
+      if (verified) {
+
+        await refreshDashboardData();
+
+        return true;
+      }
+    }
+
+
+    /*
+     * Tenant authentication is valid,
+     * but Executive access still requires
+     * the Executive admin key.
+     */
+
+    setAuthUI(
+      false
+    );
+
+
+    setGlobalStatus(
+      true,
+      "Executive key required"
+    );
+
+
+    return true;
+  }
+
+
+  /* ========================================================================
+   * EXPORT PART 3 FUNCTIONS
+   * ====================================================================== */
+
+  window.GRIDV21 = {
+
+    ...(window.GRIDV21 || {}),
+
+    loadScanStatus,
+
+    controlRequest,
+
+    startScan,
+
+    stopScan,
+
+    pauseBrain,
+
+    resumeBrain,
+
+    emergencyStop,
+
+    toggleOSModule,
+
+    bindExecutiveControls,
+
+    bindAdminKeyControls,
+
+    initialiseExecutiveDashboard
+  };
+
+
+  /*
+   * ================================================================
+   * END OF PART 3
+   * ================================================================
+   *
+   * DO NOT ADD THE FINAL:
+   *
+   * })();
+   *
+   * Part 4 will contain the final event/bootstrap section and
+   * the single closing wrapper.
+   */
