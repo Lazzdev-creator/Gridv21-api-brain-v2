@@ -875,3 +875,862 @@
       "info"
     );
       }
+  /* ================================================================
+   * DATA NORMALISATION
+   * ================================================================ */
+
+  function normaliseDashboard(payload) {
+    const source =
+      safeObject(payload);
+
+    const dashboard =
+      safeObject(
+        source.dashboard ||
+        source.data ||
+        source
+      );
+
+    const engine =
+      safeObject(
+        dashboard.engine ||
+        source.engine
+      );
+
+    state.engine = {
+      ...state.engine,
+      ...engine,
+
+      running:
+        Boolean(
+          engine.running ??
+          engine.isRunning ??
+          dashboard.running
+        ),
+
+      scanning:
+        Boolean(
+          engine.scanning ??
+          engine.isScanning ??
+          dashboard.scanning
+        ),
+
+      emergencyStopped:
+        Boolean(
+          engine.emergencyStopped ??
+          engine.emergency_stop ??
+          dashboard.emergencyStopped
+        ),
+
+      permitsFound:
+        numeric(
+          engine.permitsFound ??
+          engine.permits_found ??
+          dashboard.permitsFound,
+          0
+        ),
+
+      errors:
+        numeric(
+          engine.errors ??
+          dashboard.errors,
+          0
+        ),
+
+      uptime:
+        numeric(
+          engine.uptime ??
+          dashboard.uptime,
+          0
+        )
+    };
+
+    state.dashboard =
+      dashboard;
+
+    return dashboard;
+  }
+
+  function extractModules(payload) {
+    const source =
+      safeObject(payload);
+
+    const candidates = [
+      source.modules,
+      source.osModules,
+      source.os_modules,
+      source.data?.modules,
+      source.data?.osModules,
+      source.data?.os_modules
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    return FALLBACK_MODULES.slice();
+  }
+
+  function extractPermits(payload) {
+    const source =
+      safeObject(payload);
+
+    const candidates = [
+      source.permits,
+      source.data?.permits,
+      source.rows,
+      source.data
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    return [];
+  }
+
+  function extractEvents(payload) {
+    const source =
+      safeObject(payload);
+
+    const candidates = [
+      source.events,
+      source.systemEvents,
+      source.system_events,
+      source.data?.events,
+      source.data?.systemEvents,
+      source.data?.system_events
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    return [];
+  }
+
+  function extractIntegrations(payload) {
+    const source =
+      safeObject(payload);
+
+    const candidates = [
+      source.integrations,
+      source.data?.integrations
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    return [];
+  }
+
+  /* ================================================================
+   * DASHBOARD DATA
+   * ================================================================ */
+
+  async function loadDashboard() {
+    try {
+      const payload =
+        await apiFetch(
+          API.dashboard
+        );
+
+      const dashboard =
+        normaliseDashboard(
+          payload
+        );
+
+      renderDashboard(
+        dashboard
+      );
+
+      return dashboard;
+
+    } catch (error) {
+      console.error(
+        "[GRIDV21] Dashboard load failed:",
+        error
+      );
+
+      if (
+        error instanceof APIError &&
+        error.status === 401
+      ) {
+        state.authenticated = false;
+        setAuthUI(false);
+
+        actionMessage(
+          "Executive authentication required.",
+          "warning"
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  async function loadModules() {
+    try {
+      const payload =
+        await apiFetch(
+          API.osModules
+        );
+
+      state.modules =
+        extractModules(
+          payload
+        );
+
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] OS modules endpoint unavailable.",
+        error
+      );
+
+      state.modules =
+        FALLBACK_MODULES.slice();
+    }
+
+    renderModules();
+  }
+
+  async function loadPermits() {
+    try {
+      const payload =
+        await apiFetch(
+          API.permits
+        );
+
+      state.permits =
+        extractPermits(
+          payload
+        );
+
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Permit endpoint unavailable.",
+        error
+      );
+
+      state.permits = [];
+    }
+
+    renderPermits();
+    renderLeads();
+  }
+
+  async function loadEvents() {
+    try {
+      const payload =
+        await apiFetch(
+          API.systemEvents
+        );
+
+      state.events =
+        extractEvents(
+          payload
+        );
+
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Events endpoint unavailable.",
+        error
+      );
+
+      state.events = [];
+    }
+
+    renderEvents();
+    renderAudit();
+  }
+
+  async function loadForecast() {
+    try {
+      const payload =
+        await apiFetch(
+          API.forecast
+        );
+
+      state.forecast =
+        safeObject(
+          payload.forecast ||
+          payload.data ||
+          payload
+        );
+
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Forecast unavailable.",
+        error
+      );
+
+      state.forecast = null;
+    }
+
+    renderForecast();
+  }
+
+  async function loadIntegrations() {
+    try {
+      const payload =
+        await apiFetch(
+          API.integrations
+        );
+
+      state.integrations =
+        extractIntegrations(
+          payload
+        );
+
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Integrations endpoint unavailable.",
+        error
+      );
+
+      state.integrations = [];
+    }
+
+    renderIntegrations();
+  }
+
+  async function refreshAll() {
+    if (state.refreshInFlight) {
+      return;
+    }
+
+    if (
+      !state.authenticated
+    ) {
+      return;
+    }
+
+    state.refreshInFlight = true;
+
+    try {
+      setGlobalStatus(
+        true,
+        "Refreshing..."
+      );
+
+      await Promise.allSettled([
+        loadDashboard(),
+        loadModules(),
+        loadPermits(),
+        loadEvents(),
+        loadForecast(),
+        loadIntegrations()
+      ]);
+
+      setGlobalStatus(
+        true,
+        "Connected"
+      );
+
+    } catch (error) {
+      console.error(
+        "[GRIDV21] Refresh error:",
+        error
+      );
+
+      setGlobalStatus(
+        false,
+        "Refresh failed"
+      );
+
+    } finally {
+      state.refreshInFlight = false;
+    }
+  }
+
+  /* ================================================================
+   * DASHBOARD RENDERING
+   * ================================================================ */
+
+  function renderDashboard(data) {
+    const source =
+      safeObject(data);
+
+    const engine =
+      safeObject(
+        source.engine ||
+        state.engine
+      );
+
+    const running =
+      Boolean(
+        engine.running ??
+        engine.isRunning ??
+        state.engine.running
+      );
+
+    const scanning =
+      Boolean(
+        engine.scanning ??
+        engine.isScanning ??
+        state.engine.scanning
+      );
+
+    const emergency =
+      Boolean(
+        engine.emergencyStopped ??
+        engine.emergency_stop ??
+        state.engine.emergencyStopped
+      );
+
+    const permitsFound =
+      numeric(
+        engine.permitsFound ??
+        engine.permits_found ??
+        state.engine.permitsFound,
+        state.engine.permitsFound
+      );
+
+    const errors =
+      numeric(
+        engine.errors,
+        state.engine.errors
+      );
+
+    const uptime =
+      numeric(
+        engine.uptime,
+        state.engine.uptime
+      );
+
+    state.engine = {
+      ...state.engine,
+      running,
+      scanning,
+      emergencyStopped: emergency,
+      permitsFound,
+      errors,
+      uptime,
+      lastScan:
+        engine.lastScan ??
+        engine.last_scan ??
+        state.engine.lastScan,
+      lastScanDuration:
+        engine.lastScanDuration ??
+        engine.last_scan_duration ??
+        state.engine.lastScanDuration,
+      lastError:
+        engine.lastError ??
+        engine.last_error ??
+        state.engine.lastError
+    };
+
+    setText(
+      "metric-engine",
+      running
+        ? "RUNNING"
+        : "STOPPED"
+    );
+
+    setText(
+      "metric-engine-sub",
+      scanning
+        ? "Scanning"
+        : "Idle"
+    );
+
+    const activeModules =
+      safeArray(
+        state.modules
+      ).filter(
+        module =>
+          Boolean(
+            module.enabled ??
+            module.active ??
+            module.is_active ??
+            true
+          )
+      );
+
+    setText(
+      "metric-os",
+      formatNumber(
+        activeModules.length
+      )
+    );
+
+    const leadsCount =
+      numeric(
+        source.leads ??
+        source.leadCount ??
+        source.leadsCount ??
+        state.permits.length,
+        state.permits.length
+      );
+
+    setText(
+      "metric-leads",
+      formatNumber(
+        leadsCount
+      )
+    );
+
+    const revenue =
+      source.revenue ??
+      source.totalRevenue ??
+      source.total_revenue ??
+      state.dashboard?.revenue ??
+      0;
+
+    setText(
+      "metric-revenue",
+      formatMoney(
+        revenue
+      )
+    );
+
+    setText(
+      "telemetry-running",
+      yesNo(running)
+    );
+
+    setText(
+      "telemetry-scanning",
+      yesNo(scanning)
+    );
+
+    setText(
+      "telemetry-permits",
+      formatNumber(
+        permitsFound
+      )
+    );
+
+    setText(
+      "telemetry-errors",
+      formatNumber(
+        errors
+      )
+    );
+
+    setText(
+      "telemetry-last-scan",
+      formatDate(
+        state.engine.lastScan
+      )
+    );
+
+    setText(
+      "telemetry-duration",
+      formatDuration(
+        state.engine.lastScanDuration
+      )
+    );
+
+    setText(
+      "telemetry-uptime",
+      formatUptime(
+        uptime
+      )
+    );
+
+    setText(
+      "telemetry-emergency",
+      yesNo(emergency)
+    );
+
+    const badge =
+      byId("engine-badge");
+
+    if (badge) {
+      badge.textContent =
+        emergency
+          ? "EMERGENCY STOP"
+          : scanning
+            ? "SCANNING"
+            : running
+              ? "RUNNING"
+              : "STOPPED";
+
+      badge.className =
+        emergency
+          ? "badge badge-danger"
+          : running
+            ? "badge badge-success"
+            : "badge badge-muted";
+    }
+
+    const recommendation =
+      source.recommendation ??
+      source.brainRecommendation ??
+      source.brain_recommendation ??
+      state.forecast?.recommendation;
+
+    if (recommendation) {
+      setText(
+        "brain-recommendation",
+        recommendation
+      );
+    } else {
+      setText(
+        "brain-recommendation",
+        running
+          ? "Executive engine is online and monitoring the operating environment."
+          : "Executive engine is currently stopped."
+      );
+    }
+
+    renderTopLeads(
+      safeArray(
+        source.topLeads ||
+        source.top_leads
+      )
+    );
+
+    renderEvents();
+  }
+
+  /* ================================================================
+   * MODULE RENDERING
+   * ================================================================ */
+
+  function renderModules() {
+    const container =
+      byId(
+        "os-overview-grid"
+      );
+
+    if (!container) {
+      return;
+    }
+
+    const modules =
+      safeArray(
+        state.modules
+      );
+
+    if (!modules.length) {
+      container.innerHTML =
+        '<div class="empty">No OS modules available.</div>';
+
+      return;
+    }
+
+    container.innerHTML =
+      modules.map(
+        module => {
+          const id =
+            module.id ??
+            module.module_id ??
+            module.slug ??
+            "";
+
+          const enabled =
+            Boolean(
+              module.enabled ??
+              module.active ??
+              module.is_active ??
+              true
+            );
+
+          const name =
+            module.name ??
+            module.module_name ??
+            "Unnamed OS";
+
+          const description =
+            module.description ??
+            "GRIDV21 operating system module.";
+
+          return `
+            <article class="os-card">
+              <div class="os-card-head">
+                <div>
+                  <strong>${escapeHTML(name)}</strong>
+                  <small>${escapeHTML(
+                    module.layer || ""
+                  )}</small>
+                </div>
+
+                <label class="switch">
+                  <input
+                    type="checkbox"
+                    data-os-toggle="${escapeHTML(id)}"
+                    ${enabled ? "checked" : ""}
+                  >
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <p>${escapeHTML(
+                description
+              )}</p>
+
+              <span class="badge ${
+                enabled
+                  ? "badge-success"
+                  : "badge-muted"
+              }">
+                ${enabled ? "ACTIVE" : "OFF"}
+              </span>
+            </article>
+          `;
+        }
+      ).join("");
+
+    setControlsEnabled(
+      state.authenticated
+    );
+  }
+
+  /* ================================================================
+   * LEADS
+   * ================================================================ */
+
+  function getPermitCity(item) {
+    return (
+      item.city ||
+      item.municipality ||
+      item.region ||
+      item.location ||
+      "—"
+    );
+  }
+
+  function getPermitType(item) {
+    return (
+      item.trade ||
+      item.type ||
+      item.category ||
+      item.permit_type ||
+      item.permitType ||
+      "—"
+    );
+  }
+
+  function getPermitValue(item) {
+    return (
+      item.estimated_value ??
+      item.estimatedValue ??
+      item.value ??
+      item.permit_value ??
+      0
+    );
+  }
+
+  function getPermitScore(item) {
+    return (
+      item.ai_score ??
+      item.aiScore ??
+      item.score ??
+      item.lead_score ??
+      0
+    );
+  }
+
+  function renderTopLeads(items = []) {
+    const body =
+      byId(
+        "top-leads-body"
+      );
+
+    if (!body) return;
+
+    const rows =
+      safeArray(
+        items.length
+          ? items
+          : state.permits
+      )
+        .slice()
+        .sort(
+          (a, b) =>
+            numeric(
+              getPermitScore(b)
+            ) -
+            numeric(
+              getPermitScore(a)
+            )
+        )
+        .slice(0, 10);
+
+    if (!rows.length) {
+      body.innerHTML =
+        '<tr><td colspan="4" class="empty">No leads available.</td></tr>';
+
+      return;
+    }
+
+    body.innerHTML =
+      rows.map(
+        item => `
+          <tr>
+            <td>${escapeHTML(
+              getPermitCity(item)
+            )}</td>
+            <td>${escapeHTML(
+              getPermitType(item)
+            )}</td>
+            <td>${formatNumber(
+              getPermitScore(item)
+            )}</td>
+            <td>${formatMoney(
+              getPermitValue(item)
+            )}</td>
+          </tr>
+        `
+      ).join("");
+  }
+
+  function renderLeads() {
+    const body =
+      byId(
+        "leads-body"
+      );
+
+    if (!body) return;
+
+    const rows =
+      safeArray(
+        state.permits
+      ).slice(0, 100);
+
+    if (!rows.length) {
+      body.innerHTML =
+        '<tr><td colspan="5" class="empty">No lead data available.</td></tr>';
+
+      return;
+    }
+
+    body.innerHTML =
+      rows.map(
+        item => `
+          <tr>
+            <td>${escapeHTML(
+              getPermitType(item)
+            )}</td>
+            <td>${escapeHTML(
+              getPermitCity(item)
+            )}</td>
+            <td>${formatMoney(
+              getPermitValue(item)
+            )}</td>
+            <td>${escapeHTML(
+              item.status ||
+              item.lead_status ||
+              "New"
+            )}</td>
+            <td>${escapeHTML(
+              formatDate(
+                item.created_at ||
+                item.createdAt ||
+                item.date
+              )
+            )}</td>
+          </tr>
+        `
+      ).join("");
+      }
