@@ -2797,4 +2797,10 @@
         </strong>
 
         <p>
-          Tenant authen
+          Tenant authentication is not treated as
+          Executive authentication. Privileged controls
+          remain protected by backend authorization.
+        </p>
+      </div>
+    `;
+  }
