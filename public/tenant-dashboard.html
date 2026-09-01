@@ -20,8 +20,8 @@
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: radial-gradient(1200px 600px at 10% -10%, #1a2744 0%, var(--bg) 55%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
     }
@@ -29,31 +29,26 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 1rem 1.5rem;
+      padding: 1rem 1.25rem;
       border-bottom: 1px solid var(--border);
-      background: rgba(11, 18, 32, 0.85);
-      backdrop-filter: blur(8px);
-      position: sticky;
-      top: 0;
-      z-index: 10;
+      background: rgba(0,0,0,0.25);
     }
     .brand { font-weight: 700; letter-spacing: 0.02em; }
-    .brand span { color: var(--accent); }
+    .brand span { color: var(--accent); font-weight: 600; }
     .user { color: var(--muted); font-size: 0.9rem; }
-    .user strong { color: var(--text); }
-    main { max-width: 1100px; margin: 0 auto; padding: 1.5rem; }
+    main { max-width: 960px; margin: 0 auto; padding: 1.25rem; }
     .hero {
       display: flex;
-      flex-wrap: wrap;
-      gap: 1rem;
       justify-content: space-between;
-      align-items: end;
+      gap: 1rem;
+      align-items: flex-start;
       margin-bottom: 1.25rem;
+      flex-wrap: wrap;
     }
-    h1 { margin: 0 0 0.35rem; font-size: 1.5rem; }
-    p.lead { margin: 0; color: var(--muted); }
-    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    button, .btn {
+    h1 { margin: 0 0 0.35rem; font-size: 1.45rem; }
+    .lead { margin: 0; color: var(--muted); }
+    .actions { display: flex; gap: 0.5rem; }
+    button {
       background: var(--accent);
       color: white;
       border: none;
@@ -61,12 +56,8 @@
       padding: 0.55rem 0.9rem;
       font-weight: 600;
       cursor: pointer;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
     }
-    button.secondary, .btn.secondary {
+    button.secondary {
       background: transparent;
       border: 1px solid var(--border);
       color: var(--text);
@@ -105,7 +96,7 @@
     .tier {
       font-size: 0.75rem;
       font-weight: 700;
-      padding: 0.25rem 0.5rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 999px;
       white-space: nowrap;
     }
@@ -114,26 +105,25 @@
     .tier.LOW { background: rgba(148,163,184,0.15); color: var(--low); }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 0.5rem 1rem;
-      margin-top: 0.65rem;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.6rem;
       font-size: 0.9rem;
     }
-    .k { color: var(--muted); }
-    .empty, .error, .loading {
-      text-align: center;
-      padding: 2.5rem 1rem;
-      color: var(--muted);
-      border: 1px dashed var(--border);
+    .k { color: var(--muted); font-size: 0.78rem; }
+    .loading, .empty, .error {
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: 12px;
-      background: rgba(18,26,43,0.5);
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
     }
-    .error { color: #fecaca; border-color: rgba(239,68,68,0.35); }
+    .error { border-color: var(--danger); color: #fecaca; }
     footer {
       text-align: center;
       color: var(--muted);
       font-size: 0.8rem;
-      padding: 2rem 1rem;
+      padding: 1.5rem 1rem 2rem;
     }
   </style>
 </head>
@@ -197,7 +187,12 @@
     function renderCards(items) {
       if (!items.length) {
         content.className = "empty";
-        content.innerHTML = "No opportunities have been matched to your account yet.<br/>Your admin will match relevant SA leads to you.";
+        content.innerHTML = `
+          No opportunities have been matched to your account yet.<br/><br/>
+          Your admin needs to run an SA scan and then <strong>Match to Tenants</strong>
+          from the Acquisition Intelligence section.<br/><br/>
+          Once matched, HIGH and MEDIUM construction leads will appear here automatically.
+        `;
         return;
       }
       content.className = "list";
@@ -218,9 +213,7 @@
               <div><span class="k">Municipality</span><br>${esc(o.municipality || "—")}</div>
               <div><span class="k">Status</span><br>${esc(o.status || "—")}</div>
               <div><span class="k">Zoning</span><br>${esc(o.zoning || "—")}</div>
-              <div><span class="k">Match score</span><br>${esc(o.match_score ?? "—")}</div>
-              <div><span class="k">Erf / Parcel</span><br>${esc(o.erf_number || o.parcel_number || "—")}</div>
-              <div><span class="k">Category</span><br>${esc(o.source_category || "—")}</div>
+              <div><span class="k">Match</span><br>${esc(o.match_score ?? o.score ?? "—")}</div>
             </div>
             ${o.ai_summary ? `<p class="meta" style="margin-top:0.75rem">${esc(o.ai_summary)}</p>` : ""}
             ${o.match_reason ? `<p class="meta">Match reason: ${esc(o.match_reason)}</p>` : ""}
@@ -275,4 +268,4 @@
     })();
   </script>
 </body>
-  </html>
+</html>
