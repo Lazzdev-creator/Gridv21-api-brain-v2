@@ -2,23 +2,35 @@
   "use strict";
 
   /*
-   * GRIDV21 EXECUTIVE DASHBOARD
-   * Clean frontend controller
+   * ================================================================
+   * GRIDV21 BRAIN — EXECUTIVE DASHBOARD CONTROLLER
+   * ================================================================
    *
-   * Version: 6.4.1
+   * Matched to:
+   *   public/dashboard/index.html
+   *   server.js v6.4.0
+   *
+   * Executive authentication:
+   *   POST /api/auth/verify
+   *
+   * Tenant authentication:
+   *   authType === "tenant"
+   *
+   * Executive authentication:
+   *   authType === "admin_key"
    *
    * IMPORTANT:
-   * - This file controls the Executive dashboard only.
-   * - Tenant authentication is NOT treated as Executive authentication.
-   * - Executive controls are enabled only after /api/auth/verify succeeds.
-   * - All privileged operations are still protected by the backend.
+   * This file controls the Executive dashboard only.
+   * Tenant authentication is never treated as Executive access.
+   * Backend authorization remains the security boundary.
+   * ================================================================
    */
 
   const VERSION = "6.4.1";
 
-  /* ============================================================
-   * API CONTRACT
-   * ========================================================== */
+  /* ================================================================
+   * API
+   * ================================================================ */
 
   const API = Object.freeze({
     health: "/api/health",
@@ -30,194 +42,269 @@
     dashboard: "/api/dashboard",
     osModules: "/api/os-modules",
     permits: "/api/permits",
-
-    scrapeNow: "/api/scrape-now",
     scanStatus: "/api/scan-status",
 
-    scanStop: "/api/brain/scan-stop",
+    scrapeNow: "/api/scrape-now",
+
     brainPause: "/api/brain/pause",
     brainResume: "/api/brain/resume",
-    emergencyStop: "/api/brain/emergency-stop",
+    emergencyStop:
+      "/api/brain/emergency-stop",
+    scanStop:
+      "/api/brain/scan-stop",
 
-    forecast: "/api/forecast",
-    integrations: "/api/integrations",
+    systemEvents:
+      "/api/system-events",
 
-    systemEvents: "/api/system-events",
+    forecast:
+      "/api/forecast",
+
+    integrations:
+      "/api/integrations",
 
     osToggle: id =>
       `/api/os-toggle/${encodeURIComponent(id)}`
   });
 
-  /* ============================================================
-   * EXECUTIVE STORAGE
-   * ========================================================== */
+  /* ================================================================
+   * STORAGE
+   * ================================================================ */
 
-  const ADMIN_STORAGE_KEY = "GRIDV21_ADMIN_KEY";
+  const ADMIN_STORAGE_KEY =
+    "GRIDV21_ADMIN_KEY";
 
-  /* ============================================================
-   * APPLICATION STATE
-   * ========================================================== */
+  /* ================================================================
+   * STATE
+   * ================================================================ */
 
   const state = {
-    initialized: false,
-
     authenticated: false,
-    connected: false,
+
+    authType: null,
+
+    role: null,
 
     adminKey: "",
 
+    connected: false,
+
     dashboard: null,
+
     engine: {
       running: false,
       scanning: false,
-      emergencyStopped: false
+      emergencyStopped: false,
+      lastScan: null,
+      lastScanDuration: null,
+      permitsFound: 0,
+      errors: 0,
+      uptime: 0,
+      lastError: null
     },
 
-    osModules: [],
+    modules: [],
+
     permits: [],
-    systemEvents: [],
-    integrations: [],
+
+    events: [],
+
     forecast: null,
 
+    integrations: [],
+
     refreshTimer: null,
-    statusTimer: null,
 
-    requestInFlight: false,
+    refreshInFlight: false,
 
-    activeSection: "overview"
+    actionInFlight: false,
+
+    mobileSidebarOpen: false,
+
+    activeSection:
+      "dashboard"
   };
 
-  /* ============================================================
-   * EXECUTIVE OS DEFINITIONS
-   *
-   * These are UI fallback definitions only.
-   * The backend remains authoritative.
-   * ========================================================== */
+  /* ================================================================
+   * FALLBACK OS DEFINITIONS
+   * ================================================================ */
 
   const OS_MODULES = [
     {
       id: 1,
-      name: "Executive Intelligence",
+      name:
+        "Executive Intelligence",
       description:
         "Strategy and executive decision intelligence.",
-      layer: "Strategy"
+      layer:
+        "Strategy"
     },
+
     {
       id: 2,
-      name: "Revenue Intelligence",
+      name:
+        "Revenue Intelligence",
       description:
         "Revenue performance, forecasting and monetisation.",
-      layer: "Finance"
+      layer:
+        "Finance"
     },
+
     {
       id: 3,
-      name: "Sales & CRM",
+      name:
+        "Sales & CRM",
       description:
         "Sales pipeline, prospects and customer relationship intelligence.",
-      layer: "Sales"
+      layer:
+        "Sales"
     },
+
     {
       id: 4,
-      name: "Marketing",
+      name:
+        "Marketing",
       description:
         "Growth, campaigns, audiences and acquisition intelligence.",
-      layer: "Growth"
+      layer:
+        "Growth"
     },
+
     {
       id: 5,
-      name: "Operations",
+      name:
+        "Operations",
       description:
         "Operational performance and process intelligence.",
-      layer: "Operations"
+      layer:
+        "Operations"
     },
+
     {
       id: 6,
-      name: "Finance",
+      name:
+        "Finance",
       description:
         "Accounting, cash flow and financial intelligence.",
-      layer: "Accounting"
+      layer:
+        "Accounting"
     },
+
     {
       id: 7,
-      name: "Human Capital",
+      name:
+        "Human Capital",
       description:
         "People, workforce and organisational intelligence.",
-      layer: "People"
+      layer:
+        "People"
     },
+
     {
       id: 8,
-      name: "Project Management",
+      name:
+        "Project Management",
       description:
         "Projects, delivery, milestones and resource intelligence.",
-      layer: "Projects"
+      layer:
+        "Projects"
     },
+
     {
       id: 9,
-      name: "Knowledge Intelligence",
+      name:
+        "Knowledge Intelligence",
       description:
         "Enterprise knowledge and institutional intelligence.",
-      layer: "Knowledge"
+      layer:
+        "Knowledge"
     },
+
     {
       id: 10,
-      name: "Legal & Compliance",
+      name:
+        "Legal & Compliance",
       description:
         "Risk, regulatory and compliance intelligence.",
-      layer: "Compliance"
+      layer:
+        "Compliance"
     },
+
     {
       id: 11,
-      name: "Supply Chain",
+      name:
+        "Supply Chain",
       description:
         "Suppliers, logistics and procurement intelligence.",
-      layer: "Supply"
+      layer:
+        "Supply"
     },
+
     {
       id: 12,
-      name: "Acquisition Intelligence",
+      name:
+        "Acquisition Intelligence",
       description:
         "Lead discovery, permit intelligence and acquisition.",
-      layer: "Lead Generation"
+      layer:
+        "Lead Generation"
     },
+
     {
       id: 13,
-      name: "Customer Success",
+      name:
+        "Customer Success",
       description:
         "Customer health, retention and expansion intelligence.",
-      layer: "Customer"
+      layer:
+        "Customer"
     },
+
     {
       id: 14,
-      name: "IT & Security",
+      name:
+        "IT & Security",
       description:
         "Technology, infrastructure and security intelligence.",
-      layer: "Technology"
+      layer:
+        "Technology"
     },
+
     {
       id: 15,
-      name: "Analytics & BI",
+      name:
+        "Analytics & BI",
       description:
         "Enterprise analytics, reporting and business intelligence.",
-      layer: "Analytics"
+      layer:
+        "Analytics"
     }
   ];
 
-  /* ============================================================
+  /* ================================================================
    * DOM HELPERS
-   * ========================================================== */
+   * ================================================================ */
 
   function byId(id) {
     return document.getElementById(id);
   }
 
-  function all(selector, root = document) {
+  function all(
+    selector,
+    root = document
+  ) {
     return Array.from(
-      root.querySelectorAll(selector)
+      root.querySelectorAll(
+        selector
+      )
     );
   }
 
-  function setText(id, value) {
-    const element = byId(id);
+  function setText(
+    id,
+    value
+  ) {
+    const element =
+      byId(id);
 
     if (!element) {
       return;
@@ -231,8 +318,12 @@
         : String(value);
   }
 
-  function setHTML(id, value) {
-    const element = byId(id);
+  function setHTML(
+    id,
+    value
+  ) {
+    const element =
+      byId(id);
 
     if (!element) {
       return;
@@ -242,61 +333,119 @@
       value ?? "";
   }
 
-  function escapeHTML(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  function escapeHTML(
+    value
+  ) {
+    return String(
+      value ?? ""
+    )
+      .replace(
+        /&/g,
+        "&amp;"
+      )
+      .replace(
+        /</g,
+        "&lt;"
+      )
+      .replace(
+        />/g,
+        "&gt;"
+      )
+      .replace(
+        /"/g,
+        "&quot;"
+      )
+      .replace(
+        /'/g,
+        "&#039;"
+      );
   }
 
-  function safeArray(value) {
-    return Array.isArray(value)
+  function safeArray(
+    value
+  ) {
+    return Array.isArray(
+      value
+    )
       ? value
       : [];
   }
 
-  function safeObject(value) {
-    return (
+  function safeObject(
+    value
+  ) {
+    if (
       value &&
-      typeof value === "object" &&
+      typeof value ===
+        "object" &&
       !Array.isArray(value)
-    )
-      ? value
-      : {};
+    ) {
+      return value;
+    }
+
+    return {};
   }
 
-  function number(value, fallback = 0) {
-    const n = Number(value);
+  function numeric(
+    value,
+    fallback = 0
+  ) {
+    const n =
+      Number(value);
 
     return Number.isFinite(n)
       ? n
       : fallback;
   }
 
-  function formatNumber(value) {
+  /* ================================================================
+   * FORMATTING
+   * ================================================================ */
+
+  function formatNumber(
+    value
+  ) {
     return new Intl.NumberFormat(
-      "en-ZA"
+      "en-GB"
     ).format(
-      number(value)
+      numeric(
+        value,
+        0
+      )
     );
   }
 
-  function formatMoney(value) {
+  function formatMoney(
+    value
+  ) {
+    /*
+     * Existing GRIDV21 backend currently reports
+     * revenue values without a currency conversion.
+     *
+     * The existing dashboard used USD formatting.
+     */
+
     return new Intl.NumberFormat(
-      "en-ZA",
+      "en-US",
       {
-        style: "currency",
-        currency: "ZAR",
-        maximumFractionDigits: 2
+        style:
+          "currency",
+        currency:
+          "USD",
+        maximumFractionDigits:
+          2
       }
     ).format(
-      number(value)
+      numeric(
+        value,
+        0
+      )
     );
   }
 
-  function formatDate(value) {
+  function formatDate(
+    value
+  ) {
     if (!value) {
       return "—";
     }
@@ -309,73 +458,154 @@
         date.getTime()
       )
     ) {
-      return String(value);
+      return String(
+        value
+      );
     }
 
     return date.toLocaleString(
-      "en-ZA",
+      "en-GB",
       {
-        dateStyle: "medium",
-        timeStyle: "short"
+        dateStyle:
+          "medium",
+        timeStyle:
+          "short"
       }
     );
   }
 
-  function formatUptime(seconds) {
-    const value =
-      number(seconds, NaN);
-
+  function formatDuration(
+    value
+  ) {
     if (
-      !Number.isFinite(value)
+      value === undefined ||
+      value === null ||
+      value === ""
     ) {
       return "—";
     }
 
-    const total =
-      Math.max(
-        0,
-        Math.floor(value)
+    const seconds =
+      numeric(
+        value,
+        NaN
       );
+
+    if (
+      !Number.isFinite(
+        seconds
+      )
+    ) {
+      return String(
+        value
+      );
+    }
+
+    if (
+      seconds < 60
+    ) {
+      return `${Math.round(
+        seconds
+      )}s`;
+    }
+
+    const minutes =
+      Math.floor(
+        seconds / 60
+      );
+
+    const remaining =
+      Math.round(
+        seconds % 60
+      );
+
+    if (
+      minutes < 60
+    ) {
+      return `${minutes}m ${remaining}s`;
+    }
+
+    const hours =
+      Math.floor(
+        minutes / 60
+      );
+
+    const mins =
+      minutes % 60;
+
+    return `${hours}h ${mins}m`;
+  }
+
+  function formatUptime(
+    value
+  ) {
+    const seconds =
+      numeric(
+        value,
+        NaN
+      );
+
+    if (
+      !Number.isFinite(
+        seconds
+      )
+    ) {
+      return "—";
+    }
 
     const days =
       Math.floor(
-        total / 86400
+        seconds / 86400
       );
 
     const hours =
       Math.floor(
-        (total % 86400) / 3600
+        (seconds % 86400) /
+          3600
       );
 
     const minutes =
       Math.floor(
-        (total % 3600) / 60
+        (seconds % 3600) /
+          60
       );
 
-    if (days > 0) {
+    if (
+      days > 0
+    ) {
       return `${days}d ${hours}h`;
     }
 
-    if (hours > 0) {
+    if (
+      hours > 0
+    ) {
       return `${hours}h ${minutes}m`;
     }
 
     return `${minutes}m`;
   }
 
-  /* ============================================================
-   * TOAST
-   * ========================================================== */
+  function yesNo(
+    value
+  ) {
+    return value
+      ? "YES"
+      : "NO";
+  }
 
-  function toast(
+  /* ================================================================
+   * TOAST
+   * ================================================================ */
+
+  function showToast(
     message,
     type = "info"
   ) {
-    const element =
+    const toast =
       byId("toast");
 
-    if (!element) {
-      console[type === "error" ? "error" : "log"](
+    if (!toast) {
+      console.log(
         "[GRIDV21]",
         message
       );
@@ -383,24 +613,26 @@
       return;
     }
 
-    element.textContent =
-      String(message ?? "");
+    toast.textContent =
+      String(
+        message ?? ""
+      );
 
-    element.className =
+    toast.className =
       `toast toast-${type}`;
 
-    element.classList.add(
+    toast.classList.add(
       "show"
     );
 
     clearTimeout(
-      toast.timer
+      showToast.timer
     );
 
-    toast.timer =
+    showToast.timer =
       setTimeout(
         () => {
-          element.classList.remove(
+          toast.classList.remove(
             "show"
           );
         },
@@ -408,21 +640,51 @@
       );
   }
 
-  /* ============================================================
+  /* ================================================================
+   * ACTION MESSAGE
+   * ================================================================ */
+
+  function actionMessage(
+    message,
+    type = "info"
+  ) {
+    const element =
+      byId(
+        "action-message"
+      );
+
+    if (!element) {
+      return;
+    }
+
+    element.textContent =
+      String(
+        message ?? ""
+      );
+
+    element.dataset.type =
+      type;
+  }
+
+  /* ================================================================
    * GLOBAL STATUS
-   * ========================================================== */
+   * ================================================================ */
 
   function setGlobalStatus(
     connected,
     message
   ) {
     state.connected =
-      Boolean(connected);
+      Boolean(
+        connected
+      );
 
     const badge =
-      byId("global-status");
+      byId(
+        "global-status"
+      );
 
-    const label =
+    const text =
       byId(
         "global-status-text"
       );
@@ -432,46 +694,94 @@
         "global-status-dot"
       );
 
-    if (label) {
-      label.textContent =
-        message ||
-        (
-          connected
-            ? "Connected"
-            : "Disconnected"
-        );
+    const sidebarDot =
+      byId(
+        "sidebar-status-dot"
+      );
+
+    const sidebarText =
+      byId(
+        "sidebar-status-text"
+      );
+
+    const finalMessage =
+      message ||
+      (
+        connected
+          ? "Connected"
+          : "Disconnected"
+      );
+
+    if (text) {
+      text.textContent =
+        finalMessage;
+    }
+
+    if (
+      sidebarText
+    ) {
+      sidebarText.textContent =
+        finalMessage;
     }
 
     if (badge) {
       badge.classList.toggle(
         "badge-success",
-        Boolean(connected)
+        Boolean(
+          connected
+        )
       );
 
       badge.classList.toggle(
         "badge-muted",
-        !Boolean(connected)
+        !Boolean(
+          connected
+        )
       );
     }
 
     if (dot) {
       dot.classList.toggle(
         "status-online",
-        Boolean(connected)
+        Boolean(
+          connected
+        )
       );
 
       dot.classList.toggle(
         "status-offline",
-        !Boolean(connected)
+        !Boolean(
+          connected
+        )
+      );
+    }
+
+    if (
+      sidebarDot
+    ) {
+      sidebarDot.classList.toggle(
+        "status-online",
+        Boolean(
+          connected
+        )
+      );
+
+      sidebarDot.classList.toggle(
+        "status-offline",
+        !Boolean(
+          connected
+        )
       );
     }
   }
 
-  /* ============================================================
+  /* ================================================================
    * API ERROR
-   * ========================================================== */
+   * ================================================================ */
 
-  class APIError extends Error {
+  class APIError
+    extends Error {
+
     constructor(
       message,
       status = 0,
@@ -479,7 +789,7 @@
     ) {
       super(
         message ||
-        "Request failed"
+          "Request failed"
       );
 
       this.name =
@@ -493,48 +803,50 @@
     }
   }
 
-  /* ============================================================
+  /* ================================================================
    * API REQUEST
-   * ========================================================== */
+   * ================================================================ */
 
   async function apiFetch(
     url,
     options = {}
   ) {
-    const requestOptions = {
-      ...options,
-
-      credentials:
-        "include",
-
-      cache:
-        options.cache ||
-        "no-store",
-
-      headers: {
-        Accept:
-          "application/json",
-
-        ...(options.body !== undefined
-          ? {
-              "Content-Type":
-                "application/json"
-            }
-          : {}),
-
-        ...(options.headers || {})
-      }
+    const headers = {
+      Accept:
+        "application/json"
     };
 
+    if (
+      options.body !==
+      undefined
+    ) {
+      headers[
+        "Content-Type"
+      ] =
+        "application/json";
+    }
+
+    if (
+      options.headers
+    ) {
+      Object.assign(
+        headers,
+        options.headers
+      );
+    }
+
     /*
-     * Executive key is sent explicitly.
+     * Direct admin key is intentionally retained.
      *
-     * The backend remains responsible for
-     * deciding whether it is valid.
+     * This allows the backend's requireAdmin middleware
+     * to authorize the request even if the browser session
+     * has not yet been persisted.
      */
 
-    if (state.adminKey) {
-      requestOptions.headers[
+    if (
+      state.adminKey
+    ) {
+      headers[
         "x-admin-key"
       ] =
         state.adminKey;
@@ -546,11 +858,23 @@
       response =
         await fetch(
           url,
-          requestOptions
+          {
+            ...options,
+
+            credentials:
+              "include",
+
+            cache:
+              "no-store",
+
+            headers
+          }
         );
-    } catch (error) {
+    } catch (
+      error
+    ) {
       throw new APIError(
-        "Unable to connect to the GRIDV21 server.",
+        "Unable to connect to GRIDV21 server.",
         0,
         null
       );
@@ -588,11 +912,13 @@
       };
     }
 
-    if (!response.ok) {
+    if (
+      !response.ok
+    ) {
       throw new APIError(
         payload.error ||
-        payload.message ||
-        `Request failed (${response.status})`,
+          payload.message ||
+          `Request failed (${response.status})`,
         response.status,
         payload
       );
@@ -601,9 +927,9 @@
     return payload;
   }
 
-  /* ============================================================
+  /* ================================================================
    * ADMIN KEY STORAGE
-   * ========================================================== */
+   * ================================================================ */
 
   function loadAdminKey() {
     try {
@@ -611,14 +937,16 @@
         localStorage.getItem(
           ADMIN_STORAGE_KEY
         ) || "";
-    } catch (error) {
-      state.adminKey =
-        "";
-
+    } catch (
+      error
+    ) {
       console.warn(
-        "[GRIDV21] Could not read admin key.",
+        "[GRIDV21] Could not load admin key.",
         error
       );
+
+      state.adminKey =
+        "";
     }
 
     const input =
@@ -633,11 +961,9 @@
       input.value =
         state.adminKey;
     }
-
-    return state.adminKey;
   }
 
-  function clearStoredAdminKey() {
+  function clearAdminKeyStorage() {
     try {
       localStorage.removeItem(
         ADMIN_STORAGE_KEY
@@ -648,73 +974,19 @@
       "";
   }
 
-  function storeAdminKey(key) {
-    state.adminKey =
-      String(
-        key ?? ""
-      ).trim();
+  /* ================================================================
+   * AUTH UI
+   * ================================================================ */
 
-    try {
-      localStorage.setItem(
-        ADMIN_STORAGE_KEY,
-        state.adminKey
-      );
-    } catch (error) {
-      console.warn(
-        "[GRIDV21] Could not persist admin key.",
-        error
-      );
-    }
-  }
-
-  /* ============================================================
-   * EXECUTIVE AUTH UI
-   * ========================================================== */
-
-  function setControlsEnabled(
-    enabled
+  function setAuthUI(
+    authenticated
   ) {
-    const privilegedSelectors = [
-      "[data-executive-action]",
-      "[data-os-toggle]",
-      "#scrapeNowBtn",
-      "#scanNowBtn",
-      "#scanStartBtn",
-      "#scanStopBtn",
-      "#brainPauseBtn",
-      "#brainResumeBtn",
-      "#emergencyStopBtn"
-    ];
-
-    privilegedSelectors.forEach(
-      selector => {
-        all(selector).forEach(
-          element => {
-            element.disabled =
-              !enabled;
-          }
-        );
-      }
-    );
-
-    document.body.classList.toggle(
-      "executive-authenticated",
-      Boolean(enabled)
-    );
-
-    document.body.classList.toggle(
-      "executive-locked",
-      !Boolean(enabled)
-    );
-  }
-
-  function updateAdminKeyUI() {
     const input =
       byId(
         "adminKeyInput"
       );
 
-    const saveButton =
+    const save =
       byId(
         "saveKeyBtn"
       );
@@ -727,61 +999,134 @@
     if (input) {
       input.disabled =
         Boolean(
-          state.authenticated
+          authenticated
         );
-
-      if (
-        !input.value &&
-        state.adminKey
-      ) {
-        input.value =
-          state.adminKey;
-      }
     }
 
-    if (saveButton) {
-      saveButton.disabled =
+    if (save) {
+      save.disabled =
         false;
     }
 
     if (status) {
       status.textContent =
-        state.authenticated
+        authenticated
           ? "Owner authenticated"
-          : "Executive admin key required";
+          : "Admin key required";
     }
+
+    setControlsEnabled(
+      authenticated
+    );
   }
 
-  /* ============================================================
-   * VERIFY EXECUTIVE KEY
-   * ========================================================== */
+  /* ================================================================
+   * EXECUTIVE CONTROL ENABLE/DISABLE
+   * ================================================================ */
+
+  function setControlsEnabled(
+    enabled
+  ) {
+    const buttons =
+      all(
+        "[data-action]"
+      );
+
+    buttons.forEach(
+      button => {
+        const action =
+          button.dataset.action;
+
+        /*
+         * Navigation and view actions are not
+         * privileged Brain controls.
+         */
+
+        const privileged =
+          [
+            "scan-start",
+            "scan-stop",
+            "brain-pause",
+            "brain-resume",
+            "emergency-stop"
+          ].includes(
+            action
+          );
+
+        if (
+          privileged
+        ) {
+          button.disabled =
+            !enabled;
+        }
+      }
+    );
+
+    all(
+      "[data-os-toggle]"
+    ).forEach(
+      input => {
+        input.disabled =
+          !enabled;
+      }
+    );
+
+    document.body.classList.toggle(
+      "executive-authenticated",
+      Boolean(
+        enabled
+      )
+    );
+
+    document.body.classList.toggle(
+      "executive-locked",
+      !Boolean(
+        enabled
+      )
+    );
+  }
+
+  /* ================================================================
+   * VERIFY ADMIN KEY
+   * ================================================================ */
 
   async function verifyAdminKey(
-    keyOverride = null
+    key = null
   ) {
-    const key =
+    const supplied =
       String(
-        keyOverride ??
-        state.adminKey ??
-        ""
+        key ??
+          state.adminKey ??
+          ""
       ).trim();
 
-    if (!key) {
+    if (!supplied) {
       state.authenticated =
         false;
 
-      setControlsEnabled(
+      setAuthUI(
         false
       );
 
-      updateAdminKeyUI();
-
       setGlobalStatus(
-        false,
-        "Executive key required"
+        true,
+        "Admin key required"
       );
 
       return false;
+    }
+
+    state.adminKey =
+      supplied;
+
+    const status =
+      byId(
+        "keyStatus"
+      );
+
+    if (status) {
+      status.textContent =
+        "Verifying admin key...";
     }
 
     try {
@@ -794,299 +1139,64 @@
 
             headers: {
               "x-admin-key":
-                key
+                supplied
             }
           }
         );
 
+      /*
+       * Backend returns:
+       *
+       * {
+       *   ok: true,
+       *   authenticated: true,
+       *   authType: "admin_key",
+       *   role: "owner"
+       * }
+       */
+
       if (
         payload.ok !== true ||
-        payload.authenticated !== true
+        payload.authenticated !== true ||
+        payload.authType !==
+          "admin_key"
       ) {
         throw new APIError(
-          "Invalid Executive admin key.",
+          "Invalid admin key.",
           401,
           payload
         );
       }
 
-      storeAdminKey(
-        key
-      );
-
       state.authenticated =
         true;
 
-      setControlsEnabled(
+      state.authType =
+        "admin_key";
+
+      state.role =
+        "owner";
+
+      try {
+        localStorage.setItem(
+          ADMIN_STORAGE_KEY,
+          supplied
+        );
+      } catch (_) {}
+
+      setAuthUI(
         true
       );
 
-      updateAdminKeyUI();
-
       setGlobalStatus(
         true,
-        "Executive authenticated"
+        "Admin authenticated"
       );
-
-      toast(
-        "Executive access authenticated successfully.",
-        "success"
-      );
-
-      await refreshDashboard();
-
-      return true;
-
-    } catch (error) {
-      state.authenticated =
-        false;
-
-      setControlsEnabled(
-        false
-      );
-
-      updateAdminKeyUI();
-
-      setGlobalStatus(
-        false,
-        error.status === 401
-          ? "Invalid Executive key"
-          : "Executive authentication failed"
-      );
-
-      console.error(
-        "[GRIDV21 EXECUTIVE AUTH]",
-        error
-      );
-
-      return false;
-    }
-  }
-
-  /* ============================================================
-   * CHECK EXISTING EXECUTIVE SESSION
-   * ========================================================== */
-
-  async function verifyAdminSession() {
-    try {
-      const payload =
-        await apiFetch(
-          API.authMe
-        );
-
-      if (
-        payload.authenticated === true &&
-        payload.authType === "admin_key"
-      ) {
-        state.authenticated =
-          true;
-
-        setControlsEnabled(
-          true
-        );
-
-        updateAdminKeyUI();
-
-        setGlobalStatus(
-          true,
-          "Executive authenticated"
-        );
-
-        return true;
-      }
-
-      /*
-       * A tenant session is NOT an Executive session.
-       */
-
-      if (
-        payload.authenticated === true &&
-        payload.authType === "tenant"
-      ) {
-        state.authenticated =
-          false;
-
-        setControlsEnabled(
-          false
-        );
-
-        setGlobalStatus(
-          true,
-          "Tenant session — Executive key required"
-        );
-
-        return false;
-      }
-
-    } catch (error) {
-      /*
-       * 401 here simply means there is no existing
-       * Executive session.
-       */
-
-      if (
-        error.status !== 401
-      ) {
-        console.warn(
-          "[GRIDV21] Executive session check failed.",
-          error
-        );
-      }
-    }
-
-    state.authenticated =
-      false;
-
-    setControlsEnabled(
-      false
-    );
-
-    return false;
-  }
-
-  /* ============================================================
-   * SAVE ADMIN KEY
-   * ========================================================== */
-
-  async function handleSaveAdminKey(
-    event
-  ) {
-    event?.preventDefault();
-
-    const input =
-      byId(
-        "adminKeyInput"
-      );
-
-    const button =
-      byId(
-        "saveKeyBtn"
-      );
-
-    const status =
-      byId(
-        "keyStatus"
-      );
-
-    const key =
-      String(
-        input?.value ||
-        ""
-      ).trim();
-
-    if (!key) {
-      if (status) {
-        status.textContent =
-          "Enter your Executive admin key";
-      }
-
-      toast(
-        "Please enter the Executive admin key.",
-        "error"
-      );
-
-      input?.focus();
-
-      return false;
-    }
-
-    if (button) {
-      button.disabled =
-        true;
-    }
-
-    if (status) {
-      status.textContent =
-        "Verifying Executive key...";
-    }
-
-    const success =
-      await verifyAdminKey(
-        key
-      );
-
-    if (!success) {
-      clearStoredAdminKey();
-
-      if (input) {
-        input.value =
-          "";
-        input.disabled =
-          false;
-      }
 
       if (status) {
         status.textContent =
-          "Invalid Executive admin key";
+          "Owner authenticated";
       }
-    }
 
-    if (button) {
-      button.disabled =
-        false;
-    }
-
-    return success;
-  }
-
-  /* ============================================================
-   * EXECUTIVE LOGOUT
-   * ========================================================== */
-
-  async function logoutExecutive() {
-    try {
-      await fetch(
-        API.authLogout,
-        {
-          method:
-            "POST",
-
-          credentials:
-            "include",
-
-          headers: {
-            Accept:
-              "application/json",
-
-            ...(state.adminKey
-              ? {
-                  "x-admin-key":
-                    state.adminKey
-                }
-              : {})
-          }
-        }
-      );
-    } catch (error) {
-      console.warn(
-        "[GRIDV21] Executive logout request failed.",
-        error
-      );
-    }
-
-    clearStoredAdminKey();
-
-    state.authenticated =
-      false;
-
-    state.dashboard =
-      null;
-
-    setControlsEnabled(
-      false
-    );
-
-    updateAdminKeyUI();
-
-    setGlobalStatus(
-      false,
-      "Executive session ended"
-    );
-
-    toast(
-      "Executive access logged out.",
-      "success"
-    );
-  }
-
-  /* =====
+      actionMessage(
+        "E
