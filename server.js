@@ -764,7 +764,80 @@ morgan.token(
   "id",
   req => req.id || "no-id"
 );
+/* -------------------------------------------------------------------------- */
+/* SOUTH AFRICA INTELLIGENCE — MATCH + SCAN-AND-MATCH (NEW)                   */
+/* -------------------------------------------------------------------------- */
 
+app.post(
+  "/api/sa-intelligence/match",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const tenantIds = Array.isArray(req.body?.tenant_ids)
+        ? req.body.tenant_ids.map(String)
+        : null;
+      const minScore = Number(req.body?.min_score) || 60;
+      const limitPerTenant = Number(req.body?.limit_per_tenant) || 40;
+
+      const result = await SA_INTELLIGENCE.matchOpportunitiesToTenants({
+        tenantIds,
+        minScore,
+        limitPerTenant,
+        reason: req.body?.reason || "admin_manual_match"
+      });
+
+      return res.status(result.ok ? 200 : 400).json(result);
+    } catch (error) {
+      console.error("[SA] match error:", error);
+      return res.status(500).json({
+        ok: false,
+        error: error.message || "Match failed"
+      });
+    }
+  }
+);
+
+app.post(
+  "/api/sa-intelligence/scan-and-match",
+  requireAuth,
+  async (req, res) => {
+    try {
+      const sourceIds = Array.isArray(req.body?.source_ids)
+        ? req.body.source_ids.map(String)
+        : null;
+
+      const scanResult = await SA_INTELLIGENCE.scan({
+        sourceIds,
+        runType: "manual"
+      });
+
+      if (!scanResult.ok) {
+        return res.status(500).json(scanResult);
+      }
+
+      const matchResult = await SA_INTELLIGENCE.matchOpportunitiesToTenants({
+        tenantIds: Array.isArray(req.body?.tenant_ids)
+          ? req.body.tenant_ids.map(String)
+          : null,
+        minScore: Number(req.body?.min_score) || 60,
+        limitPerTenant: Number(req.body?.limit_per_tenant) || 40,
+        reason: "post_scan_auto_match"
+      });
+
+      return res.json({
+        ok: true,
+        scan: scanResult,
+        match: matchResult
+      });
+    } catch (error) {
+      console.error("[SA] scan-and-match error:", error);
+      return res.status(500).json({
+        ok: false,
+        error: error.message || "Scan + match failed"
+      });
+    }
+  }
+);
 /* -------------------------------------------------------------------------- */
 /* MIDDLEWARE                                                                 */
 /* -------------------------------------------------------------------------- */
