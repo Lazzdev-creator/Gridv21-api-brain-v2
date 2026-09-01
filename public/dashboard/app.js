@@ -85,6 +85,14 @@
     events: [],
     forecast: null,
     integrations: [],
+    
+        sa: {
+      status: null,
+      sources: [],
+      opportunities: [],
+      loading: false,
+      lastError: null
+    },
 
     refreshTimer: null,
     refreshInFlight: false,
