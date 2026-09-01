@@ -1238,13 +1238,16 @@
       );
 
       await Promise.allSettled([
-        loadDashboard(),
-        loadModules(),
-        loadPermits(),
-        loadEvents(),
-        loadForecast(),
-        loadIntegrations()
-      ]);
+  loadDashboard(),
+  loadModules(),
+  loadPermits(),
+  loadEvents(),
+  loadForecast(),
+  loadIntegrations(),
+  loadSaStatus(),
+  loadSaSources(),
+  loadSaOpportunities()
+]);
 
       setGlobalStatus(
         true,
