@@ -40,20 +40,19 @@
     emergencyStop: "/api/brain/emergency-stop",
     scanStop: "/api/brain/scan-stop",
 
-    systemEvents: "/api/system-events",
+        systemEvents: "/api/system-events",
     forecast: "/api/forecast",
     integrations: "/api/integrations",
 
     osToggle: id =>
-    
-      `/api/os-toggle/${encodeURIComponent(id)}`
-      
-        saSources:       "/api/sa-intelligence/sources",
+      `/api/os-toggle/${encodeURIComponent(id)}`,
+
+    saSources:       "/api/sa-intelligence/sources",
     saStatus:        "/api/sa-intelligence/status",
     saScan:          "/api/sa-intelligence/scan",
     saOpportunities: "/api/sa-intelligence/opportunities",
     saMatch:         "/api/sa-intelligence/match",
-    saScanAndMatch:  "/api/sa-intelligence/scan-and-match",
+    saScanAndMatch:  "/api/sa-intelligence/scan-and-match"
   });
 
   const ADMIN_STORAGE_KEY = "GRIDV21_ADMIN_KEY";
