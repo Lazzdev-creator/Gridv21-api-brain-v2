@@ -2804,3 +2804,435 @@
       </div>
     `;
   }
+  /* ================================================================
+   * EVENT HANDLERS
+   * ================================================================ */
+
+  function bindEvents() {
+    const saveKey =
+      byId(
+        "saveKeyBtn"
+      );
+
+    const keyInput =
+      byId(
+        "adminKeyInput"
+      );
+
+    if (saveKey) {
+      saveKey.addEventListener(
+        "click",
+        async () => {
+          const key =
+            keyInput
+              ? keyInput.value
+              : "";
+
+          await verifyAdminKey(
+            key
+          );
+        }
+      );
+    }
+
+    if (keyInput) {
+      keyInput.addEventListener(
+        "keydown",
+        event => {
+          if (
+            event.key ===
+            "Enter"
+          ) {
+            event.preventDefault();
+
+            verifyAdminKey(
+              keyInput.value
+            );
+          }
+        }
+      );
+    }
+
+    const logout =
+      byId(
+        "logout-btn"
+      );
+
+    if (logout) {
+      logout.addEventListener(
+        "click",
+        logoutExecutive
+      );
+    }
+
+    const refresh =
+      byId(
+        "refresh-btn"
+      );
+
+    if (refresh) {
+      refresh.addEventListener(
+        "click",
+        async () => {
+          if (
+            !state.authenticated
+          ) {
+            showToast(
+              "Authenticate first.",
+              "warning"
+            );
+
+            return;
+          }
+
+          await refreshAll();
+
+          showToast(
+            "Dashboard refreshed.",
+            "success"
+          );
+        }
+      );
+    }
+
+    all(
+      ".nav-item[data-section]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          () => {
+            showSection(
+              button.dataset.section
+            );
+          }
+        );
+      }
+    );
+
+    all(
+      "[data-section-target]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          () => {
+            showSection(
+              button.dataset.sectionTarget
+            );
+          }
+        );
+      }
+    );
+
+    all(
+      "[data-action]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          async event => {
+            const action =
+              event.currentTarget
+                .dataset.action;
+
+            if (
+              action ===
+              "refresh"
+            ) {
+              await refreshAll();
+              return;
+            }
+
+            if (
+              action ===
+              "clear-logs"
+            ) {
+              state.events = [];
+              renderEvents();
+              renderAudit();
+
+              showToast(
+                "Audit view cleared.",
+                "info"
+              );
+
+              return;
+            }
+
+            await runExecutiveAction(
+              action
+            );
+          }
+        );
+      }
+    );
+
+    document.addEventListener(
+      "change",
+      event => {
+        const target =
+          event.target;
+
+        if (
+          target &&
+          target.matches(
+            "[data-os-toggle]"
+          )
+        ) {
+          toggleOS(
+            target
+          );
+        }
+      }
+    );
+
+    const exportButton =
+      byId(
+        "btnExportPermits"
+      );
+
+    if (exportButton) {
+      exportButton.addEventListener(
+        "click",
+        exportPermitsCSV
+      );
+    }
+
+    const openSidebar =
+      byId(
+        "open-sidebar"
+      );
+
+    if (openSidebar) {
+      openSidebar.addEventListener(
+        "click",
+        openMobileSidebar
+      );
+    }
+
+    const closeSidebar =
+      byId(
+        "close-sidebar"
+      );
+
+    if (closeSidebar) {
+      closeSidebar.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+    }
+
+    const overlay =
+      byId(
+        "sidebar-overlay"
+      );
+
+    if (overlay) {
+      overlay.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+    }
+  }
+
+  /* ================================================================
+   * INITIALISE UI
+   * ================================================================ */
+
+  function initialiseUI() {
+    setAuthUI(
+      state.authenticated
+    );
+
+    setGlobalStatus(
+      true,
+      "Checking system..."
+    );
+
+    renderModules();
+    renderPermits();
+    renderLeads();
+    renderEvents();
+    renderAudit();
+    renderIntegrations();
+    renderForecast();
+    renderSettings();
+    renderAnalytics();
+    renderAcquisition();
+    renderSecurity();
+
+    /*
+     * Generic OS shells.
+     */
+    [
+      "executive",
+      "revenue",
+      "sales",
+      "marketing",
+      "operations",
+      "finance",
+      "human-capital",
+      "projects",
+      "knowledge",
+      "legal",
+      "supply",
+      "customer-success"
+    ].forEach(
+      renderGenericOS
+    );
+  }
+
+  /* ================================================================
+   * STARTUP
+   * ================================================================ */
+
+  async function initialise() {
+    try {
+      loadAdminKey();
+
+      initialiseUI();
+
+      bindEvents();
+
+      showSection(
+        "dashboard"
+      );
+
+      /*
+       * First try the existing authenticated session.
+       */
+      const sessionValid =
+        await checkExistingSession();
+
+      /*
+       * If no active session exists, attempt the stored
+       * Executive admin key.
+       */
+      if (
+        !sessionValid &&
+        state.adminKey
+      ) {
+        await verifyAdminKey(
+          state.adminKey
+        );
+      }
+
+      if (
+        state.authenticated
+      ) {
+        await refreshAll();
+
+        /*
+         * Keep dashboard telemetry current.
+         */
+        clearInterval(
+          state.refreshTimer
+        );
+
+        state.refreshTimer =
+          setInterval(
+            () => {
+              if (
+                state.authenticated &&
+                !state.refreshInFlight
+              ) {
+                refreshAll();
+              }
+            },
+            30000
+          );
+      } else {
+        setGlobalStatus(
+          true,
+          "Admin key required"
+        );
+
+        actionMessage(
+          "Enter the Executive ADMIN_KEY to unlock controls.",
+          "warning"
+        );
+      }
+
+    } catch (error) {
+      console.error(
+        "[GRIDV21] Dashboard startup failed:",
+        error
+      );
+
+      setGlobalStatus(
+        false,
+        "Dashboard error"
+      );
+
+      actionMessage(
+        error.message ||
+          "Dashboard initialisation failed.",
+        "error"
+      );
+    }
+  }
+
+  /* ================================================================
+   * GLOBAL ERROR HANDLING
+   * ================================================================ */
+
+  window.addEventListener(
+    "error",
+    event => {
+      console.error(
+        "[GRIDV21] JavaScript error:",
+        event.error ||
+          event.message
+      );
+    }
+  );
+
+  window.addEventListener(
+    "unhandledrejection",
+    event => {
+      console.error(
+        "[GRIDV21] Unhandled promise rejection:",
+        event.reason
+      );
+    }
+  );
+
+  /* ================================================================
+   * PUBLIC DEBUG HANDLE
+   * ================================================================ */
+
+  window.GRIDV21Dashboard = Object.freeze({
+    version: VERSION,
+
+    refresh: refreshAll,
+
+    authenticate:
+      verifyAdminKey,
+
+    logout:
+      logoutExecutive,
+
+    state
+  });
+
+  /* ================================================================
+   * RUN
+   * ================================================================ */
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      initialise,
+      {
+        once: true
+      }
+    );
+  } else {
+    initialise();
+  }
+
+})();
