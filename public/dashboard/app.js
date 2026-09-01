@@ -45,7 +45,9 @@
     integrations: "/api/integrations",
 
     osToggle: id =>
+    
       `/api/os-toggle/${encodeURIComponent(id)}`
+      
         saSources:       "/api/sa-intelligence/sources",
     saStatus:        "/api/sa-intelligence/status",
     saScan:          "/api/sa-intelligence/scan",
