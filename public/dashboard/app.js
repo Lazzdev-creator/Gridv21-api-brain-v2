@@ -6,31 +6,21 @@
    * GRIDV21 BRAIN — EXECUTIVE DASHBOARD CONTROLLER
    * ================================================================
    *
-   * Matched to:
-   *   public/dashboard/index.html
-   *   server.js v6.4.0
+   * Corrected replacement for the truncated dashboard app.js.
    *
-   * Executive authentication:
-   *   POST /api/auth/verify
-   *
-   * Tenant authentication:
-   *   authType === "tenant"
-   *
-   * Executive authentication:
+   * Executive access:
    *   authType === "admin_key"
    *
-   * IMPORTANT:
-   * This file controls the Executive dashboard only.
-   * Tenant authentication is never treated as Executive access.
-   * Backend authorization remains the security boundary.
+   * Tenant access:
+   *   authType === "tenant"
+   *
+   * Tenant sessions are NEVER treated as Executive sessions.
+   *
+   * Backend authorization remains the final security boundary.
    * ================================================================
    */
 
-  const VERSION = "6.4.1";
-
-  /* ================================================================
-   * API
-   * ================================================================ */
+  const VERSION = "6.4.2";
 
   const API = Object.freeze({
     health: "/api/health",
@@ -45,45 +35,25 @@
     scanStatus: "/api/scan-status",
 
     scrapeNow: "/api/scrape-now",
-
     brainPause: "/api/brain/pause",
     brainResume: "/api/brain/resume",
-    emergencyStop:
-      "/api/brain/emergency-stop",
-    scanStop:
-      "/api/brain/scan-stop",
+    emergencyStop: "/api/brain/emergency-stop",
+    scanStop: "/api/brain/scan-stop",
 
-    systemEvents:
-      "/api/system-events",
-
-    forecast:
-      "/api/forecast",
-
-    integrations:
-      "/api/integrations",
+    systemEvents: "/api/system-events",
+    forecast: "/api/forecast",
+    integrations: "/api/integrations",
 
     osToggle: id =>
       `/api/os-toggle/${encodeURIComponent(id)}`
   });
 
-  /* ================================================================
-   * STORAGE
-   * ================================================================ */
-
-  const ADMIN_STORAGE_KEY =
-    "GRIDV21_ADMIN_KEY";
-
-  /* ================================================================
-   * STATE
-   * ================================================================ */
+  const ADMIN_STORAGE_KEY = "GRIDV21_ADMIN_KEY";
 
   const state = {
     authenticated: false,
-
     authType: null,
-
     role: null,
-
     adminKey: "",
 
     connected: false,
@@ -103,180 +73,109 @@
     },
 
     modules: [],
-
     permits: [],
-
     events: [],
-
     forecast: null,
-
     integrations: [],
 
     refreshTimer: null,
-
     refreshInFlight: false,
-
     actionInFlight: false,
 
-    mobileSidebarOpen: false,
-
-    activeSection:
-      "dashboard"
+    activeSection: "dashboard",
+    mobileSidebarOpen: false
   };
 
-  /* ================================================================
-   * FALLBACK OS DEFINITIONS
-   * ================================================================ */
-
-  const OS_MODULES = [
+  const FALLBACK_MODULES = [
     {
       id: 1,
-      name:
-        "Executive Intelligence",
-      description:
-        "Strategy and executive decision intelligence.",
-      layer:
-        "Strategy"
+      name: "Executive Intelligence",
+      description: "Strategy and executive decision intelligence.",
+      layer: "Strategy"
     },
-
     {
       id: 2,
-      name:
-        "Revenue Intelligence",
-      description:
-        "Revenue performance, forecasting and monetisation.",
-      layer:
-        "Finance"
+      name: "Revenue Intelligence",
+      description: "Revenue performance and forecasting.",
+      layer: "Finance"
     },
-
     {
       id: 3,
-      name:
-        "Sales & CRM",
-      description:
-        "Sales pipeline, prospects and customer relationship intelligence.",
-      layer:
-        "Sales"
+      name: "Sales & CRM",
+      description: "Sales pipeline and customer intelligence.",
+      layer: "Sales"
     },
-
     {
       id: 4,
-      name:
-        "Marketing",
-      description:
-        "Growth, campaigns, audiences and acquisition intelligence.",
-      layer:
-        "Growth"
+      name: "Marketing",
+      description: "Growth, campaigns and acquisition intelligence.",
+      layer: "Growth"
     },
-
     {
       id: 5,
-      name:
-        "Operations",
-      description:
-        "Operational performance and process intelligence.",
-      layer:
-        "Operations"
+      name: "Operations",
+      description: "Operational performance intelligence.",
+      layer: "Operations"
     },
-
     {
       id: 6,
-      name:
-        "Finance",
-      description:
-        "Accounting, cash flow and financial intelligence.",
-      layer:
-        "Accounting"
+      name: "Finance",
+      description: "Accounting and financial intelligence.",
+      layer: "Accounting"
     },
-
     {
       id: 7,
-      name:
-        "Human Capital",
-      description:
-        "People, workforce and organisational intelligence.",
-      layer:
-        "People"
+      name: "Human Capital",
+      description: "People and workforce intelligence.",
+      layer: "People"
     },
-
     {
       id: 8,
-      name:
-        "Project Management",
-      description:
-        "Projects, delivery, milestones and resource intelligence.",
-      layer:
-        "Projects"
+      name: "Project Management",
+      description: "Projects and delivery intelligence.",
+      layer: "Projects"
     },
-
     {
       id: 9,
-      name:
-        "Knowledge Intelligence",
-      description:
-        "Enterprise knowledge and institutional intelligence.",
-      layer:
-        "Knowledge"
+      name: "Knowledge Intelligence",
+      description: "Enterprise knowledge intelligence.",
+      layer: "Knowledge"
     },
-
     {
       id: 10,
-      name:
-        "Legal & Compliance",
-      description:
-        "Risk, regulatory and compliance intelligence.",
-      layer:
-        "Compliance"
+      name: "Legal & Compliance",
+      description: "Risk and compliance intelligence.",
+      layer: "Compliance"
     },
-
     {
       id: 11,
-      name:
-        "Supply Chain",
-      description:
-        "Suppliers, logistics and procurement intelligence.",
-      layer:
-        "Supply"
+      name: "Supply Chain",
+      description: "Suppliers, logistics and procurement.",
+      layer: "Supply"
     },
-
     {
       id: 12,
-      name:
-        "Acquisition Intelligence",
-      description:
-        "Lead discovery, permit intelligence and acquisition.",
-      layer:
-        "Lead Generation"
+      name: "Acquisition Intelligence",
+      description: "Lead discovery and acquisition.",
+      layer: "Lead Generation"
     },
-
     {
       id: 13,
-      name:
-        "Customer Success",
-      description:
-        "Customer health, retention and expansion intelligence.",
-      layer:
-        "Customer"
+      name: "Customer Success",
+      description: "Retention and customer health.",
+      layer: "Customer"
     },
-
     {
       id: 14,
-      name:
-        "IT & Security",
-      description:
-        "Technology, infrastructure and security intelligence.",
-      layer:
-        "Technology"
+      name: "IT & Security",
+      description: "Technology and security intelligence.",
+      layer: "Technology"
     },
-
     {
       id: 15,
-      name:
-        "Analytics & BI",
-      description:
-        "Enterprise analytics, reporting and business intelligence.",
-      layer:
-        "Analytics"
+      name: "Analytics & BI",
+      description: "Business intelligence and analytics.",
+      layer: "Analytics"
     }
   ];
 
@@ -288,27 +187,14 @@
     return document.getElementById(id);
   }
 
-  function all(
-    selector,
-    root = document
-  ) {
-    return Array.from(
-      root.querySelectorAll(
-        selector
-      )
-    );
+  function all(selector, root = document) {
+    return Array.from(root.querySelectorAll(selector));
   }
 
-  function setText(
-    id,
-    value
-  ) {
-    const element =
-      byId(id);
+  function setText(id, value) {
+    const element = byId(id);
 
-    if (!element) {
-      return;
-    }
+    if (!element) return;
 
     element.textContent =
       value === undefined ||
@@ -318,66 +204,31 @@
         : String(value);
   }
 
-  function setHTML(
-    id,
-    value
-  ) {
-    const element =
-      byId(id);
+  function setHTML(id, value) {
+    const element = byId(id);
 
-    if (!element) {
-      return;
-    }
+    if (!element) return;
 
-    element.innerHTML =
-      value ?? "";
+    element.innerHTML = value ?? "";
   }
 
-  function escapeHTML(
-    value
-  ) {
-    return String(
-      value ?? ""
-    )
-      .replace(
-        /&/g,
-        "&amp;"
-      )
-      .replace(
-        /</g,
-        "&lt;"
-      )
-      .replace(
-        />/g,
-        "&gt;"
-      )
-      .replace(
-        /"/g,
-        "&quot;"
-      )
-      .replace(
-        /'/g,
-        "&#039;"
-      );
+  function escapeHTML(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 
-  function safeArray(
-    value
-  ) {
-    return Array.isArray(
-      value
-    )
-      ? value
-      : [];
+  function safeArray(value) {
+    return Array.isArray(value) ? value : [];
   }
 
-  function safeObject(
-    value
-  ) {
+  function safeObject(value) {
     if (
       value &&
-      typeof value ===
-        "object" &&
+      typeof value === "object" &&
       !Array.isArray(value)
     ) {
       return value;
@@ -386,15 +237,11 @@
     return {};
   }
 
-  function numeric(
-    value,
-    fallback = 0
-  ) {
-    const n =
-      Number(value);
+  function numeric(value, fallback = 0) {
+    const number = Number(value);
 
-    return Number.isFinite(n)
-      ? n
+    return Number.isFinite(number)
+      ? number
       : fallback;
   }
 
@@ -402,81 +249,38 @@
    * FORMATTING
    * ================================================================ */
 
-  function formatNumber(
-    value
-  ) {
-    return new Intl.NumberFormat(
-      "en-GB"
-    ).format(
-      numeric(
-        value,
-        0
-      )
+  function formatNumber(value) {
+    return new Intl.NumberFormat("en-GB").format(
+      numeric(value, 0)
     );
   }
 
-  function formatMoney(
-    value
-  ) {
-    /*
-     * Existing GRIDV21 backend currently reports
-     * revenue values without a currency conversion.
-     *
-     * The existing dashboard used USD formatting.
-     */
-
-    return new Intl.NumberFormat(
-      "en-US",
-      {
-        style:
-          "currency",
-        currency:
-          "USD",
-        maximumFractionDigits:
-          2
-      }
-    ).format(
-      numeric(
-        value,
-        0
-      )
+  function formatMoney(value) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2
+    }).format(
+      numeric(value, 0)
     );
   }
 
-  function formatDate(
-    value
-  ) {
-    if (!value) {
-      return "—";
+  function formatDate(value) {
+    if (!value) return "—";
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
     }
 
-    const date =
-      new Date(value);
-
-    if (
-      Number.isNaN(
-        date.getTime()
-      )
-    ) {
-      return String(
-        value
-      );
-    }
-
-    return date.toLocaleString(
-      "en-GB",
-      {
-        dateStyle:
-          "medium",
-        timeStyle:
-          "short"
-      }
-    );
+    return date.toLocaleString("en-GB", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    });
   }
 
-  function formatDuration(
-    value
-  ) {
+  function formatDuration(value) {
     if (
       value === undefined ||
       value === null ||
@@ -485,224 +289,101 @@
       return "—";
     }
 
-    const seconds =
-      numeric(
-        value,
-        NaN
-      );
+    const seconds = numeric(value, NaN);
 
-    if (
-      !Number.isFinite(
-        seconds
-      )
-    ) {
-      return String(
-        value
-      );
+    if (!Number.isFinite(seconds)) {
+      return String(value);
     }
 
-    if (
-      seconds < 60
-    ) {
-      return `${Math.round(
-        seconds
-      )}s`;
+    if (seconds < 60) {
+      return `${Math.round(seconds)}s`;
     }
 
-    const minutes =
-      Math.floor(
-        seconds / 60
-      );
+    const minutes = Math.floor(seconds / 60);
+    const remaining = Math.round(seconds % 60);
 
-    const remaining =
-      Math.round(
-        seconds % 60
-      );
-
-    if (
-      minutes < 60
-    ) {
+    if (minutes < 60) {
       return `${minutes}m ${remaining}s`;
     }
 
-    const hours =
-      Math.floor(
-        minutes / 60
-      );
-
-    const mins =
-      minutes % 60;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
 
     return `${hours}h ${mins}m`;
   }
 
-  function formatUptime(
-    value
-  ) {
-    const seconds =
-      numeric(
-        value,
-        NaN
-      );
+  function formatUptime(value) {
+    const seconds = numeric(value, NaN);
 
-    if (
-      !Number.isFinite(
-        seconds
-      )
-    ) {
+    if (!Number.isFinite(seconds)) {
       return "—";
     }
 
-    const days =
-      Math.floor(
-        seconds / 86400
-      );
+    const days = Math.floor(seconds / 86400);
 
-    const hours =
-      Math.floor(
-        (seconds % 86400) /
-          3600
-      );
+    const hours = Math.floor(
+      (seconds % 86400) / 3600
+    );
 
-    const minutes =
-      Math.floor(
-        (seconds % 3600) /
-          60
-      );
+    const minutes = Math.floor(
+      (seconds % 3600) / 60
+    );
 
-    if (
-      days > 0
-    ) {
+    if (days > 0) {
       return `${days}d ${hours}h`;
     }
 
-    if (
-      hours > 0
-    ) {
+    if (hours > 0) {
       return `${hours}h ${minutes}m`;
     }
 
     return `${minutes}m`;
   }
 
-  function yesNo(
-    value
-  ) {
-    return value
-      ? "YES"
-      : "NO";
+  function yesNo(value) {
+    return value ? "YES" : "NO";
   }
 
   /* ================================================================
-   * TOAST
+   * TOAST / STATUS
    * ================================================================ */
 
-  function showToast(
-    message,
-    type = "info"
-  ) {
-    const toast =
-      byId("toast");
+  function showToast(message, type = "info") {
+    const toast = byId("toast");
 
     if (!toast) {
-      console.log(
-        "[GRIDV21]",
-        message
-      );
-
+      console.log("[GRIDV21]", message);
       return;
     }
 
-    toast.textContent =
-      String(
-        message ?? ""
-      );
+    toast.textContent = String(message ?? "");
+    toast.className = `toast toast-${type}`;
+    toast.classList.add("show");
 
-    toast.className =
-      `toast toast-${type}`;
+    clearTimeout(showToast.timer);
 
-    toast.classList.add(
-      "show"
-    );
-
-    clearTimeout(
-      showToast.timer
-    );
-
-    showToast.timer =
-      setTimeout(
-        () => {
-          toast.classList.remove(
-            "show"
-          );
-        },
-        3500
-      );
+    showToast.timer = setTimeout(() => {
+      toast.classList.remove("show");
+    }, 3500);
   }
 
-  /* ================================================================
-   * ACTION MESSAGE
-   * ================================================================ */
+  function actionMessage(message, type = "info") {
+    const element = byId("action-message");
 
-  function actionMessage(
-    message,
-    type = "info"
-  ) {
-    const element =
-      byId(
-        "action-message"
-      );
+    if (!element) return;
 
-    if (!element) {
-      return;
-    }
-
-    element.textContent =
-      String(
-        message ?? ""
-      );
-
-    element.dataset.type =
-      type;
+    element.textContent = String(message ?? "");
+    element.dataset.type = type;
   }
 
-  /* ================================================================
-   * GLOBAL STATUS
-   * ================================================================ */
+  function setGlobalStatus(connected, message) {
+    state.connected = Boolean(connected);
 
-  function setGlobalStatus(
-    connected,
-    message
-  ) {
-    state.connected =
-      Boolean(
-        connected
-      );
-
-    const badge =
-      byId(
-        "global-status"
-      );
-
-    const text =
-      byId(
-        "global-status-text"
-      );
-
-    const dot =
-      byId(
-        "global-status-dot"
-      );
-
-    const sidebarDot =
-      byId(
-        "sidebar-status-dot"
-      );
-
-    const sidebarText =
-      byId(
-        "sidebar-status-text"
-      );
+    const text = byId("global-status-text");
+    const dot = byId("global-status-dot");
+    const sidebarDot = byId("sidebar-status-dot");
+    const sidebarText = byId("sidebar-status-text");
+    const badge = byId("global-status");
 
     const finalMessage =
       message ||
@@ -713,64 +394,46 @@
       );
 
     if (text) {
-      text.textContent =
-        finalMessage;
+      text.textContent = finalMessage;
     }
 
-    if (
-      sidebarText
-    ) {
-      sidebarText.textContent =
-        finalMessage;
+    if (sidebarText) {
+      sidebarText.textContent = finalMessage;
     }
 
     if (badge) {
       badge.classList.toggle(
         "badge-success",
-        Boolean(
-          connected
-        )
+        Boolean(connected)
       );
 
       badge.classList.toggle(
         "badge-muted",
-        !Boolean(
-          connected
-        )
+        !Boolean(connected)
       );
     }
 
     if (dot) {
       dot.classList.toggle(
         "status-online",
-        Boolean(
-          connected
-        )
+        Boolean(connected)
       );
 
       dot.classList.toggle(
         "status-offline",
-        !Boolean(
-          connected
-        )
+        !Boolean(connected)
       );
     }
 
-    if (
-      sidebarDot
-    ) {
+    if (sidebarDot) {
       sidebarDot.classList.toggle(
         "status-online",
-        Boolean(
-          connected
-        )
+        Boolean(connected)
       );
 
       sidebarDot.classList.toggle(
         "status-offline",
-        !Boolean(
-          connected
-        )
+        !Boolean(connected)
       );
     }
   }
@@ -779,27 +442,13 @@
    * API ERROR
    * ================================================================ */
 
-  class APIError
-    extends Error {
+  class APIError extends Error {
+    constructor(message, status = 0, payload = null) {
+      super(message || "Request failed");
 
-    constructor(
-      message,
-      status = 0,
-      payload = null
-    ) {
-      super(
-        message ||
-          "Request failed"
-      );
-
-      this.name =
-        "APIError";
-
-      this.status =
-        status;
-
-      this.payload =
-        payload;
+      this.name = "APIError";
+      this.status = status;
+      this.payload = payload;
     }
   }
 
@@ -807,72 +456,39 @@
    * API REQUEST
    * ================================================================ */
 
-  async function apiFetch(
-    url,
-    options = {}
-  ) {
+  async function apiFetch(url, options = {}) {
     const headers = {
-      Accept:
-        "application/json"
+      Accept: "application/json"
     };
 
-    if (
-      options.body !==
-      undefined
-    ) {
-      headers[
-        "Content-Type"
-      ] =
+    if (options.body !== undefined) {
+      headers["Content-Type"] =
         "application/json";
     }
 
-    if (
-      options.headers
-    ) {
-      Object.assign(
-        headers,
-        options.headers
-      );
+    if (options.headers) {
+      Object.assign(headers, options.headers);
     }
 
     /*
-     * Direct admin key is intentionally retained.
-     *
-     * This allows the backend's requireAdmin middleware
-     * to authorize the request even if the browser session
-     * has not yet been persisted.
+     * Executive requests may carry the admin key.
+     * Tenant sessions are handled by the backend session cookie.
      */
-
-    if (
-      state.adminKey
-    ) {
-      headers[
-        "x-admin-key"
-      ] =
+    if (state.adminKey) {
+      headers["x-admin-key"] =
         state.adminKey;
     }
 
     let response;
 
     try {
-      response =
-        await fetch(
-          url,
-          {
-            ...options,
-
-            credentials:
-              "include",
-
-            cache:
-              "no-store",
-
-            headers
-          }
-        );
-    } catch (
-      error
-    ) {
+      response = await fetch(url, {
+        ...options,
+        credentials: "include",
+        cache: "no-store",
+        headers
+      });
+    } catch (error) {
       throw new APIError(
         "Unable to connect to GRIDV21 server.",
         0,
@@ -881,9 +497,7 @@
     }
 
     const contentType =
-      response.headers.get(
-        "content-type"
-      ) || "";
+      response.headers.get("content-type") || "";
 
     let payload = {};
 
@@ -893,28 +507,21 @@
       )
     ) {
       payload =
-        await response
-          .json()
-          .catch(
-            () => ({})
-          );
+        await response.json().catch(
+          () => ({})
+        );
     } else {
       const text =
-        await response
-          .text()
-          .catch(
-            () => ""
-          );
+        await response.text().catch(
+          () => ""
+        );
 
       payload = {
-        message:
-          text
+        message: text
       };
     }
 
-    if (
-      !response.ok
-    ) {
+    if (!response.ok) {
       throw new APIError(
         payload.error ||
           payload.message ||
@@ -937,29 +544,19 @@
         localStorage.getItem(
           ADMIN_STORAGE_KEY
         ) || "";
-    } catch (
-      error
-    ) {
+    } catch (error) {
       console.warn(
         "[GRIDV21] Could not load admin key.",
         error
       );
 
-      state.adminKey =
-        "";
+      state.adminKey = "";
     }
 
-    const input =
-      byId(
-        "adminKeyInput"
-      );
+    const input = byId("adminKeyInput");
 
-    if (
-      input &&
-      state.adminKey
-    ) {
-      input.value =
-        state.adminKey;
+    if (input && state.adminKey) {
+      input.value = state.adminKey;
     }
   }
 
@@ -970,42 +567,25 @@
       );
     } catch (_) {}
 
-    state.adminKey =
-      "";
+    state.adminKey = "";
   }
 
   /* ================================================================
-   * AUTH UI
+   * EXECUTIVE AUTH UI
    * ================================================================ */
 
-  function setAuthUI(
-    authenticated
-  ) {
-    const input =
-      byId(
-        "adminKeyInput"
-      );
-
-    const save =
-      byId(
-        "saveKeyBtn"
-      );
-
-    const status =
-      byId(
-        "keyStatus"
-      );
+  function setAuthUI(authenticated) {
+    const input = byId("adminKeyInput");
+    const save = byId("saveKeyBtn");
+    const status = byId("keyStatus");
 
     if (input) {
       input.disabled =
-        Boolean(
-          authenticated
-        );
+        Boolean(authenticated);
     }
 
     if (save) {
-      save.disabled =
-        false;
+      save.disabled = false;
     }
 
     if (status) {
@@ -1020,41 +600,24 @@
     );
   }
 
-  /* ================================================================
-   * EXECUTIVE CONTROL ENABLE/DISABLE
-   * ================================================================ */
+  function setControlsEnabled(enabled) {
+    const privilegedActions = [
+      "scan-start",
+      "scan-stop",
+      "brain-pause",
+      "brain-resume",
+      "emergency-stop"
+    ];
 
-  function setControlsEnabled(
-    enabled
-  ) {
-    const buttons =
-      all(
-        "[data-action]"
-      );
-
-    buttons.forEach(
+    all("[data-action]").forEach(
       button => {
         const action =
           button.dataset.action;
 
-        /*
-         * Navigation and view actions are not
-         * privileged Brain controls.
-         */
-
-        const privileged =
-          [
-            "scan-start",
-            "scan-stop",
-            "brain-pause",
-            "brain-resume",
-            "emergency-stop"
-          ].includes(
-            action
-          );
-
         if (
-          privileged
+          privilegedActions.includes(
+            action
+          )
         ) {
           button.disabled =
             !enabled;
@@ -1062,9 +625,7 @@
       }
     );
 
-    all(
-      "[data-os-toggle]"
-    ).forEach(
+    all("[data-os-toggle]").forEach(
       input => {
         input.disabled =
           !enabled;
@@ -1073,56 +634,49 @@
 
     document.body.classList.toggle(
       "executive-authenticated",
-      Boolean(
-        enabled
-      )
+      Boolean(enabled)
     );
 
     document.body.classList.toggle(
       "executive-locked",
-      !Boolean(
-        enabled
-      )
+      !Boolean(enabled)
     );
   }
 
   /* ================================================================
-   * VERIFY ADMIN KEY
+   * EXECUTIVE AUTHENTICATION
    * ================================================================ */
 
-  async function verifyAdminKey(
-    key = null
-  ) {
-    const supplied =
-      String(
-        key ??
-          state.adminKey ??
-          ""
-      ).trim();
+  async function verifyAdminKey(key = null) {
+    const supplied = String(
+      key ??
+        state.adminKey ??
+        ""
+    ).trim();
 
     if (!supplied) {
-      state.authenticated =
-        false;
+      state.authenticated = false;
+      state.authType = null;
+      state.role = null;
 
-      setAuthUI(
-        false
-      );
+      setAuthUI(false);
 
       setGlobalStatus(
         true,
         "Admin key required"
       );
 
+      actionMessage(
+        "Enter the Executive ADMIN_KEY.",
+        "warning"
+      );
+
       return false;
     }
 
-    state.adminKey =
-      supplied;
+    state.adminKey = supplied;
 
-    const status =
-      byId(
-        "keyStatus"
-      );
+    const status = byId("keyStatus");
 
     if (status) {
       status.textContent =
@@ -1134,9 +688,7 @@
         await apiFetch(
           API.authVerify,
           {
-            method:
-              "POST",
-
+            method: "POST",
             headers: {
               "x-admin-key":
                 supplied
@@ -1145,16 +697,10 @@
         );
 
       /*
-       * Backend returns:
-       *
-       * {
-       *   ok: true,
-       *   authenticated: true,
-       *   authType: "admin_key",
-       *   role: "owner"
-       * }
+       * IMPORTANT:
+       * Only admin_key is allowed to establish
+       * Executive authentication.
        */
-
       if (
         payload.ok !== true ||
         payload.authenticated !== true ||
@@ -1168,14 +714,10 @@
         );
       }
 
-      state.authenticated =
-        true;
-
-      state.authType =
-        "admin_key";
-
+      state.authenticated = true;
+      state.authType = "admin_key";
       state.role =
-        "owner";
+        payload.role || "owner";
 
       try {
         localStorage.setItem(
@@ -1184,9 +726,7 @@
         );
       } catch (_) {}
 
-      setAuthUI(
-        true
-      );
+      setAuthUI(true);
 
       setGlobalStatus(
         true,
@@ -1199,4 +739,139 @@
       }
 
       actionMessage(
-        "E
+        "Executive access authenticated.",
+        "success"
+      );
+
+      showToast(
+        "Owner authenticated.",
+        "success"
+      );
+
+      await refreshAll();
+
+      return true;
+
+    } catch (error) {
+      state.authenticated = false;
+      state.authType = null;
+      state.role = null;
+
+      setAuthUI(false);
+
+      if (
+        error instanceof APIError &&
+        error.status === 401
+      ) {
+        actionMessage(
+          "Invalid ADMIN_KEY.",
+          "error"
+        );
+
+        showToast(
+          "Invalid ADMIN_KEY.",
+          "error"
+        );
+      } else {
+        actionMessage(
+          error.message ||
+            "Authentication failed.",
+          "error"
+        );
+
+        showToast(
+          error.message ||
+            "Authentication failed.",
+          "error"
+        );
+      }
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * SESSION CHECK
+   * ================================================================ */
+
+  async function checkExistingSession() {
+    try {
+      const payload =
+        await apiFetch(
+          API.authMe
+        );
+
+      /*
+       * Tenant authentication must never unlock
+       * Executive controls.
+       */
+      if (
+        payload &&
+        payload.authenticated === true &&
+        payload.authType ===
+          "admin_key"
+      ) {
+        state.authenticated = true;
+        state.authType = "admin_key";
+        state.role =
+          payload.role || "owner";
+
+        setAuthUI(true);
+
+        return true;
+      }
+
+      state.authenticated = false;
+      state.authType = null;
+      state.role = null;
+
+      setAuthUI(false);
+
+      return false;
+
+    } catch (_) {
+      setAuthUI(
+        Boolean(state.authenticated)
+      );
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * LOGOUT / CLEAR KEY
+   * ================================================================ */
+
+  async function logoutExecutive() {
+    try {
+      await apiFetch(
+        API.authLogout,
+        {
+          method: "POST"
+        }
+      );
+    } catch (_) {}
+
+    clearAdminKeyStorage();
+
+    state.authenticated = false;
+    state.authType = null;
+    state.role = null;
+
+    setAuthUI(false);
+
+    setGlobalStatus(
+      true,
+      "Executive access cleared"
+    );
+
+    actionMessage(
+      "Executive access cleared.",
+      "info"
+    );
+
+    showToast(
+      "Admin key cleared.",
+      "info"
+    );
+      }
