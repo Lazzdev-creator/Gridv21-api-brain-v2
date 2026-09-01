@@ -1734,3 +1734,1067 @@
         `
       ).join("");
       }
+  /* ================================================================
+   * PERMITS
+   * ================================================================ */
+
+  function renderPermits() {
+    const body =
+      byId(
+        "permits-body"
+      );
+
+    if (!body) return;
+
+    const rows =
+      safeArray(
+        state.permits
+      ).slice(0, 200);
+
+    if (!rows.length) {
+      body.innerHTML =
+        '<tr><td colspan="5" class="empty">No permits available.</td></tr>';
+
+      return;
+    }
+
+    body.innerHTML =
+      rows.map(
+        item => `
+          <tr>
+            <td>${escapeHTML(
+              getPermitCity(item)
+            )}</td>
+
+            <td>${escapeHTML(
+              item.permit_id ||
+              item.permitId ||
+              item.id ||
+              "—"
+            )}</td>
+
+            <td>${escapeHTML(
+              item.status ||
+              "—"
+            )}</td>
+
+            <td>${formatNumber(
+              getPermitScore(item)
+            )}</td>
+
+            <td>${formatMoney(
+              getPermitValue(item)
+            )}</td>
+          </tr>
+        `
+      ).join("");
+  }
+
+  /* ================================================================
+   * EVENTS / ACTIVITY
+   * ================================================================ */
+
+  function renderEvents() {
+    const activity =
+      byId(
+        "dashboard-activity"
+      );
+
+    if (activity) {
+      const events =
+        safeArray(
+          state.events
+        ).slice(0, 10);
+
+      if (!events.length) {
+        activity.innerHTML =
+          '<div class="empty">No recent activity.</div>';
+      } else {
+        activity.innerHTML =
+          events.map(
+            event => `
+              <div class="activity-item">
+                <strong>${escapeHTML(
+                  event.title ||
+                  event.event ||
+                  event.type ||
+                  "System event"
+                )}</strong>
+
+                <span>${escapeHTML(
+                  event.message ||
+                  event.description ||
+                  ""
+                )}</span>
+
+                <small>${escapeHTML(
+                  formatDate(
+                    event.created_at ||
+                    event.createdAt ||
+                    event.timestamp
+                  )
+                )}</small>
+              </div>
+            `
+          ).join("");
+      }
+    }
+  }
+
+  function renderAudit() {
+    const container =
+      byId(
+        "log-container"
+      );
+
+    if (!container) return;
+
+    const events =
+      safeArray(
+        state.events
+      );
+
+    if (!events.length) {
+      container.innerHTML =
+        '<div class="empty">No audit activity available.</div>';
+
+      return;
+    }
+
+    container.innerHTML =
+      events.map(
+        event => `
+          <div class="log-entry">
+            <div>
+              <strong>${escapeHTML(
+                event.title ||
+                event.event ||
+                event.type ||
+                "Event"
+              )}</strong>
+
+              <p>${escapeHTML(
+                event.message ||
+                event.description ||
+                ""
+              )}</p>
+            </div>
+
+            <time>${escapeHTML(
+              formatDate(
+                event.created_at ||
+                event.createdAt ||
+                event.timestamp
+              )
+            )}</time>
+          </div>
+        `
+      ).join("");
+  }
+
+  /* ================================================================
+   * FORECAST
+   * ================================================================ */
+
+  function renderForecast() {
+    const recommendation =
+      byId(
+        "brain-recommendation"
+      );
+
+    if (!recommendation) {
+      return;
+    }
+
+    const forecast =
+      safeObject(
+        state.forecast
+      );
+
+    const text =
+      forecast.recommendation ||
+      forecast.summary ||
+      forecast.message;
+
+    if (text) {
+      recommendation.textContent =
+        String(text);
+
+      return;
+    }
+
+    if (
+      state.authenticated &&
+      state.engine.running
+    ) {
+      recommendation.textContent =
+        "GRIDV21 is monitoring the operating environment.";
+    } else {
+      recommendation.textContent =
+        "Authenticate Executive access to activate Brain controls.";
+    }
+  }
+
+  /* ================================================================
+   * INTEGRATIONS
+   * ================================================================ */
+
+  function renderIntegrations() {
+    const container =
+      byId(
+        "integrations-grid"
+      );
+
+    if (!container) return;
+
+    const integrations =
+      safeArray(
+        state.integrations
+      );
+
+    if (!integrations.length) {
+      container.innerHTML = `
+        <div class="empty-panel">
+          Integration status unavailable.
+        </div>
+      `;
+
+      return;
+    }
+
+    container.innerHTML =
+      integrations.map(
+        integration => {
+          const name =
+            integration.name ||
+            integration.provider ||
+            integration.type ||
+            "Integration";
+
+          const status =
+            integration.status ||
+            (
+              integration.connected
+                ? "Connected"
+                : "Disconnected"
+            );
+
+          return `
+            <article class="card">
+              <div class="card-header">
+                <h3>${escapeHTML(
+                  name
+                )}</h3>
+
+                <span class="badge ${
+                  String(status)
+                    .toLowerCase()
+                    .includes("connect")
+                    ? "badge-success"
+                    : "badge-muted"
+                }">
+                  ${escapeHTML(status)}
+                </span>
+              </div>
+            </article>
+          `;
+        }
+      ).join("");
+  }
+
+  /* ================================================================
+   * SECTION NAVIGATION
+   * ================================================================ */
+
+  const SECTION_TITLES = {
+    dashboard: [
+      "COMMAND CENTRE",
+      "Executive Dashboard"
+    ],
+
+    executive: [
+      "INTELLIGENCE OS",
+      "Executive Intelligence"
+    ],
+
+    revenue: [
+      "INTELLIGENCE OS",
+      "Revenue Intelligence"
+    ],
+
+    sales: [
+      "INTELLIGENCE OS",
+      "Sales & CRM"
+    ],
+
+    marketing: [
+      "INTELLIGENCE OS",
+      "Marketing"
+    ],
+
+    operations: [
+      "INTELLIGENCE OS",
+      "Operations"
+    ],
+
+    finance: [
+      "INTELLIGENCE OS",
+      "Finance"
+    ],
+
+    "human-capital": [
+      "INTELLIGENCE OS",
+      "Human Capital"
+    ],
+
+    projects: [
+      "INTELLIGENCE OS",
+      "Project Management"
+    ],
+
+    knowledge: [
+      "INTELLIGENCE OS",
+      "Knowledge Intelligence"
+    ],
+
+    legal: [
+      "INTELLIGENCE OS",
+      "Legal & Compliance"
+    ],
+
+    supply: [
+      "INTELLIGENCE OS",
+      "Supply Chain"
+    ],
+
+    acquisition: [
+      "INTELLIGENCE OS",
+      "Acquisition Intelligence"
+    ],
+
+    "customer-success": [
+      "INTELLIGENCE OS",
+      "Customer Success"
+    ],
+
+    "it-security": [
+      "INTELLIGENCE OS",
+      "IT & Security"
+    ],
+
+    analytics: [
+      "INTELLIGENCE OS",
+      "Analytics & BI"
+    ],
+
+    leads: [
+      "DATA & CONTROL",
+      "Leads"
+    ],
+
+    permits: [
+      "DATA & CONTROL",
+      "Permits"
+    ],
+
+    integrations: [
+      "DATA & CONTROL",
+      "Integrations"
+    ],
+
+    audit: [
+      "DATA & CONTROL",
+      "Audit & Activity"
+    ],
+
+    settings: [
+      "ADMINISTRATION",
+      "Settings"
+    ]
+  };
+
+  function showSection(section) {
+    const target =
+      String(
+        section || "dashboard"
+      );
+
+    const sectionElement =
+      byId(
+        `section-${target}`
+      );
+
+    if (!sectionElement) {
+      console.warn(
+        "[GRIDV21] Section not found:",
+        target
+      );
+
+      return;
+    }
+
+    all(".section").forEach(
+      element => {
+        element.classList.remove(
+          "active-section"
+        );
+      }
+    );
+
+    sectionElement.classList.add(
+      "active-section"
+    );
+
+    all(".nav-item").forEach(
+      button => {
+        button.classList.toggle(
+          "active",
+          button.dataset.section ===
+            target
+        );
+      }
+    );
+
+    state.activeSection =
+      target;
+
+    const title =
+      SECTION_TITLES[target] ||
+      [
+        "GRIDV21",
+        target
+      ];
+
+    setText(
+      "page-kicker",
+      title[0]
+    );
+
+    setText(
+      "page-title",
+      title[1]
+    );
+
+    closeMobileSidebar();
+  }
+
+  /* ================================================================
+   * MOBILE SIDEBAR
+   * ================================================================ */
+
+  function openMobileSidebar() {
+    const sidebar =
+      byId("sidebar");
+
+    const overlay =
+      byId("sidebar-overlay");
+
+    if (sidebar) {
+      sidebar.classList.add(
+        "open"
+      );
+    }
+
+    if (overlay) {
+      overlay.classList.add(
+        "show"
+      );
+    }
+
+    state.mobileSidebarOpen =
+      true;
+  }
+
+  function closeMobileSidebar() {
+    const sidebar =
+      byId("sidebar");
+
+    const overlay =
+      byId("sidebar-overlay");
+
+    if (sidebar) {
+      sidebar.classList.remove(
+        "open"
+      );
+    }
+
+    if (overlay) {
+      overlay.classList.remove(
+        "show"
+      );
+    }
+
+    state.mobileSidebarOpen =
+      false;
+  }
+
+  /* ================================================================
+   * EXECUTIVE ACTIONS
+   * ================================================================ */
+
+  async function runExecutiveAction(
+    action
+  ) {
+    if (!state.authenticated) {
+      actionMessage(
+        "Executive authentication is required.",
+        "warning"
+      );
+
+      showToast(
+        "Authenticate with the ADMIN_KEY first.",
+        "warning"
+      );
+
+      return;
+    }
+
+    if (state.actionInFlight) {
+      return;
+    }
+
+    const endpointMap = {
+      "scan-start":
+        API.scrapeNow,
+
+      "scan-stop":
+        API.scanStop,
+
+      "brain-pause":
+        API.brainPause,
+
+      "brain-resume":
+        API.brainResume,
+
+      "emergency-stop":
+        API.emergencyStop
+    };
+
+    const url =
+      endpointMap[action];
+
+    if (!url) {
+      return;
+    }
+
+    state.actionInFlight =
+      true;
+
+    const buttons =
+      all(
+        `[data-action="${action}"]`
+      );
+
+    buttons.forEach(
+      button => {
+        button.disabled = true;
+      }
+    );
+
+    const labels = {
+      "scan-start":
+        "Starting scan...",
+
+      "scan-stop":
+        "Stopping scan...",
+
+      "brain-pause":
+        "Pausing engine...",
+
+      "brain-resume":
+        "Resuming engine...",
+
+      "emergency-stop":
+        "Activating emergency stop..."
+    };
+
+    actionMessage(
+      labels[action] ||
+        "Executing action...",
+      "info"
+    );
+
+    try {
+      const payload =
+        await apiFetch(
+          url,
+          {
+            method: "POST"
+          }
+        );
+
+      const message =
+        payload.message ||
+        payload.status ||
+        (
+          action ===
+          "emergency-stop"
+            ? "Emergency stop activated."
+            : "Action completed."
+        );
+
+      actionMessage(
+        message,
+        "success"
+      );
+
+      showToast(
+        message,
+        "success"
+      );
+
+      await refreshAll();
+
+    } catch (error) {
+      console.error(
+        "[GRIDV21] Executive action failed:",
+        error
+      );
+
+      if (
+        error instanceof APIError &&
+        error.status === 401
+      ) {
+        state.authenticated =
+          false;
+
+        setAuthUI(false);
+      }
+
+      actionMessage(
+        error.message ||
+          "Action failed.",
+        "error"
+      );
+
+      showToast(
+        error.message ||
+          "Action failed.",
+        "error"
+      );
+
+    } finally {
+      state.actionInFlight =
+        false;
+
+      setControlsEnabled(
+        state.authenticated
+      );
+    }
+  }
+
+  /* ================================================================
+   * OS TOGGLE
+   * ================================================================ */
+
+  async function toggleOS(input) {
+    if (!input) return;
+
+    if (!state.authenticated) {
+      input.checked =
+        !input.checked;
+
+      showToast(
+        "Executive authentication required.",
+        "warning"
+      );
+
+      return;
+    }
+
+    const id =
+      input.dataset.osToggle;
+
+    if (!id) return;
+
+    const enabled =
+      Boolean(
+        input.checked
+      );
+
+    input.disabled = true;
+
+    try {
+      const payload =
+        await apiFetch(
+          API.osToggle(id),
+          {
+            method: "POST",
+
+            body:
+              JSON.stringify({
+                enabled
+              })
+          }
+        );
+
+      const message =
+        payload.message ||
+        `OS module ${enabled ? "enabled" : "disabled"}.`;
+
+      showToast(
+        message,
+        "success"
+      );
+
+      actionMessage(
+        message,
+        "success"
+      );
+
+      await loadModules();
+      await loadDashboard();
+
+    } catch (error) {
+      input.checked =
+        !enabled;
+
+      showToast(
+        error.message ||
+          "Unable to change OS module.",
+        "error"
+      );
+
+      actionMessage(
+        error.message ||
+          "Unable to change OS module.",
+        "error"
+      );
+
+    } finally {
+      input.disabled =
+        !state.authenticated;
+    }
+  }
+
+  /* ================================================================
+   * CSV EXPORT
+   * ================================================================ */
+
+  function csvEscape(value) {
+    const text =
+      String(
+        value ?? ""
+      );
+
+    if (
+      /[",\n]/.test(
+        text
+      )
+    ) {
+      return `"${text.replace(
+        /"/g,
+        '""'
+      )}"`;
+    }
+
+    return text;
+  }
+
+  function exportPermitsCSV() {
+    const rows =
+      safeArray(
+        state.permits
+      );
+
+    if (!rows.length) {
+      showToast(
+        "There are no permits to export.",
+        "warning"
+      );
+
+      return;
+    }
+
+    const header = [
+      "City",
+      "Permit",
+      "Status",
+      "Score",
+      "Estimated Value",
+      "Created"
+    ];
+
+    const lines = [
+      header
+        .map(csvEscape)
+        .join(",")
+    ];
+
+    rows.forEach(
+      item => {
+        lines.push(
+          [
+            getPermitCity(item),
+            item.permit_id ||
+              item.permitId ||
+              item.id ||
+              "",
+            item.status || "",
+            getPermitScore(item),
+            getPermitValue(item),
+            item.created_at ||
+              item.createdAt ||
+              ""
+          ]
+            .map(csvEscape)
+            .join(",")
+        );
+      }
+    );
+
+    const blob =
+      new Blob(
+        [
+          lines.join("\n")
+        ],
+        {
+          type:
+            "text/csv;charset=utf-8"
+        }
+      );
+
+    const url =
+      URL.createObjectURL(
+        blob
+      );
+
+    const anchor =
+      document.createElement(
+        "a"
+      );
+
+    anchor.href = url;
+    anchor.download =
+      `gridv21-permits-${new Date()
+        .toISOString()
+        .slice(0, 10)}.csv`;
+
+    document.body.appendChild(
+      anchor
+    );
+
+    anchor.click();
+    anchor.remove();
+
+    URL.revokeObjectURL(
+      url
+    );
+
+    showToast(
+      "Permit CSV exported.",
+      "success"
+    );
+  }
+
+  /* ================================================================
+   * SETTINGS / OS SHELLS
+   * ================================================================ */
+
+  function renderSettings() {
+    const container =
+      byId(
+        "settings-content"
+      );
+
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="card-grid">
+        <article class="card">
+          <div class="card-header">
+            <h3>Executive Authentication</h3>
+          </div>
+          <div class="card-body">
+            <p>
+              Status:
+              <strong>
+                ${
+                  state.authenticated
+                    ? "Authenticated"
+                    : "Locked"
+                }
+              </strong>
+            </p>
+
+            <p>
+              Role:
+              <strong>
+                ${
+                  escapeHTML(
+                    state.role ||
+                    "—"
+                  )
+                }
+              </strong>
+            </p>
+
+            <p>
+              Authentication type:
+              <strong>
+                ${
+                  escapeHTML(
+                    state.authType ||
+                    "—"
+                  )
+                }
+              </strong>
+            </p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-header">
+            <h3>Dashboard Version</h3>
+          </div>
+          <div class="card-body">
+            <p>
+              Controller:
+              <strong>
+                ${VERSION}
+              </strong>
+            </p>
+
+            <p>
+              Executive controls:
+              <strong>
+                ${
+                  state.authenticated
+                    ? "Unlocked"
+                    : "Locked"
+                }
+              </strong>
+            </p>
+          </div>
+        </article>
+      </div>
+    `;
+  }
+
+  function renderGenericOS(section) {
+    const container =
+      byId(
+        `${section}-content`
+      );
+
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="empty-panel">
+        <strong>
+          ${escapeHTML(
+            SECTION_TITLES[
+              section
+            ]?.[1] ||
+            section
+          )}
+        </strong>
+
+        <p>
+          Operating-system shell is online.
+          Live metrics will populate from the
+          connected GRIDV21 backend.
+        </p>
+      </div>
+    `;
+  }
+
+  function renderAnalytics() {
+    const container =
+      byId(
+        "analytics-content"
+      );
+
+    if (!container) return;
+
+    const active =
+      safeArray(
+        state.modules
+      ).filter(
+        module =>
+          Boolean(
+            module.enabled ??
+            module.active ??
+            module.is_active ??
+            true
+          )
+      ).length;
+
+    container.innerHTML = `
+      <div class="metric-grid">
+        <article class="metric-card">
+          <span>OS Modules</span>
+          <strong>${formatNumber(
+            state.modules.length
+          )}</strong>
+          <small>Loaded</small>
+        </article>
+
+        <article class="metric-card">
+          <span>Active OS</span>
+          <strong>${formatNumber(
+            active
+          )}</strong>
+          <small>Currently enabled</small>
+        </article>
+
+        <article class="metric-card">
+          <span>Permits</span>
+          <strong>${formatNumber(
+            state.permits.length
+          )}</strong>
+          <small>Loaded</small>
+        </article>
+
+        <article class="metric-card">
+          <span>Events</span>
+          <strong>${formatNumber(
+            state.events.length
+          )}</strong>
+          <small>Loaded</small>
+        </article>
+      </div>
+    `;
+  }
+
+  function renderAcquisition() {
+    const container =
+      byId(
+        "acquisition-content"
+      );
+
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="empty-panel">
+        Acquisition Intelligence is connected to the
+        current permit and lead data pipeline.
+        <br><br>
+        Loaded permits:
+        <strong>${formatNumber(
+          state.permits.length
+        )}</strong>
+      </div>
+    `;
+  }
+
+  function renderSecurity() {
+    const container =
+      byId(
+        "security-content"
+      );
+
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="empty-panel">
+        <strong>
+          Executive security boundary active.
+        </strong>
+
+        <p>
+          Tenant authen
