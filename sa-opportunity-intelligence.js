@@ -1,8 +1,8 @@
-/* GRIDV21 South Africa Construction Opportunity Intelligence - Phase 1 */
+/* GRIDV21 South Africa Construction Opportunity Intelligence - Phase 1 + Matching */
 import crypto from "crypto";
 import axios from "axios";
 
-const VERSION = "6.4.0";
+const VERSION = "6.4.1";
 
 export const SA_SOURCE_CONFIG = [
   { id:"SA_CPT_BDM", municipality:"Cape Town", province:"Western Cape", category:"building_development", type:"arcgis", endpoint:"https://citymaps.capetown.gov.za/agsext/rest/services/Theme_Based/ODP_SPLIT_11/MapServer/1", enabled:true, confidence:100 },
@@ -106,7 +106,7 @@ async function fetchGenericJSON(source, {timeout=30000}={}) {
   if (!source.endpoint) return [];
   const {data} = await axios.get(source.endpoint,{timeout,headers:{"User-Agent":`GRIDV21-BRAIN/${VERSION}`,Accept:"application/json,text/csv,*/*"}});
   const rows = Array.isArray(data) ? data : (data?.data || data?.results || data?.features || []);
-  return rows.map((row,i)=>normalizeArcGIS(source,{attributes:row,geometry:row.geometry||{}}).external_id ? normalizeArcGIS(source,{attributes:row,geometry:row.geometry||{}}) : null).filter(Boolean);
+  return rows.map((row)=>normalizeArcGIS(source,{attributes:row,geometry:row.geometry||{}})).filter(r => r.external_id);
 }
 
 async function upsertRecord(supabase, row) {
@@ -169,7 +169,7 @@ export function createSouthAfricaIntelligence({supabase, logger=console}) {
       return {ok:true,version:VERSION,stats,duration_ms:Date.now()-started};
     } catch(error){
       state.lastError=String(error.message||error);
-      if(runId) await supabase.from("acquisition_runs").update({status:"failed",finished_at:new Date().toISOString(),error_summary:state.lastError}).eq("id",runId);
+      if(runId) await supabase.from("acquisition_runs").update({status:"failed",finished_at:new Date().toISOString(),error_summary:state.lastError});
       return {ok:false,error:state.lastError,stats};
     } finally { state.running=false; }
   }
@@ -202,5 +202,84 @@ export function createSouthAfricaIntelligence({supabase, logger=console}) {
     return matches.map(m => ({...byId.get(m.record_id), match_score:m.match_score, match_reason:m.reason, match_status:m.status, matched_at:m.created_at})).filter(Boolean);
   }
 
-  return {version:VERSION,state,ensureSources,scan,opportunities,tenantOpportunities,sources:SA_SOURCE_CONFIG};
-   }
+  /**
+   * Basic auto-matching: push HIGH + MEDIUM opportunities to all active tenants
+   * (or a specific tenant). Creates rows in tenant_opportunity_matches.
+   * Idempotent via unique (tenant_id, record_id).
+   */
+  async function matchOpportunitiesToTenants({
+    tenantIds = null,
+    minScore = 60,
+    limitPerTenant = 40,
+    reason = "auto_high_score"
+  } = {}) {
+    let tenants = [];
+    if (Array.isArray(tenantIds) && tenantIds.length) {
+      tenants = tenantIds.map(id => ({ id }));
+    } else {
+      const { data, error } = await supabase
+        .from("tenants")
+        .select("id")
+        .eq("status", "active")
+        .limit(500);
+      if (error) {
+        logger.warn?.(`[SA] match: tenants table unavailable (${error.message}). Provide tenantIds explicitly.`);
+        return { ok: false, error: "No tenants resolved. Pass tenant_ids or create a tenants table.", matched: 0 };
+      }
+      tenants = data || [];
+    }
+
+    if (!tenants.length) {
+      return { ok: true, matched: 0, message: "No tenants to match" };
+    }
+
+    const opps = await opportunities({ limit: 200, minScore });
+    if (!opps.length) {
+      return { ok: true, matched: 0, message: "No opportunities above minScore" };
+    }
+
+    let totalMatched = 0;
+    const now = new Date().toISOString();
+
+    for (const tenant of tenants) {
+      const rows = opps.slice(0, limitPerTenant).map(o => ({
+        tenant_id: tenant.id,
+        record_id: o.id,
+        match_score: o.score,
+        reason: `${reason} (tier=${o.tier})`,
+        status: "new",
+        created_at: now,
+        updated_at: now
+      }));
+
+      const { error } = await supabase
+        .from("tenant_opportunity_matches")
+        .upsert(rows, { onConflict: "tenant_id,record_id", ignoreDuplicates: false });
+
+      if (error) {
+        logger.warn?.(`[SA] match tenant ${tenant.id}: ${error.message}`);
+        continue;
+      }
+      totalMatched += rows.length;
+    }
+
+    return {
+      ok: true,
+      matched: totalMatched,
+      tenants: tenants.length,
+      opportunities_considered: opps.length,
+      minScore
+    };
+  }
+
+  return {
+    version: VERSION,
+    state,
+    ensureSources,
+    scan,
+    opportunities,
+    tenantOpportunities,
+    matchOpportunitiesToTenants,
+    sources: SA_SOURCE_CONFIG
+  };
+    }
