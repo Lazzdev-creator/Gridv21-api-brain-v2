@@ -2777,26 +2777,291 @@
     `;
   }
 
-  function renderAcquisition() {
-    const container =
-      byId(
-        "acquisition-content"
-      );
+    /* ---------- SA Acquisition loaders & actions ---------- */
 
+  async function loadSaStatus() {
+    try {
+      const data = await apiFetch(API.saStatus);
+      state.sa = state.sa || {};
+      state.sa.status = data;
+      return data;
+    } catch (err) {
+      console.warn("[SA] status load failed", err);
+      state.sa = state.sa || {};
+      state.sa.lastError = err.message;
+      return null;
+    }
+  }
+
+  async function loadSaSources() {
+    try {
+      const data = await apiFetch(API.saSources);
+      state.sa = state.sa || {};
+      state.sa.sources = data.sources || [];
+      return state.sa.sources;
+    } catch (err) {
+      console.warn("[SA] sources load failed", err);
+      return [];
+    }
+  }
+
+  async function loadSaOpportunities(opts = {}) {
+    const params = new URLSearchParams();
+    params.set("limit", opts.limit || 40);
+    if (opts.min_score != null) params.set("min_score", opts.min_score);
+    if (opts.tier) params.set("tier", opts.tier);
+    if (opts.municipality) params.set("municipality", opts.municipality);
+
+    try {
+      const data = await apiFetch(`${API.saOpportunities}?${params}`);
+      state.sa = state.sa || {};
+      state.sa.opportunities = data.opportunities || data.data || [];
+      return state.sa.opportunities;
+    } catch (err) {
+      console.warn("[SA] opportunities load failed", err);
+      state.sa = state.sa || {};
+      state.sa.lastError = err.message;
+      state.sa.opportunities = [];
+      return [];
+    }
+  }
+
+  async function runSaScan() {
+    if (state.actionInFlight) return;
+    state.actionInFlight = true;
+    actionMessage("Starting South Africa acquisition scan…", "info");
+
+    try {
+      const result = await apiFetch(API.saScan, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+
+      if (result.ok) {
+        actionMessage(
+          `SA scan complete — fetched ${result.stats?.fetched ?? 0}, new ${result.stats?.new ?? 0}, HIGH ${result.stats?.high ?? 0}`,
+          "success"
+        );
+      } else {
+        actionMessage(result.error || "Scan failed", "error");
+      }
+
+      await Promise.all([loadSaStatus(), loadSaOpportunities()]);
+      renderAcquisition();
+    } catch (err) {
+      actionMessage(err.message || "Scan failed", "error");
+    } finally {
+      state.actionInFlight = false;
+    }
+  }
+
+  async function runSaMatch() {
+    if (state.actionInFlight) return;
+    state.actionInFlight = true;
+    actionMessage("Matching HIGH/MEDIUM opportunities to tenants…", "info");
+
+    try {
+      const result = await apiFetch(API.saMatch, {
+        method: "POST",
+        body: JSON.stringify({ min_score: 60, limit_per_tenant: 40 })
+      });
+
+      if (result.ok) {
+        actionMessage(
+          `Matched ${result.matched ?? 0} opportunity rows across ${result.tenants ?? 0} tenants`,
+          "success"
+        );
+      } else {
+        actionMessage(result.error || "Match failed", "error");
+      }
+    } catch (err) {
+      actionMessage(err.message || "Match failed", "error");
+    } finally {
+      state.actionInFlight = false;
+    }
+  }
+
+  async function runSaScanAndMatch() {
+    if (state.actionInFlight) return;
+    state.actionInFlight = true;
+    actionMessage("Running SA scan + auto-match…", "info");
+
+    try {
+      const result = await apiFetch(API.saScanAndMatch, {
+        method: "POST",
+        body: JSON.stringify({ min_score: 60, limit_per_tenant: 40 })
+      });
+
+      if (result.ok) {
+        const s = result.scan?.stats || {};
+        actionMessage(
+          `Scan+Match done — fetched ${s.fetched ?? 0}, matched ${result.match?.matched ?? 0}`,
+          "success"
+        );
+      } else {
+        actionMessage(result.error || "Scan+Match failed", "error");
+      }
+
+      await Promise.all([loadSaStatus(), loadSaOpportunities()]);
+      renderAcquisition();
+    } catch (err) {
+      actionMessage(err.message || "Scan+Match failed", "error");
+    } finally {
+      state.actionInFlight = false;
+    }
+  }
+
+  function renderAcquisition() {
+    const container = byId("acquisition-content");
     if (!container) return;
 
+    const sa = state.sa || {};
+    const status = sa.status || {};
+    const stats = status.stats || {};
+    const opps = sa.opportunities || [];
+    const sources = sa.sources || [];
+    const running = Boolean(status.running);
+
+    const high = opps.filter(o => o.tier === "HIGH").length;
+    const medium = opps.filter(o => o.tier === "MEDIUM").length;
+    const enabledSources = sources.filter(s => s.enabled).length;
+
     container.innerHTML = `
-      <div class="empty-panel">
-        Acquisition Intelligence is connected to the
-        current permit and lead data pipeline.
-        <br><br>
-        Loaded permits:
-        <strong>${formatNumber(
-          state.permits.length
-        )}</strong>
+      <div class="section-actions" style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:1rem;">
+        <button class="btn btn-primary" type="button" data-sa-action="scan" ${running || state.actionInFlight ? "disabled" : ""}>
+          ${running ? "Scanning…" : "Run SA Scan"}
+        </button>
+        <button class="btn btn-secondary" type="button" data-sa-action="match" ${state.actionInFlight ? "disabled" : ""}>
+          Match to Tenants
+        </button>
+        <button class="btn btn-secondary" type="button" data-sa-action="scan-match" ${running || state.actionInFlight ? "disabled" : ""}>
+          Scan + Match
+        </button>
+        <button class="btn btn-secondary" type="button" data-sa-action="refresh">
+          Refresh
+        </button>
       </div>
+
+      <div class="metric-grid" style="margin-bottom:1.25rem;">
+        <article class="metric-card">
+          <span>Scan Status</span>
+          <strong>${running ? "RUNNING" : (status.lastRun ? "Idle" : "Never run")}</strong>
+          <small>${status.lastRun ? "Last: " + new Date(status.lastRun).toLocaleString() : "No scan yet"}</small>
+        </article>
+        <article class="metric-card">
+          <span>Sources</span>
+          <strong>${enabledSources}/${sources.length || "—"}</strong>
+          <small>Enabled / total</small>
+        </article>
+        <article class="metric-card">
+          <span>Fetched (last)</span>
+          <strong>${formatNumber(stats.fetched ?? 0)}</strong>
+          <small>New ${formatNumber(stats.new ?? 0)} · Updated ${formatNumber(stats.updated ?? 0)}</small>
+        </article>
+        <article class="metric-card">
+          <span>HIGH / MEDIUM</span>
+          <strong>${formatNumber(stats.high ?? high)} / ${formatNumber(stats.medium ?? medium)}</strong>
+          <small>Opportunity tiers</small>
+        </article>
+      </div>
+
+      ${status.lastError ? `
+        <div class="empty-panel" style="border-color:#ef4444;margin-bottom:1rem;">
+          <strong>Last error</strong><br>${escapeHTML(status.lastError)}
+        </div>
+      ` : ""}
+
+      <div class="section-head" style="margin-bottom:0.75rem;">
+        <div>
+          <span class="eyebrow">LIVE FEED</span>
+          <h3 style="margin:0.15rem 0;">South Africa Opportunities</h3>
+          <p class="muted" style="margin:0;">Top scored construction / development leads from municipal sources.</p>
+        </div>
+      </div>
+
+      ${opps.length === 0 ? `
+        <div class="empty-panel">
+          No opportunities loaded yet.<br>
+          Click <strong>Run SA Scan</strong> to pull data from Cape Town, Ekurhuleni, Breede Valley and other enabled sources.
+          ${sa.lastError ? `<br><br><span style="color:#ef4444">${escapeHTML(sa.lastError)}</span>` : ""}
+        </div>
+      ` : `
+        <div class="list" style="display:grid;gap:0.75rem;">
+          ${opps.map(o => {
+            const tier = o.tier || "LOW";
+            const title = o.project_type || o.application_type || o.permit_type || o.source_category || "Opportunity";
+            const place = [o.address, o.suburb, o.town || o.municipality].filter(Boolean).join(", ");
+            return `
+              <article class="card" style="padding:1rem 1.1rem;">
+                <div style="display:flex;justify-content:space-between;gap:0.75rem;align-items:start;margin-bottom:0.5rem;">
+                  <div>
+                    <div style="font-weight:650;">${escapeHTML(title)}</div>
+                    <div class="muted" style="font-size:0.88rem;margin-top:0.15rem;">${escapeHTML(place || o.municipality || "South Africa")}</div>
+                  </div>
+                  <span class="badge ${tier === "HIGH" ? "badge-success" : tier === "MEDIUM" ? "badge-warning" : "badge-muted"}">
+                    ${escapeHTML(tier)} · ${escapeHTML(String(o.score ?? "—"))}
+                  </span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.6rem;font-size:0.9rem;">
+                  <div><span class="muted">Municipality</span><br>${escapeHTML(o.municipality || "—")}</div>
+                  <div><span class="muted">Status</span><br>${escapeHTML(o.status || "—")}</div>
+                  <div><span class="muted">Zoning</span><br>${escapeHTML(o.zoning || "—")}</div>
+                  <div><span class="muted">Category</span><br>${escapeHTML(o.source_category || "—")}</div>
+                </div>
+                ${o.ai_summary ? `<p class="muted" style="margin:0.7rem 0 0;font-size:0.85rem;">${escapeHTML(o.ai_summary)}</p>` : ""}
+              </article>
+            `;
+          }).join("")}
+        </div>
+      `}
+
+      ${sources.length ? `
+        <div class="section-head" style="margin:1.5rem 0 0.75rem;">
+          <div>
+            <span class="eyebrow">SOURCES</span>
+            <h3 style="margin:0.15rem 0;">Municipal endpoints</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Municipality</th>
+                <th>Category</th>
+                <th>Enabled</th>
+                <th>Confidence</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sources.map(s => `
+                <tr>
+                  <td>${escapeHTML(s.id)}</td>
+                  <td>${escapeHTML(s.municipality || "—")}</td>
+                  <td>${escapeHTML(s.category || "—")}</td>
+                  <td>${s.enabled ? "Yes" : "No"}</td>
+                  <td>${escapeHTML(String(s.confidence ?? "—"))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      ` : ""}
     `;
-  }
+
+    container.querySelectorAll("[data-sa-action]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const action = btn.getAttribute("data-sa-action");
+        if (action === "scan") await runSaScan();
+        else if (action === "match") await runSaMatch();
+        else if (action === "scan-match") await runSaScanAndMatch();
+        else if (action === "refresh") {
+          await Promise.all([loadSaStatus(), loadSaSources(), loadSaOpportunities()]);
+          renderAcquisition();
+        }
+      });
+    });
+            }
 
   function renderSecurity() {
     const container =
