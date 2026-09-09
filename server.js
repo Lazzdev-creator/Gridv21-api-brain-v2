@@ -3750,7 +3750,211 @@ app.get(
   }
 );
 
+/* -------------------------------------------------------------------------- */
+/* ZIMBABWE INTELLIGENCE API                                                  */
+/* -------------------------------------------------------------------------- */
 
+app.get(
+  "/api/zw-intelligence/sources",
+  requireAuth,
+  (req, res) => {
+
+    return res.json({
+      ok: true,
+
+      country:
+        "ZW",
+
+      version:
+        ZW_INTELLIGENCE.version,
+
+      sources:
+        ZW_INTELLIGENCE.sources.map(
+          source => ({
+            ...source,
+
+            endpoint:
+              source.endpoint ||
+              null
+          })
+        )
+    });
+
+  }
+);
+
+
+app.get(
+  "/api/zw-intelligence/status",
+  requireAuth,
+  (req, res) => {
+
+    return res.json({
+
+      ok: true,
+
+      country:
+        "ZW",
+
+      version:
+        ZW_INTELLIGENCE.version,
+
+      running:
+        ZW_INTELLIGENCE.state.running,
+
+      lastRun:
+        ZW_INTELLIGENCE.state.lastRun,
+
+      lastError:
+        ZW_INTELLIGENCE.state.lastError,
+
+      stats:
+        ZW_INTELLIGENCE.state.stats
+
+    });
+
+  }
+);
+
+
+app.post(
+  "/api/zw-intelligence/scan",
+  requireAuth,
+  async (req, res) => {
+
+    try {
+
+      const sourceIds =
+        Array.isArray(
+          req.body?.source_ids
+        )
+          ? req.body.source_ids.map(
+              String
+            )
+          : null;
+
+      const result =
+        await ZW_INTELLIGENCE.scan({
+
+          sourceIds,
+
+          runType:
+            "manual"
+
+        });
+
+      return res
+        .status(
+          result.ok
+            ? 200
+            : 500
+        )
+        .json(result);
+
+    }
+    catch (error) {
+
+      console.error(
+        "[ZW INTELLIGENCE] Scan API error:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok:
+          false,
+
+        country:
+          "ZW",
+
+        error:
+          error.message ||
+          "Zimbabwe intelligence scan failed."
+
+      });
+
+    }
+
+  }
+);
+
+
+app.get(
+  "/api/zw-intelligence/opportunities",
+  requireAuth,
+  async (req, res) => {
+
+    try {
+
+      const limit =
+        Math.min(
+          Number(
+            req.query.limit
+          ) || 50,
+          200
+        );
+
+      const minScore =
+        Number(
+          req.query.min_score
+        ) || 0;
+
+      const tier =
+        req.query.tier ||
+        null;
+
+      const data =
+        await ZW_INTELLIGENCE.opportunities({
+
+          limit,
+
+          minScore,
+
+          tier
+
+        });
+
+      return res.json({
+
+        ok:
+          true,
+
+        country:
+          "ZW",
+
+        count:
+          data.length,
+
+        opportunities:
+          data
+
+      });
+
+    }
+    catch (error) {
+
+      console.error(
+        "[ZW INTELLIGENCE] Opportunity API error:",
+        error
+      );
+
+      return res.status(500).json({
+
+        ok:
+          false,
+
+        country:
+          "ZW",
+
+        error:
+          "Could not load Zimbabwe opportunities."
+
+      });
+
+    }
+
+  }
+);
 /* -------------------------------------------------------------------------- */
 /* BRAIN CONTROL APIs (Parts 2–5 — dashboard + engine + permits)              */
 /* -------------------------------------------------------------------------- */
