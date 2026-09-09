@@ -3208,7 +3208,319 @@ const zwRunning = Boolean(zwStatus.running);
             </tbody>
           </table>
         </div>
-      ` : ""}
+      ` :       <div
+        class="section-head"
+        style="margin:1.75rem 0 0.75rem;"
+      >
+        <div>
+          <span class="eyebrow">
+            ZIMBABWE ACQUISITION INTELLIGENCE
+          </span>
+
+          <h3 style="margin:0.15rem 0;">
+            🇿🇼 Zimbabwe Construction Opportunities
+          </h3>
+
+          <p
+            class="muted"
+            style="margin:0;"
+          >
+            Zimbabwe procurement and construction opportunities from the registered acquisition sources.
+          </p>
+        </div>
+      </div>
+
+      <div
+        class="metric-grid"
+        style="margin-bottom:1rem;"
+      >
+        <article class="metric-card">
+          <span>ZW Scan Status</span>
+          <strong>
+            ${
+              zwRunning
+                ? "RUNNING"
+                : (
+                    zwStatus.lastRun
+                      ? "IDLE"
+                      : "NEVER RUN"
+                  )
+            }
+          </strong>
+
+          <small>
+            ${
+              zwStatus.lastRun
+                ? "Last: " +
+                  new Date(
+                    zwStatus.lastRun
+                  ).toLocaleString()
+                : "No Zimbabwe scan yet"
+            }
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>ZW Sources</span>
+          <strong>
+            ${
+              zwSources.filter(
+                s => s.enabled
+              ).length
+            }/${zwSources.length || "—"}
+          </strong>
+
+          <small>
+            Enabled / total
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>ZW Fetched</span>
+          <strong>
+            ${
+              formatNumber(
+                zwStats.fetched ?? 0
+              )
+            }
+          </strong>
+
+          <small>
+            New ${
+              formatNumber(
+                zwStats.new ?? 0
+              )
+            }
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>ZW HIGH / MEDIUM</span>
+          <strong>
+            ${
+              formatNumber(
+                zwStats.high ??
+                zwOpps.filter(
+                  o => o.tier === "HIGH"
+                ).length
+              )
+            }
+            /
+            ${
+              formatNumber(
+                zwStats.medium ??
+                zwOpps.filter(
+                  o => o.tier === "MEDIUM"
+                ).length
+              )
+            }
+          </strong>
+
+          <small>
+            Opportunity tiers
+          </small>
+        </article>
+      </div>
+
+      ${
+        zwStatus.lastError
+          ? `
+            <div
+              class="empty-panel"
+              style="border-color:#ef4444;margin-bottom:1rem;"
+            >
+              <strong>
+                Zimbabwe last error
+              </strong>
+              <br>
+              ${escapeHTML(
+                zwStatus.lastError
+              )}
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        zwOpps.length === 0
+          ? `
+            <div class="empty-panel">
+              No Zimbabwe opportunities loaded yet.
+              <br><br>
+              Click
+              <strong>
+                🇿🇼 Zimbabwe Scan
+              </strong>
+              to run the Zimbabwe acquisition engine.
+            </div>
+          `
+          : `
+            <div
+              class="list"
+              style="display:grid;gap:0.75rem;"
+            >
+              ${zwOpps.map(o => {
+
+                const tier =
+                  o.tier || "LOW";
+
+                const title =
+                  o.project_type ||
+                  o.project_title ||
+                  o.application_type ||
+                  o.permit_type ||
+                  o.source_category ||
+                  "Zimbabwe Opportunity";
+
+                const place =
+                  [
+                    o.address,
+                    o.town,
+                    o.municipality,
+                    o.procuring_entity
+                  ]
+                    .filter(Boolean)
+                    .join(", ");
+
+                return `
+                  <article
+                    class="card"
+                    style="padding:1rem 1.1rem;"
+                  >
+                    <div
+                      style="
+                        display:flex;
+                        justify-content:space-between;
+                        gap:0.75rem;
+                        align-items:start;
+                        margin-bottom:0.5rem;
+                      "
+                    >
+                      <div>
+                        <div
+                          style="font-weight:650;"
+                        >
+                          ${escapeHTML(title)}
+                        </div>
+
+                        <div
+                          class="muted"
+                          style="
+                            font-size:0.88rem;
+                            margin-top:0.15rem;
+                          "
+                        >
+                          ${escapeHTML(
+                            place ||
+                            "Zimbabwe"
+                          )}
+                        </div>
+                      </div>
+
+                      <span
+                        class="badge ${
+                          tier === "HIGH"
+                            ? "badge-success"
+                            : tier === "MEDIUM"
+                              ? "badge-warning"
+                              : "badge-muted"
+                        }"
+                      >
+                        ${escapeHTML(
+                          tier
+                        )}
+                        ·
+                        ${escapeHTML(
+                          String(
+                            o.score ?? "—"
+                          )
+                        )}
+                      </span>
+                    </div>
+
+                    <div
+                      style="
+                        display:grid;
+                        grid-template-columns:
+                          repeat(
+                            auto-fit,
+                            minmax(120px,1fr)
+                          );
+                        gap:0.6rem;
+                        font-size:0.9rem;
+                      "
+                    >
+                      <div>
+                        <span class="muted">
+                          Entity
+                        </span>
+                        <br>
+                        ${escapeHTML(
+                          o.procuring_entity ||
+                          "—"
+                        )}
+                      </div>
+
+                      <div>
+                        <span class="muted">
+                          Category
+                        </span>
+                        <br>
+                        ${escapeHTML(
+                          o.source_category ||
+                          o.category ||
+                          "—"
+                        )}
+                      </div>
+
+                      <div>
+                        <span class="muted">
+                          Status
+                        </span>
+                        <br>
+                        ${escapeHTML(
+                          o.status ||
+                          "—"
+                        )}
+                      </div>
+
+                      <div>
+                        <span class="muted">
+                          Closing
+                        </span>
+                        <br>
+                        ${escapeHTML(
+                          o.closing_date ||
+                          o.deadline ||
+                          "—"
+                        )}
+                      </div>
+                    </div>
+
+                    ${
+                      o.ai_summary
+                        ? `
+                          <p
+                            class="muted"
+                            style="
+                              margin:
+                                0.7rem 0 0;
+                              font-size:0.85rem;
+                            "
+                          >
+                            ${escapeHTML(
+                              o.ai_summary
+                            )}
+                          </p>
+                        `
+                        : ""
+                    }
+                  </article>
+                `;
+              }).join("")}
+            </div>
+          `
+                }""}
     `;
 
     container.querySelectorAll("[data-sa-action]").forEach(btn => {
