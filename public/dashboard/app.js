@@ -2923,7 +2923,150 @@ zwOpportunities: "/api/zw-intelligence/opportunities"
       state.actionInFlight = false;
     }
   }
+/* ---------- Zimbabwe Acquisition loaders & actions ---------- */
 
+async function loadZwStatus() {
+  try {
+    const data = await apiFetch(API.zwStatus);
+
+    state.zw = state.zw || {};
+    state.zw.status = data;
+
+    return data;
+  } catch (err) {
+    console.warn("[ZW] status load failed", err);
+
+    state.zw = state.zw || {};
+    state.zw.lastError = err.message;
+
+    return null;
+  }
+}
+
+async function loadZwSources() {
+  try {
+    const data = await apiFetch(API.zwSources);
+
+    state.zw = state.zw || {};
+    state.zw.sources = data.sources || [];
+
+    return state.zw.sources;
+  } catch (err) {
+    console.warn("[ZW] sources load failed", err);
+    return [];
+  }
+}
+
+async function loadZwOpportunities(opts = {}) {
+  const params = new URLSearchParams();
+
+  params.set("limit", opts.limit || 40);
+
+  if (opts.min_score != null) {
+    params.set("min_score", opts.min_score);
+  }
+
+  if (opts.tier) {
+    params.set("tier", opts.tier);
+  }
+
+  try {
+    const data = await apiFetch(
+      `${API.zwOpportunities}?${params}`
+    );
+
+    state.zw = state.zw || {};
+    state.zw.opportunities =
+      data.opportunities ||
+      data.data ||
+      [];
+
+    return state.zw.opportunities;
+  } catch (err) {
+    console.warn(
+      "[ZW] opportunities load failed",
+      err
+    );
+
+    state.zw = state.zw || {};
+    state.zw.lastError = err.message;
+    state.zw.opportunities = [];
+
+    return [];
+  }
+}
+
+async function runZwScan() {
+  if (state.actionInFlight) {
+    return;
+  }
+
+  state.actionInFlight = true;
+
+  actionMessage(
+    "Starting Zimbabwe acquisition scan…",
+    "info"
+  );
+
+  try {
+    const result =
+      await apiFetch(
+        API.zwScan,
+        {
+          method: "POST",
+          body: JSON.stringify({})
+        }
+      );
+
+    if (result.ok) {
+      actionMessage(
+        `Zimbabwe scan complete — fetched ${result.stats?.fetched ?? 0}, new ${result.stats?.new ?? 0}, HIGH ${result.stats?.high ?? 0}`,
+        "success"
+      );
+
+      showToast(
+        "Zimbabwe acquisition scan completed.",
+        "success"
+      );
+    } else {
+      actionMessage(
+        result.error ||
+          "Zimbabwe scan failed.",
+        "error"
+      );
+    }
+
+    await Promise.all([
+      loadZwStatus(),
+      loadZwSources(),
+      loadZwOpportunities()
+    ]);
+
+    renderAcquisition();
+
+  } catch (err) {
+    console.error(
+      "[ZW] scan failed",
+      err
+    );
+
+    actionMessage(
+      err.message ||
+        "Zimbabwe scan failed.",
+      "error"
+    );
+
+    showToast(
+      err.message ||
+        "Zimbabwe scan failed.",
+      "error"
+    );
+
+  } finally {
+    state.actionInFlight =
+      false;
+  }
+  }
   function renderAcquisition() {
     const container = byId("acquisition-content");
     if (!container) return;
