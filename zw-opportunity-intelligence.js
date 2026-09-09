@@ -1,162 +1,28 @@
 /******************************************************************************
  * GRIDV21 ZIMBABWE CONSTRUCTION OPPORTUNITY INTELLIGENCE
- * STEP 1 — MODULE ONLY
+ * VERSION 1.1.0
  *
- * Target:
- *   Zimbabwe Electronic Government Procurement System
- *   Procurement Regulatory Authority of Zimbabwe (PRAZ)
- *
- * IMPORTANT:
- *   This module is intentionally NOT imported by server.js yet.
- *   Database migration and server integration happen in later steps.
+ * Zimbabwe Electronic Government Procurement System
+ * Procurement Regulatory Authority of Zimbabwe (PRAZ)
  *
  * Uses existing GRIDV21 dependencies:
  *   - axios
  *   - crypto
  *
- * Architecture mirrors:
- *   sa-opportunity-intelligence.js
+ * Reuses existing GRIDV21 tables:
+ *   - acquisition_sources
+ *   - acquisition_records
+ *   - opportunity_scores
+ *   - acquisition_runs
+ *   - v_gridv21_zw_opportunities
  ******************************************************************************/
 
 import crypto from "crypto";
 import axios from "axios";
 
-/* -------------------------------------------------------------------------- */
-/* VERSION                                                                    */
-/* -------------------------------------------------------------------------- */
-
-const VERSION = "1.0.0";
-
-/* -------------------------------------------------------------------------- */
-/* OFFICIAL ZIMBABWE eGP SOURCES                                              */
-/* -------------------------------------------------------------------------- */
-
-export const ZW_SOURCE_CONFIG = [
-
-  {
-    id: "ZW_EGP_LATEST",
-    country: "ZW",
-    province: null,
-    municipality: null,
-    category: "public_tenders",
-    type: "egp_html",
-
-    endpoint:
-      "https://egp.praz.org.zw/Indexes/index",
-
-    enabled: true,
-    confidence: 100,
-
-    scan_frequency_minutes: 30,
-
-    metadata: {
-      authority:
-        "Procurement Regulatory Authority of Zimbabwe",
-
-      source_name:
-        "Zimbabwe Electronic Government Procurement System",
-
-      bulletin_type:
-        "Latest Tenders",
-
-      construction_focus:
-        true
-    }
-  },
-
-  {
-    id: "ZW_EGP_PAST",
-    country: "ZW",
-    province: null,
-    municipality: null,
-    category: "past_tenders",
-    type: "egp_html",
-
-    endpoint:
-      "https://egp.praz.org.zw/indexes/get-former-opportunities",
-
-    enabled: false,
-    confidence: 100,
-
-    scan_frequency_minutes: 360,
-
-    metadata: {
-      authority:
-        "Procurement Regulatory Authority of Zimbabwe",
-
-      bulletin_type:
-        "Past Tenders",
-
-      construction_focus:
-        true
-    }
-  },
-
-  {
-    id: "ZW_EGP_AWARDS",
-    country: "ZW",
-    province: null,
-    municipality: null,
-    category: "award_notices",
-    type: "egp_html",
-
-    endpoint:
-      "https://egp.praz.org.zw/Indexes/index",
-
-    enabled: false,
-    confidence: 100,
-
-    metadata: {
-      authority:
-        "Procurement Regulatory Authority of Zimbabwe",
-
-      bulletin_type:
-        "Award Notices",
-
-      construction_focus:
-        true
-    }
-  },
-
-  {
-    id: "ZW_EGP_APP",
-    country: "ZW",
-    province: null,
-    municipality: null,
-    category: "annual_procurement_plan",
-    type: "egp_html",
-
-    endpoint:
-      "https://egp.praz.org.zw/Indexes/index",
-
-    enabled: false,
-    confidence: 100,
-
-    metadata: {
-      authority:
-        "Procurement Regulatory Authority of Zimbabwe",
-
-      bulletin_type:
-        "Annual Procurement Plan",
-
-      construction_focus:
-        true,
-
-      value_field:
-        "Estimated Budget (US$)"
-    }
-  }
-
-];
-
-/* -------------------------------------------------------------------------- */
-/* CONSTANTS                                                                  */
-/* -------------------------------------------------------------------------- */
+const VERSION = "1.1.0";
 
 const BASE_URL = "https://egp.praz.org.zw";
-
-const USER_AGENT =
-  `GRIDV21-BRAIN-ZW/${VERSION}`;
 
 const REQUEST_TIMEOUT =
   Number(process.env.ZW_REQUEST_TIMEOUT || 30000);
@@ -173,15 +39,118 @@ const DETAIL_DELAY =
 const DEFAULT_USD_ZAR_RATE =
   Number(process.env.ZW_USD_ZAR_RATE || 18);
 
+/*
+ * IMPORTANT:
+ * acquisition_sources.scan_frequency_minutes is NOT NULL.
+ * Every source below therefore has an explicit value.
+ */
+
+export const ZW_SOURCE_CONFIG = [
+  {
+    id: "ZW_EGP_LATEST",
+    country: "ZW",
+    province: null,
+    municipality: null,
+    category: "public_tenders",
+    type: "egp_html",
+    endpoint:
+      "https://egp.praz.org.zw/Indexes/index",
+    enabled: true,
+    confidence: 100,
+    scan_frequency_minutes: 30,
+    metadata: {
+      authority:
+        "Procurement Regulatory Authority of Zimbabwe",
+      source_name:
+        "Zimbabwe Electronic Government Procurement System",
+      bulletin_type:
+        "Latest Tenders",
+      construction_focus: true
+    }
+  },
+
+  {
+    id: "ZW_EGP_PAST",
+    country: "ZW",
+    province: null,
+    municipality: null,
+    category: "past_tenders",
+    type: "egp_html",
+    endpoint:
+      "https://egp.praz.org.zw/indexes/get-former-opportunities",
+    enabled: false,
+    confidence: 100,
+    scan_frequency_minutes: 360,
+    metadata: {
+      authority:
+        "Procurement Regulatory Authority of Zimbabwe",
+      source_name:
+        "Zimbabwe Electronic Government Procurement System",
+      bulletin_type:
+        "Past Tenders",
+      construction_focus: true
+    }
+  },
+
+  {
+    id: "ZW_EGP_AWARDS",
+    country: "ZW",
+    province: null,
+    municipality: null,
+    category: "award_notices",
+    type: "egp_html",
+    endpoint:
+      "https://egp.praz.org.zw/Indexes/index",
+    enabled: false,
+    confidence: 100,
+    scan_frequency_minutes: 360,
+    metadata: {
+      authority:
+        "Procurement Regulatory Authority of Zimbabwe",
+      source_name:
+        "Zimbabwe Electronic Government Procurement System",
+      bulletin_type:
+        "Award Notices",
+      construction_focus: true
+    }
+  },
+
+  {
+    id: "ZW_EGP_APP",
+    country: "ZW",
+    province: null,
+    municipality: null,
+    category: "annual_procurement_plan",
+    type: "egp_html",
+    endpoint:
+      "https://egp.praz.org.zw/Indexes/getApp",
+    enabled: false,
+    confidence: 100,
+    scan_frequency_minutes: 1440,
+    metadata: {
+      authority:
+        "Procurement Regulatory Authority of Zimbabwe",
+      source_name:
+        "Zimbabwe Electronic Government Procurement System",
+      bulletin_type:
+        "Annual Procurement Plan",
+      construction_focus: true,
+      value_field:
+        "Estimated Budget (US$)"
+    }
+  }
+];
+
 /* -------------------------------------------------------------------------- */
 /* HELPERS                                                                    */
 /* -------------------------------------------------------------------------- */
 
 const sleep = ms =>
-  new Promise(resolve => setTimeout(resolve, ms));
+  new Promise(resolve =>
+    setTimeout(resolve, ms)
+  );
 
 function text(value) {
-
   if (
     value === null ||
     value === undefined
@@ -189,16 +158,15 @@ function text(value) {
     return null;
   }
 
-  const cleaned =
+  const result =
     String(value)
       .replace(/\s+/g, " ")
       .trim();
 
-  return cleaned || null;
+  return result || null;
 }
 
 function num(value) {
-
   if (
     value === null ||
     value === undefined ||
@@ -212,8 +180,7 @@ function num(value) {
       .replace(/,/g, "")
       .replace(/[^\d.-]/g, "");
 
-  const result =
-    Number(cleaned);
+  const result = Number(cleaned);
 
   return Number.isFinite(result)
     ? result
@@ -221,7 +188,6 @@ function num(value) {
 }
 
 function date(value) {
-
   if (!value) {
     return null;
   }
@@ -229,19 +195,12 @@ function date(value) {
   const raw =
     String(value).trim();
 
-  const parsed =
+  let parsed =
     new Date(raw);
 
   if (!Number.isNaN(parsed.getTime())) {
     return parsed.toISOString();
   }
-
-  /*
-   * Zimbabwe eGP commonly exposes:
-   * 08-Jul-2026 06:00 PM
-   *
-   * Try normalizing this format.
-   */
 
   const match =
     raw.match(
@@ -252,65 +211,73 @@ function date(value) {
     return null;
   }
 
-  const normalized =
-    `${match[1]} ${match[2]} ${match[3]} ${match[4]}`;
+  parsed =
+    new Date(
+      `${match[1]} ${match[2]} ${match[3]} ${match[4]}`
+    );
 
-  const d =
-    new Date(normalized);
-
-  return Number.isNaN(d.getTime())
+  return Number.isNaN(parsed.getTime())
     ? null
-    : d.toISOString();
+    : parsed.toISOString();
 }
 
 function sha1(value) {
-
   return crypto
     .createHash("sha1")
     .update(String(value))
     .digest("hex");
 }
 
-/* -------------------------------------------------------------------------- */
-/* HTML DECODING                                                              */
-/* -------------------------------------------------------------------------- */
+function escapeRegex(value) {
+  return String(value)
+    .replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&"
+    );
+}
 
 function decodeHtml(value) {
-
   return String(value || "")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
     .replace(/&#x27;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, n) =>
-      String.fromCharCode(Number(n))
+    .replace(
+      /&#(\d+);/g,
+      (_, n) =>
+        String.fromCharCode(Number(n))
     )
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) =>
-      String.fromCharCode(parseInt(n, 16))
+    .replace(
+      /&#x([0-9a-f]+);/gi,
+      (_, n) =>
+        String.fromCharCode(
+          parseInt(n, 16)
+        )
     );
 }
 
 function stripTags(value) {
-
   return decodeHtml(
     String(value || "")
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "")
-      .replace(/<[^>]+>/g, " ")
+      .replace(
+        /<script[\s\S]*?<\/script>/gi,
+        ""
+      )
+      .replace(
+        /<style[\s\S]*?<\/style>/gi,
+        ""
+      )
+      .replace(
+        /<[^>]+>/g,
+        " "
+      )
   )
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/* -------------------------------------------------------------------------- */
-/* ATTRIBUTE PARSER                                                           */
-/* -------------------------------------------------------------------------- */
-
 function getAttribute(tag, attribute) {
-
   const regex =
     new RegExp(
       `${attribute}\\s*=\\s*["']([^"']+)["']`,
@@ -326,35 +293,46 @@ function getAttribute(tag, attribute) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* LINK EXTRACTION                                                            */
+/* LINK / TABLE PARSING                                                       */
 /* -------------------------------------------------------------------------- */
 
-function findTenderLink(rowHtml, tenderId) {
-
+function findTenderLink(
+  rowHtml,
+  tenderId
+) {
   const links =
     String(rowHtml || "").match(
       /<a\b[^>]*href\s*=\s*["'][^"']+["'][^>]*>/gi
     ) || [];
 
   for (const link of links) {
-
     const href =
-      getAttribute(link, "href");
+      getAttribute(
+        link,
+        "href"
+      );
 
     if (!href) {
       continue;
     }
 
     if (
-      href.includes("viewLiveTenderDetails") ||
-      href.includes(String(tenderId))
+      href.includes(
+        "viewLiveTenderDetails"
+      ) ||
+      href.includes(
+        String(tenderId)
+      )
     ) {
-
-      if (href.startsWith("http")) {
+      if (
+        href.startsWith("http")
+      ) {
         return href;
       }
 
-      if (href.startsWith("/")) {
+      if (
+        href.startsWith("/")
+      ) {
         return `${BASE_URL}${href}`;
       }
 
@@ -363,7 +341,6 @@ function findTenderLink(rowHtml, tenderId) {
   }
 
   if (tenderId) {
-
     return (
       `${BASE_URL}/Indexes/viewLiveTenderDetails/` +
       encodeURIComponent(tenderId)
@@ -373,12 +350,7 @@ function findTenderLink(rowHtml, tenderId) {
   return null;
 }
 
-/* -------------------------------------------------------------------------- */
-/* TABLE ROW PARSER                                                           */
-/* -------------------------------------------------------------------------- */
-
 function parseTableRows(html) {
-
   const rows = [];
 
   const rowMatches =
@@ -387,7 +359,6 @@ function parseTableRows(html) {
     ) || [];
 
   for (const rowHtml of rowMatches) {
-
     const cells =
       rowHtml.match(
         /<(?:td|th)\b[^>]*>[\s\S]*?<\/(?:td|th)>/gi
@@ -405,13 +376,13 @@ function parseTableRows(html) {
     const joined =
       values.join(" | ");
 
-    /*
-     * Skip table headers.
-     */
-
     if (
-      /Tender Id/i.test(values[0] || "") &&
-      /Tender Title/i.test(joined)
+      /Tender Id/i.test(
+        values[0] || ""
+      ) &&
+      /Tender Title/i.test(
+        joined
+      )
     ) {
       continue;
     }
@@ -425,28 +396,9 @@ function parseTableRows(html) {
   return rows;
 }
 
-/* -------------------------------------------------------------------------- */
-/* LATEST TENDER LIST NORMALIZATION                                           */
-/* -------------------------------------------------------------------------- */
-
 function normalizeTenderListRow(row) {
-
   const values =
     row.values || [];
-
-  /*
-   * Current PRAZ structure:
-   *
-   * 0 Tender ID
-   * 1 Tender Reference Number
-   * 2 Tender Title
-   * 3 Supplier Category Code
-   * 4 Supplier Category Name
-   * 5 Procuring Entity
-   * 6 Scope
-   * 7 Publish Date
-   * 8 Closing Date
-   */
 
   const tenderId =
     text(values[0]);
@@ -475,14 +427,7 @@ function normalizeTenderListRow(row) {
   const closingDate =
     date(values[8]);
 
-  const sourceRecordUrl =
-    findTenderLink(
-      row.html,
-      tenderId
-    );
-
   return {
-
     external_id:
       tenderId ||
       sha1(
@@ -515,20 +460,21 @@ function normalizeTenderListRow(row) {
       closingDate,
 
     source_record_url:
-      sourceRecordUrl,
+      findTenderLink(
+        row.html,
+        tenderId
+      ),
 
     raw_list_row:
       values
-
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* CONSTRUCTION FILTER                                                        */
+/* CONSTRUCTION DETECTION                                                     */
 /* -------------------------------------------------------------------------- */
 
 const CONSTRUCTION_PATTERNS = [
-
   /construction/i,
   /building/i,
   /civil works/i,
@@ -536,7 +482,7 @@ const CONSTRUCTION_PATTERNS = [
   /bridge/i,
   /dam/i,
   /drainage/i,
-  /storm water/i,
+  /storm.?water/i,
   /water infrastructure/i,
   /borehole/i,
   /sewer/i,
@@ -561,11 +507,11 @@ const CONSTRUCTION_PATTERNS = [
   /airport/i,
   /industrial/i,
   /plant/i
-
 ];
 
-function isConstructionOpportunity(record) {
-
+function isConstructionOpportunity(
+  record
+) {
   const sourceText =
     [
       record.title,
@@ -576,10 +522,10 @@ function isConstructionOpportunity(record) {
       .filter(Boolean)
       .join(" ");
 
-  return CONSTRUCTION_PATTERNS
-    .some(pattern =>
+  return CONSTRUCTION_PATTERNS.some(
+    pattern =>
       pattern.test(sourceText)
-    );
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -587,7 +533,6 @@ function isConstructionOpportunity(record) {
 /* -------------------------------------------------------------------------- */
 
 function classifyProject(record) {
-
   const s =
     [
       record.title,
@@ -599,37 +544,49 @@ function classifyProject(record) {
       .toLowerCase();
 
   if (
-    /road|bridge|dam|drainage|storm.?water|civil works|pipeline/.test(s)
+    /road|bridge|dam|drainage|storm.?water|civil works|pipeline/.test(
+      s
+    )
   ) {
     return "civil_infrastructure";
   }
 
   if (
-    /building|school|hospital|office|warehouse|depot|fire station|roof|renovation|refurbishment/.test(s)
+    /building|school|hospital|office|warehouse|depot|fire station|roof|renovation|refurbishment/.test(
+      s
+    )
   ) {
     return "building";
   }
 
   if (
-    /transformer|substation|electrical|power station|generator|solar|energy/.test(s)
+    /transformer|substation|electrical|power station|generator|solar|energy/.test(
+      s
+    )
   ) {
     return "energy_electrical";
   }
 
   if (
-    /borehole|water|sewer|irrigation|water meter/.test(s)
+    /borehole|water|sewer|irrigation|water meter/.test(
+      s
+    )
   ) {
     return "water_infrastructure";
   }
 
   if (
-    /mine|mining|mineral/.test(s)
+    /mine|mining|mineral/.test(
+      s
+    )
   ) {
     return "mining";
   }
 
   if (
-    /steel|structural|fabrication/.test(s)
+    /steel|structural|fabrication/.test(
+      s
+    )
   ) {
     return "structural_steel";
   }
@@ -642,7 +599,6 @@ function classifyProject(record) {
 /* -------------------------------------------------------------------------- */
 
 function estimateValue(record) {
-
   const s =
     [
       record.title,
@@ -653,16 +609,9 @@ function estimateValue(record) {
       .join(" ")
       .toLowerCase();
 
-  /*
-   * IMPORTANT:
-   * These are GRIDV21 modelled estimates.
-   * They are NOT official tender values.
-   */
-
   if (
     /road|bridge|dam|major pipeline/.test(s)
   ) {
-
     return {
       min: 250000,
       max: 25000000,
@@ -671,9 +620,10 @@ function estimateValue(record) {
   }
 
   if (
-    /transformer|substation|power station|major electrical/.test(s)
+    /transformer|substation|power station|major electrical/.test(
+      s
+    )
   ) {
-
     return {
       min: 500000,
       max: 50000000,
@@ -682,9 +632,10 @@ function estimateValue(record) {
   }
 
   if (
-    /hospital|airport|industrial|warehouse|large building/.test(s)
+    /hospital|airport|industrial|warehouse|large building/.test(
+      s
+    )
   ) {
-
     return {
       min: 500000,
       max: 25000000,
@@ -693,9 +644,10 @@ function estimateValue(record) {
   }
 
   if (
-    /building|school|roof|renovation|refurbishment/.test(s)
+    /building|school|roof|renovation|refurbishment/.test(
+      s
+    )
   ) {
-
     return {
       min: 50000,
       max: 5000000,
@@ -706,7 +658,6 @@ function estimateValue(record) {
   if (
     /borehole|water|drainage|sewer/.test(s)
   ) {
-
     return {
       min: 100000,
       max: 10000000,
@@ -726,7 +677,6 @@ function estimateValue(record) {
 /* -------------------------------------------------------------------------- */
 
 function opportunityScore(record) {
-
   const s =
     [
       record.title,
@@ -742,50 +692,63 @@ function opportunityScore(record) {
   let score = 35;
 
   if (
-    /construction|civil works|building|road|bridge|dam/.test(s)
+    /construction|civil works|building|road|bridge|dam/.test(
+      s
+    )
   ) {
     score += 20;
   }
 
   if (
-    /infrastructure|pipeline|drainage|water|borehole/.test(s)
+    /infrastructure|pipeline|drainage|water|borehole/.test(
+      s
+    )
   ) {
     score += 10;
   }
 
   if (
-    /power|transformer|substation|solar|electrical/.test(s)
+    /power|transformer|substation|solar|electrical/.test(
+      s
+    )
   ) {
     score += 10;
   }
 
   if (
-    /hospital|airport|industrial|warehouse|depot/.test(s)
+    /hospital|airport|industrial|warehouse|depot/.test(
+      s
+    )
   ) {
     score += 8;
   }
 
   if (
-    /renovation|rehabilitation|refurbishment|repair/.test(s)
+    /renovation|rehabilitation|refurbishment|repair/.test(
+      s
+    )
   ) {
     score += 5;
   }
 
   if (record.closing_date) {
-
     const closing =
-      new Date(record.closing_date);
-
-    const now =
-      new Date();
+      new Date(
+        record.closing_date
+      );
 
     const days =
       Math.ceil(
-        (closing.getTime() - now.getTime()) /
-        86400000
+        (
+          closing.getTime() -
+          Date.now()
+        ) / 86400000
       );
 
-    if (days >= 0 && days <= 14) {
+    if (
+      days >= 0 &&
+      days <= 14
+    ) {
       score += 7;
     }
   }
@@ -813,7 +776,9 @@ function opportunityScore(record) {
     );
 
   const base =
-    Math.round(score * 0.82);
+    Math.round(
+      score * 0.82
+    );
 
   const tradeScore =
     pattern =>
@@ -821,7 +786,10 @@ function opportunityScore(record) {
         100,
         base +
           (
-            new RegExp(pattern, "i").test(s)
+            new RegExp(
+              pattern,
+              "i"
+            ).test(s)
               ? 12
               : 0
           )
@@ -862,8 +830,12 @@ function opportunityScore(record) {
       "fire|sprinkler|safety"
     );
 
-  return {
+  const hvac =
+    tradeScore(
+      "hvac|air.?conditioning|ventilation"
+    );
 
+  return {
     score,
 
     tier,
@@ -880,9 +852,7 @@ function opportunityScore(record) {
       plumbing,
 
     hvac_score:
-      tradeScore(
-        "hvac|air.?conditioning|ventilation"
-      ),
+      hvac,
 
     civil_score:
       civil,
@@ -900,49 +870,38 @@ function opportunityScore(record) {
       roofing,
 
     trade_matches: [
-
       {
         trade: "electrical",
         score: electrical
       },
-
       {
         trade: "plumbing",
         score: plumbing
       },
-
       {
         trade: "hvac",
-        score: tradeScore(
-          "hvac|air.?conditioning|ventilation"
-        )
+        score: hvac
       },
-
       {
         trade: "civil",
         score: civil
       },
-
       {
         trade: "structural",
         score: structural
       },
-
       {
         trade: "fire",
         score: fire
       },
-
       {
         trade: "steel",
         score: steel
       },
-
       {
         trade: "roofing",
         score: roofing
       }
-
     ].sort(
       (a, b) =>
         b.score - a.score
@@ -950,196 +909,44 @@ function opportunityScore(record) {
 
     ai_summary:
       `GRIDV21 Zimbabwe opportunity score ${score}/100 (${tier}). ` +
-      `Project type: ${record.project_type || "construction-related"}. ` +
-      `Procuring entity: ${record.procuring_entity || "unknown"}.`
-
+      `Project type: ${
+        record.project_type ||
+        "construction-related"
+      }. ` +
+      `Procuring entity: ${
+        record.procuring_entity ||
+        "unknown"
+      }.`
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* DETAIL PAGE PARSER                                                         */
+/* DETAIL PAGE PARSING                                                        */
 /* -------------------------------------------------------------------------- */
-
-function parseDetailFields(html) {
-
-  const fields = {};
-
-  const patterns = [
-
-    "Tender Id",
-    "Status",
-    "Tender Reference Number",
-    "Lot Type",
-    "Procurement Method",
-    "Class of Procurement",
-    "Applicable Procurement Rules",
-    "Funding Source",
-    "Delivery/Project Location",
-    "Required Supplier Categories",
-    "Delivery Period",
-    "Procuring Entity",
-    "Date created",
-    "Project Name",
-    "Description",
-    "Published Date",
-    "Closing Date",
-    "Date Last updated",
-    "Bid Form Fee",
-    "Bid Security Amount(Domestic)",
-    "Establishment Amount(Domestic)"
-
-  ];
-
-  const clean =
-    stripTags(html);
-
-  for (const field of patterns) {
-
-    const regex =
-      new RegExp(
-        `${escapeRegex(field)}\\s*:?\\s*([^]+?)(?=\\s+(?:${patterns.map(escapeRegex).join("|")})\\s*:|$)`,
-        "i"
-      );
-
-    const match =
-      clean.match(regex);
-
-    if (match) {
-
-      fields[field] =
-        text(match[1]);
-    }
-  }
-
-  /*
-   * More reliable extraction for the important
-   * fields using visible HTML structure.
-   */
-
-  fields.tender_id =
-    extractLabelValue(
-      html,
-      "Tender Id"
-    ) || fields["Tender Id"];
-
-  fields.status =
-    extractLabelValue(
-      html,
-      "Status"
-    ) || fields.Status;
-
-  fields.reference =
-    extractLabelValue(
-      html,
-      "Tender Reference Number"
-    ) ||
-    fields["Tender Reference Number"];
-
-  fields.procurement_method =
-    extractLabelValue(
-      html,
-      "Procurement Method"
-    ) ||
-    fields["Procurement Method"];
-
-  fields.funding_source =
-    extractLabelValue(
-      html,
-      "Funding Source"
-    ) ||
-    fields["Funding Source"];
-
-  fields.location =
-    extractLabelValue(
-      html,
-      "Delivery/Project Location"
-    ) ||
-    fields["Delivery/Project Location"];
-
-  fields.supplier_categories =
-    extractLabelValue(
-      html,
-      "Required Supplier Categories"
-    ) ||
-    fields["Required Supplier Categories"];
-
-  fields.entity =
-    extractLabelValue(
-      html,
-      "Procuring Entity"
-    ) ||
-    fields["Procuring Entity"];
-
-  fields.project_name =
-    extractLabelValue(
-      html,
-      "Project Name"
-    ) ||
-    fields["Project Name"];
-
-  fields.description =
-    extractLabelValue(
-      html,
-      "Description"
-    ) ||
-    fields.Description;
-
-  fields.published_date =
-    extractLabelValue(
-      html,
-      "Published Date"
-    ) ||
-    fields["Published Date"];
-
-  fields.closing_date =
-    extractLabelValue(
-      html,
-      "Closing Date"
-    ) ||
-    fields["Closing Date"];
-
-  fields.updated_date =
-    extractLabelValue(
-      html,
-      "Date Last updated"
-    ) ||
-    fields["Date Last updated"];
-
-  return fields;
-}
-
-function escapeRegex(value) {
-
-  return String(value)
-    .replace(
-      /[.*+?^${}()|[\]\\]/g,
-      "\\$&"
-    );
-}
 
 function extractLabelValue(
   html,
   label
 ) {
-
   const regex =
     new RegExp(
-      `<[^>]*>\\s*${escapeRegex(label)}\\s*:?\\s*<\\/[^>]+>\\s*<[^>]*>\\s*([^<]+)`,
+      `<[^>]*>\\s*${escapeRegex(
+        label
+      )}\\s*:?\\s*<\\/[^>]+>\\s*<[^>]*>\\s*([^<]+)`,
       "i"
     );
 
   const match =
-    String(html || "").match(regex);
+    String(html || "")
+      .match(regex);
 
   if (match) {
     return text(
-      decodeHtml(match[1])
+      decodeHtml(
+        match[1]
+      )
     );
   }
-
-  /*
-   * Fallback: visible text extraction.
-   */
 
   const visible =
     stripTags(html);
@@ -1155,18 +962,100 @@ function extractLabelValue(
     : null;
 }
 
-/* -------------------------------------------------------------------------- */
-/* DETAIL ENRICHMENT                                                          */
-/* -------------------------------------------------------------------------- */
+function parseDetailFields(html) {
+  const fields = {};
 
-async function fetchTenderDetail(record) {
+  fields.tender_id =
+    extractLabelValue(
+      html,
+      "Tender Id"
+    );
 
-  if (!record.source_record_url) {
+  fields.status =
+    extractLabelValue(
+      html,
+      "Status"
+    );
+
+  fields.reference =
+    extractLabelValue(
+      html,
+      "Tender Reference Number"
+    );
+
+  fields.procurement_method =
+    extractLabelValue(
+      html,
+      "Procurement Method"
+    );
+
+  fields.funding_source =
+    extractLabelValue(
+      html,
+      "Funding Source"
+    );
+
+  fields.location =
+    extractLabelValue(
+      html,
+      "Delivery/Project Location"
+    );
+
+  fields.supplier_categories =
+    extractLabelValue(
+      html,
+      "Required Supplier Categories"
+    );
+
+  fields.entity =
+    extractLabelValue(
+      html,
+      "Procuring Entity"
+    );
+
+  fields.project_name =
+    extractLabelValue(
+      html,
+      "Project Name"
+    );
+
+  fields.description =
+    extractLabelValue(
+      html,
+      "Description"
+    );
+
+  fields.published_date =
+    extractLabelValue(
+      html,
+      "Published Date"
+    );
+
+  fields.closing_date =
+    extractLabelValue(
+      html,
+      "Closing Date"
+    );
+
+  fields.updated_date =
+    extractLabelValue(
+      html,
+      "Date Last updated"
+    );
+
+  return fields;
+}
+
+async function fetchTenderDetail(
+  record
+) {
+  if (
+    !record.source_record_url
+  ) {
     return record;
   }
 
   try {
-
     const response =
       await axios.get(
         record.source_record_url,
@@ -1176,7 +1065,7 @@ async function fetchTenderDetail(record) {
 
           headers: {
             "User-Agent":
-              USER_AGENT,
+              `GRIDV21-BRAIN-ZW/${VERSION}`,
 
             Accept:
               "text/html,application/xhtml+xml"
@@ -1202,6 +1091,7 @@ async function fetchTenderDetail(record) {
 
     record.location =
       fields.location ||
+      record.location ||
       null;
 
     record.supplier_category_name =
@@ -1245,12 +1135,11 @@ async function fetchTenderDetail(record) {
         fields.updated_date
       ) ||
       record.publish_date;
-
   } catch (error) {
-
     record.detail_error =
       String(
-        error.message || error
+        error.message ||
+        error
       );
   }
 
@@ -1258,22 +1147,28 @@ async function fetchTenderDetail(record) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* NORMALIZE TO GRIDV21 acquisition_records STRUCTURE                         */
+/* NORMALIZATION                                                              */
 /* -------------------------------------------------------------------------- */
 
 function normalizeRecord(
   source,
-  tender
+  tender,
+  usdZarRate
 ) {
-
   const projectType =
-    classifyProject(tender);
+    classifyProject(
+      tender
+    );
 
   const value =
-    estimateValue(tender);
+    estimateValue(
+      tender
+    );
 
   const municipality =
-    text(tender.location);
+    text(
+      tender.location
+    );
 
   const normalizedText =
     [
@@ -1289,8 +1184,13 @@ function normalizeRecord(
       .filter(Boolean)
       .join(" ");
 
-  return {
+  const rate =
+    Number(
+      usdZarRate ||
+      DEFAULT_USD_ZAR_RATE
+    );
 
+  return {
     source_id:
       source.id,
 
@@ -1305,8 +1205,7 @@ function normalizeRecord(
     province:
       null,
 
-    municipality:
-      municipality,
+    municipality,
 
     source_category:
       source.category,
@@ -1370,13 +1269,16 @@ function normalizeRecord(
       null,
 
     /*
-     * This is a GRIDV21 modelled range midpoint.
-     * It is NOT an official PRAZ tender value.
+     * GRIDV21 MODELLED VALUE.
+     * NOT an official PRAZ tender value.
      */
 
     estimated_project_value:
       Math.round(
-        (value.min + value.max) / 2
+        (
+          value.min +
+          value.max
+        ) / 2
       ),
 
     source_url:
@@ -1385,109 +1287,108 @@ function normalizeRecord(
     source_record_url:
       tender.source_record_url,
 
-    raw_data:
-      {
-        tender_id:
-          tender.tender_id,
+    raw_data: {
+      tender_id:
+        tender.tender_id,
 
-        tender_reference:
-          tender.tender_reference,
+      tender_reference:
+        tender.tender_reference,
 
-        title:
-          tender.title,
+      title:
+        tender.title,
 
-        description:
-          tender.description,
+      description:
+        tender.description,
 
-        supplier_category_code:
-          tender.supplier_category_code,
+      supplier_category_code:
+        tender.supplier_category_code,
 
-        supplier_category_name:
-          tender.supplier_category_name,
+      supplier_category_name:
+        tender.supplier_category_name,
 
-        procuring_entity:
-          tender.procuring_entity,
+      procuring_entity:
+        tender.procuring_entity,
 
-        scope:
-          tender.scope,
+      scope:
+        tender.scope,
 
-        location:
-          tender.location,
+      location:
+        tender.location,
 
-        procurement_method:
-          tender.procurement_method,
+      procurement_method:
+        tender.procurement_method,
 
-        funding_source:
-          tender.funding_source,
+      funding_source:
+        tender.funding_source,
 
-        publish_date:
-          tender.publish_date,
+      publish_date:
+        tender.publish_date,
 
-        closing_date:
-          tender.closing_date,
+      closing_date:
+        tender.closing_date,
 
-        project_type:
-          projectType,
+      project_type:
+        projectType,
 
-        modelled_value_min_usd:
-          value.min,
+      modelled_value_min_usd:
+        value.min,
 
-        modelled_value_max_usd:
-          value.max,
+      modelled_value_max_usd:
+        value.max,
 
-        modelled_value_currency:
-          value.currency,
+      modelled_value_currency:
+        value.currency,
 
-        modelled_usd_zar_rate:
-          DEFAULT_USD_ZAR_RATE,
+      modelled_usd_zar_rate:
+        rate,
 
-        modelled_value_min_zar:
-          Math.round(
-            value.min *
-            DEFAULT_USD_ZAR_RATE
-          ),
+      modelled_value_min_zar:
+        Math.round(
+          value.min * rate
+        ),
 
-        modelled_value_max_zar:
-          Math.round(
-            value.max *
-            DEFAULT_USD_ZAR_RATE
-          ),
+      modelled_value_max_zar:
+        Math.round(
+          value.max * rate
+        ),
 
-        detail:
-          tender.detail || null,
+      detail:
+        tender.detail ||
+        null,
 
-        detail_error:
-          tender.detail_error || null,
+      detail_error:
+        tender.detail_error ||
+        null,
 
-        source:
-          "PRAZ eGP"
-      },
+      source:
+        "PRAZ eGP",
+
+      source_authority:
+        "Procurement Regulatory Authority of Zimbabwe",
+
+      intelligence_version:
+        VERSION
+    },
 
     normalized_text:
       normalizedText
-
   };
 }
 
 /* -------------------------------------------------------------------------- */
-/* FETCH eGP LATEST TENDERS                                                   */
+/* LIVE eGP FETCH                                                             */
 /* -------------------------------------------------------------------------- */
 
 async function fetchLatestTenders(
-  source,
-  {
-    maxPages = MAX_PAGES
-  } = {}
+  source
 ) {
-
   const rows = [];
 
   for (
     let page = 1;
-    page <= maxPages;
+    page <= MAX_PAGES;
     page++
   ) {
-
     const url =
       page === 1
         ? source.endpoint
@@ -1502,7 +1403,7 @@ async function fetchLatestTenders(
 
           headers: {
             "User-Agent":
-              USER_AGENT,
+              `GRIDV21-BRAIN-ZW/${VERSION}`,
 
             Accept:
               "text/html,application/xhtml+xml"
@@ -1519,35 +1420,33 @@ async function fetchLatestTenders(
       break;
     }
 
-    for (const row of parsedRows) {
-
+    for (
+      const row of parsedRows
+    ) {
       const tender =
         normalizeTenderListRow(
           row
         );
 
-      if (!tender.external_id) {
+      if (
+        !tender.external_id
+      ) {
         continue;
       }
-
-      /*
-       * Only enrich construction-related
-       * opportunities. This avoids hundreds
-       * of unnecessary detail requests.
-       */
 
       if (
         isConstructionOpportunity(
           tender
         )
       ) {
-
-        rows.push(tender);
+        rows.push(
+          tender
+        );
       }
     }
 
     if (
-      page < maxPages
+      page < MAX_PAGES
     ) {
       await sleep(
         PAGE_DELAY
@@ -1566,7 +1465,6 @@ async function upsertRecord(
   supabase,
   row
 ) {
-
   const now =
     new Date().toISOString();
 
@@ -1575,7 +1473,9 @@ async function upsertRecord(
     error: lookupError
   } =
     await supabase
-      .from("acquisition_records")
+      .from(
+        "acquisition_records"
+      )
       .select(
         "id,raw_data,last_seen_at,first_seen_at"
       )
@@ -1594,13 +1494,14 @@ async function upsertRecord(
   }
 
   if (!existing) {
-
     const {
       data,
       error
     } =
       await supabase
-        .from("acquisition_records")
+        .from(
+          "acquisition_records"
+        )
         .insert({
           ...row,
 
@@ -1627,18 +1528,25 @@ async function upsertRecord(
     }
 
     return {
-      id: data.id,
-      inserted: true,
-      updated: false
+      id:
+        data.id,
+
+      inserted:
+        true,
+
+      updated:
+        false
     };
   }
 
   const changed =
     JSON.stringify(
-      existing.raw_data || {}
+      existing.raw_data ||
+      {}
     ) !==
     JSON.stringify(
-      row.raw_data || {}
+      row.raw_data ||
+      {}
     );
 
   const updatePayload = {
@@ -1666,7 +1574,9 @@ async function upsertRecord(
     error
   } =
     await supabase
-      .from("acquisition_records")
+      .from(
+        "acquisition_records"
+      )
       .update(
         updatePayload
       )
@@ -1680,9 +1590,14 @@ async function upsertRecord(
   }
 
   return {
-    id: existing.id,
-    inserted: false,
-    updated: changed
+    id:
+      existing.id,
+
+    inserted:
+      false,
+
+    updated:
+      changed
   };
 }
 
@@ -1691,16 +1606,11 @@ async function upsertRecord(
 /* -------------------------------------------------------------------------- */
 
 export function createZimbabweIntelligence({
-
   supabase,
-
   logger = console,
-
   usdZarRate =
     DEFAULT_USD_ZAR_RATE
-
 } = {}) {
-
   if (!supabase) {
     throw new Error(
       "Zimbabwe intelligence requires Supabase client"
@@ -1708,7 +1618,6 @@ export function createZimbabweIntelligence({
   }
 
   const state = {
-
     running:
       false,
 
@@ -1719,7 +1628,6 @@ export function createZimbabweIntelligence({
       null,
 
     stats: {
-
       sources:
         0,
 
@@ -1746,9 +1654,7 @@ export function createZimbabweIntelligence({
 
       medium:
         0
-
     }
-
   };
 
   /* ------------------------------------------------------------------------ */
@@ -1756,11 +1662,9 @@ export function createZimbabweIntelligence({
   /* ------------------------------------------------------------------------ */
 
   async function ensureSources() {
-
     const rows =
       ZW_SOURCE_CONFIG.map(
         source => ({
-
           id:
             source.id,
 
@@ -1768,10 +1672,12 @@ export function createZimbabweIntelligence({
             "ZW",
 
           province:
-            source.province,
+            source.province ||
+            null,
 
           municipality:
-            source.municipality,
+            source.municipality ||
+            null,
 
           source_name:
             source.id,
@@ -1786,22 +1692,33 @@ export function createZimbabweIntelligence({
             source.endpoint,
 
           enabled:
-            source.enabled,
+            Boolean(
+              source.enabled
+            ),
 
+          /*
+           * CRITICAL FIX:
+           * Never send NULL to this NOT NULL column.
+           */
           scan_frequency_minutes:
-            source.scan_frequency_minutes,
+            Number(
+              source.scan_frequency_minutes ||
+              360
+            ),
 
           source_confidence:
-            source.confidence,
+            Number(
+              source.confidence ||
+              0
+            ),
 
-          metadata:
-            {
-              ...source.metadata,
+          metadata: {
+            ...(source.metadata ||
+              {}),
 
-              version:
-                VERSION
-            }
-
+            version:
+              VERSION
+          }
         })
       );
 
@@ -1809,7 +1726,9 @@ export function createZimbabweIntelligence({
       error
     } =
       await supabase
-        .from("acquisition_sources")
+        .from(
+          "acquisition_sources"
+        )
         .upsert(
           rows,
           {
@@ -1823,8 +1742,11 @@ export function createZimbabweIntelligence({
     }
 
     return {
-      ok: true,
-      count: rows.length
+      ok:
+        true,
+
+      count:
+        rows.length
     };
   }
 
@@ -1833,17 +1755,10 @@ export function createZimbabweIntelligence({
   /* ------------------------------------------------------------------------ */
 
   async function scan({
-
-    sourceIds =
-      null,
-
-    runType =
-      "manual"
-
+    sourceIds = null,
+    runType = "manual"
   } = {}) {
-
     if (state.running) {
-
       return {
         ok:
           false,
@@ -1875,7 +1790,6 @@ export function createZimbabweIntelligence({
       );
 
     const stats = {
-
       sources:
         sources.length,
 
@@ -1902,19 +1816,18 @@ export function createZimbabweIntelligence({
 
       medium:
         0
-
     };
 
     let runId =
       null;
 
     try {
-
       const run =
         await supabase
-          .from("acquisition_runs")
+          .from(
+            "acquisition_runs"
+          )
           .insert({
-
             country:
               "ZW",
 
@@ -1926,36 +1839,38 @@ export function createZimbabweIntelligence({
 
             sources_total:
               sources.length
-
           })
           .select("id")
           .single();
 
-      if (!run.error) {
+      if (
+        !run.error &&
+        run.data
+      ) {
         runId =
           run.data.id;
       }
 
+      /*
+       * Register/update sources before
+       * attempting to fetch anything.
+       */
       await ensureSources();
 
       for (
         const source of sources
       ) {
-
         try {
-
           if (
             source.id !==
             "ZW_EGP_LATEST"
           ) {
-
-            /*
-             * Other ZW sources are intentionally
-             * disabled in STEP 1.
-             */
-
             continue;
           }
+
+          logger.info?.(
+            `[ZW] Scanning ${source.id}`
+          );
 
           const tenderRows =
             await fetchLatestTenders(
@@ -1968,7 +1883,6 @@ export function createZimbabweIntelligence({
           for (
             const tender of tenderRows
           ) {
-
             await fetchTenderDetail(
               tender
             );
@@ -1976,49 +1890,9 @@ export function createZimbabweIntelligence({
             const row =
               normalizeRecord(
                 source,
-                tender
+                tender,
+                usdZarRate
               );
-
-            /*
-             * Recalculate value using the
-             * configured rate supplied to
-             * this intelligence instance.
-             */
-
-            const modelValue =
-              estimateValue(
-                tender
-              );
-
-            row.raw_data =
-              {
-                ...row.raw_data,
-
-                modelled_usd_zar_rate:
-                  Number(
-                    usdZarRate ||
-                    DEFAULT_USD_ZAR_RATE
-                  ),
-
-                modelled_value_min_zar:
-                  Math.round(
-                    modelValue.min *
-                    Number(
-                      usdZarRate ||
-                      DEFAULT_USD_ZAR_RATE
-                    )
-                  ),
-
-                modelled_value_max_zar:
-                  Math.round(
-                    modelValue.max *
-                    Number(
-                      usdZarRate ||
-                      DEFAULT_USD_ZAR_RATE
-                    )
-                  )
-
-              };
 
             const result =
               await upsertRecord(
@@ -2030,8 +1904,7 @@ export function createZimbabweIntelligence({
               result.inserted
             ) {
               stats.new++;
-            }
-            else if (
+            } else if (
               result.updated
             ) {
               stats.updated++;
@@ -2067,7 +1940,6 @@ export function createZimbabweIntelligence({
 
                     updated_at:
                       new Date().toISOString()
-
                   },
                   {
                     onConflict:
@@ -2084,8 +1956,7 @@ export function createZimbabweIntelligence({
               "HIGH"
             ) {
               stats.high++;
-            }
-            else if (
+            } else if (
               score.tier ===
               "MEDIUM"
             ) {
@@ -2097,24 +1968,25 @@ export function createZimbabweIntelligence({
             );
           }
 
+          const now =
+            new Date().toISOString();
+
           await supabase
             .from(
               "acquisition_sources"
             )
             .update({
-
               last_scan_at:
-                new Date().toISOString(),
+                now,
 
               last_success_at:
-                new Date().toISOString(),
+                now,
 
               last_error:
                 null,
 
               updated_at:
-                new Date().toISOString()
-
+                now
             })
             .eq(
               "id",
@@ -2123,29 +1995,31 @@ export function createZimbabweIntelligence({
 
           stats.succeeded++;
 
-        }
-        catch (error) {
-
+          logger.info?.(
+            `[ZW] ${source.id}: ${tenderRows.length} construction candidates processed`
+          );
+        } catch (error) {
           stats.failed++;
+
+          const message =
+            String(
+              error.message ||
+              error
+            );
 
           await supabase
             .from(
               "acquisition_sources"
             )
             .update({
-
               last_scan_at:
                 new Date().toISOString(),
 
               last_error:
-                String(
-                  error.message ||
-                  error
-                ),
+                message,
 
               updated_at:
                 new Date().toISOString()
-
             })
             .eq(
               "id",
@@ -2153,23 +2027,17 @@ export function createZimbabweIntelligence({
             );
 
           logger.warn?.(
-            `[ZW] ${source.id}: ${
-              error.message || error
-            }`
+            `[ZW] ${source.id}: ${message}`
           );
-
         }
-
       }
 
       if (runId) {
-
         await supabase
           .from(
             "acquisition_runs"
           )
           .update({
-
             status:
               "completed",
 
@@ -2196,7 +2064,6 @@ export function createZimbabweIntelligence({
 
             opportunities_medium:
               stats.medium
-
           })
           .eq(
             "id",
@@ -2211,7 +2078,6 @@ export function createZimbabweIntelligence({
         stats;
 
       return {
-
         ok:
           true,
 
@@ -2223,12 +2089,8 @@ export function createZimbabweIntelligence({
         duration_ms:
           Date.now() -
           started
-
       };
-
-    }
-    catch (error) {
-
+    } catch (error) {
       state.lastError =
         String(
           error.message ||
@@ -2236,13 +2098,11 @@ export function createZimbabweIntelligence({
         );
 
       if (runId) {
-
         await supabase
           .from(
             "acquisition_runs"
           )
           .update({
-
             status:
               "failed",
 
@@ -2251,7 +2111,6 @@ export function createZimbabweIntelligence({
 
             error_summary:
               state.lastError
-
           })
           .eq(
             "id",
@@ -2260,7 +2119,6 @@ export function createZimbabweIntelligence({
       }
 
       return {
-
         ok:
           false,
 
@@ -2268,17 +2126,11 @@ export function createZimbabweIntelligence({
           state.lastError,
 
         stats
-
       };
-
-    }
-    finally {
-
+    } finally {
       state.running =
         false;
-
     }
-
   }
 
   /* ------------------------------------------------------------------------ */
@@ -2286,18 +2138,10 @@ export function createZimbabweIntelligence({
   /* ------------------------------------------------------------------------ */
 
   async function opportunities({
-
-    limit =
-      50,
-
-    minScore =
-      0,
-
-    tier =
-      null
-
+    limit = 50,
+    minScore = 0,
+    tier = null
   } = {}) {
-
     let query =
       supabase
         .from(
@@ -2323,7 +2167,6 @@ export function createZimbabweIntelligence({
         );
 
     if (tier) {
-
       query =
         query.eq(
           "tier",
@@ -2349,7 +2192,6 @@ export function createZimbabweIntelligence({
   /* ------------------------------------------------------------------------ */
 
   return {
-
     version:
       VERSION,
 
@@ -2363,7 +2205,5 @@ export function createZimbabweIntelligence({
     scan,
 
     opportunities
-
   };
-
     }
