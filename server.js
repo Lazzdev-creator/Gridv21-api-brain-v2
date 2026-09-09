@@ -765,6 +765,21 @@ morgan.token(
   req => req.id || "no-id"
 );
 /* -------------------------------------------------------------------------- */
+/* ZIMBABWE CONSTRUCTION OPPORTUNITY INTELLIGENCE - PHASE 1                  */
+/* -------------------------------------------------------------------------- */
+
+export const ZW_INTELLIGENCE =
+  createZimbabweIntelligence({
+    supabase,
+    logger,
+
+    usdZarRate:
+      Number(
+        process.env.ZW_USD_ZAR_RATE ||
+        18
+      )
+  });
+/* -------------------------------------------------------------------------- */
 /* SOUTH AFRICA INTELLIGENCE — MATCH + SCAN-AND-MATCH (NEW)                   */
 /* -------------------------------------------------------------------------- */
 
