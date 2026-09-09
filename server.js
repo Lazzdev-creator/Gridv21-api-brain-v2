@@ -33,7 +33,7 @@ import { RedisStore } from "connect-redis";
 
 import fs from "fs";
 import { createSouthAfricaIntelligence } from "./sa-opportunity-intelligence.js";
-
+import { createZimbabweIntelligence } from "./zw-opportunity-intelligence.js";
 dotenv.config();
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
