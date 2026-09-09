@@ -4313,7 +4313,22 @@ async function startServer() {
     } catch (error) {
       console.warn(`[SA] Source registry sync skipped: ${error.message}`);
     }
+try {
 
+  await ZW_INTELLIGENCE.ensureSources();
+
+  console.log(
+    "[ZW] Zimbabwe acquisition source registry synchronized."
+  );
+
+}
+catch (error) {
+
+  console.warn(
+    `[ZW] Source registry sync skipped: ${error.message}`
+  );
+
+}
     app.listen(
       PORT,
       "0.0.0.0",
