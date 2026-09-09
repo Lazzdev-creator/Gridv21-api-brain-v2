@@ -3077,6 +3077,12 @@ async function runZwScan() {
     const opps = sa.opportunities || [];
     const sources = sa.sources || [];
     const running = Boolean(status.running);
+    const zw = state.zw || {};
+const zwStatus = zw.status || {};
+const zwStats = zwStatus.stats || {};
+const zwOpps = zw.opportunities || [];
+const zwSources = zw.sources || [];
+const zwRunning = Boolean(zwStatus.running);
 
     const high = opps.filter(o => o.tier === "HIGH").length;
     const medium = opps.filter(o => o.tier === "MEDIUM").length;
