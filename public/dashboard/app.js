@@ -3533,6 +3533,36 @@ const zwRunning = Boolean(zwStatus.running);
           await Promise.all([loadSaStatus(), loadSaSources(), loadSaOpportunities()]);
           renderAcquisition();
           <button
+                           container
+  .querySelectorAll("[data-zw-action]")
+  .forEach(btn => {
+    btn.addEventListener(
+      "click",
+      async () => {
+        const action =
+          btn.getAttribute(
+            "data-zw-action"
+          );
+
+        if (
+          action === "scan"
+        ) {
+          await runZwScan();
+
+        } else if (
+          action === "refresh"
+        ) {
+          await Promise.all([
+            loadZwStatus(),
+            loadZwSources(),
+            loadZwOpportunities()
+          ]);
+
+          renderAcquisition();
+        }
+      }
+    );
+  });
   class="btn btn-primary"
   type="button"
   data-zw-action="scan"
