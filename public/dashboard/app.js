@@ -2829,6 +2829,13 @@ zwOpportunities: "/api/zw-intelligence/opportunities"
       state.sa.lastError = err.message;
       state.sa.opportunities = [];
       return [];
+      zw: {
+  status: null,
+  sources: [],
+  opportunities: [],
+  loading: false,
+  lastError: null
+},
     }
   }
 
