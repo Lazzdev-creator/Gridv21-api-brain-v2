@@ -225,6 +225,334 @@
       agents_count: 6
     }
   ];
+
+
+  /* ========================================================================
+   * DOM HELPERS
+   * ====================================================================== */
+
+  function byId(id) {
+    return document.getElementById(id);
+  }
+
+
+  function $$(selector, root = document) {
+    return Array.from(
+      root.querySelectorAll(selector)
+    );
+  }
+
+
+  function text(id, value) {
+    const element =
+      byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.textContent =
+      value === undefined ||
+      value === null ||
+      value === ""
+        ? "—"
+        : String(value);
+  }
+
+
+  function html(id, value) {
+    const element =
+      byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.innerHTML =
+      value ?? "";
+  }
+
+
+  function escapeHTML(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+
+  function safeArray(value) {
+    return Array.isArray(value)
+      ? value
+      : [];
+  }
+
+
+  function safeObject(value) {
+    if (
+      value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+    ) {
+      return value;
+    }
+
+    return {};
+  }
+
+
+  function safeNumber(
+    value,
+    fallback = 0
+  ) {
+    const numberValue =
+      Number(value);
+
+    return Number.isFinite(
+      numberValue
+    )
+      ? numberValue
+      : fallback;
+  }
+
+
+  function dateTime(value) {
+    if (!value) {
+      return "—";
+    }
+
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime()
+      )
+    ) {
+      return String(value);
+    }
+
+    return date.toLocaleString(
+      "en-GB",
+      {
+        dateStyle: "medium",
+        timeStyle: "short"
+      }
+    );
+  }
+
+
+  function money(value) {
+    return new Intl.NumberFormat(
+      "en-GB",
+      {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 2
+      }
+    ).format(
+      safeNumber(value, 0)
+    );
+  }
+
+
+  function number(value) {
+    return new Intl.NumberFormat(
+      "en-GB"
+    ).format(
+      safeNumber(value, 0)
+    );
+  }
+
+
+  function bool(value) {
+    return value
+      ? "YES"
+      : "NO";
+  }
+
+
+  function formatDuration(value) {
+    if (
+      value === undefined ||
+      value === null ||
+      value === ""
+    ) {
+      return "—";
+    }
+
+    const seconds =
+      safeNumber(value, NaN);
+
+    if (
+      !Number.isFinite(seconds)
+    ) {
+      return String(value);
+    }
+
+    if (seconds < 60) {
+      return `${Math.round(seconds)}s`;
+    }
+
+    const minutes =
+      Math.floor(
+        seconds / 60
+      );
+
+    const remainingSeconds =
+      Math.round(
+        seconds % 60
+      );
+
+    if (minutes < 60) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+
+    const hours =
+      Math.floor(
+        minutes / 60
+      );
+
+    const remainingMinutes =
+      minutes % 60;
+
+    return `${hours}h ${remainingMinutes}m`;
+  }
+
+
+  function formatUptime(value) {
+    if (
+      value === undefined ||
+      value === null ||
+      value === ""
+    ) {
+      return "—";
+    }
+
+    const seconds =
+      safeNumber(value, NaN);
+
+    if (
+      !Number.isFinite(seconds)
+    ) {
+      return String(value);
+    }
+
+    const days =
+      Math.floor(
+        seconds / 86400
+      );
+
+    const hours =
+      Math.floor(
+        (seconds % 86400) / 3600
+      );
+
+    const minutes =
+      Math.floor(
+        (seconds % 3600) / 60
+      );
+
+    if (days > 0) {
+      return `${days}d ${hours}h`;
+    }
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+
+    return `${minutes}m`;
+  }
+
+
+  /* ========================================================================
+   * TOAST
+   * ====================================================================== */
+
+  function showToast(
+    message,
+    type = "info"
+  ) {
+    const toast =
+      byId("toast");
+
+    if (!toast) {
+      return;
+    }
+
+    toast.textContent =
+      String(message ?? "");
+
+    toast.className =
+      `toast toast-${type}`;
+
+    toast.classList.add(
+      "show"
+    );
+
+    clearTimeout(
+      showToast.timer
+    );
+
+    showToast.timer =
+      setTimeout(
+        () => {
+          toast.classList.remove(
+            "show"
+          );
+        },
+        3500
+      );
+  }
+
+
+  /* ========================================================================
+   * GLOBAL CONNECTION STATUS
+   * ====================================================================== */
+
+  function setGlobalStatus(
+    connected,
+    label
+  ) {
+    state.connected =
+      Boolean(connected);
+
+    const status =
+      byId("connection-status") ||
+      byId("system-connection") ||
+      byId("api-status");
+
+    if (status) {
+      status.textContent =
+        label ||
+        (
+          connected
+            ? "Connected"
+            : "Disconnected"
+        );
+
+      status.classList.toggle(
+        "online",
+        Boolean(connected)
+      );
+
+      status.classList.toggle(
+        "offline",
+        !connected
+      );
+    }
+
+    const badge =
+      byId("connection-badge");
+
+    if (badge) {
+      badge.textContent =
+        connected
+          ? "ONLINE"
+          : "OFFLINE";
+
       badge.classList.toggle(
         "badge-success",
         Boolean(connected)
@@ -235,6 +563,9 @@
         !connected
       );
     }
+
+    const dot =
+      byId("connection-dot");
 
     if (dot) {
       dot.classList.toggle(
@@ -560,586 +891,3 @@
       "info"
     );
   }
-
-
-  /* ========================================================================
-   * DASHBOARD NORMALISATION
-   * ====================================================================== */
-
-  function normalizeDashboard(
-    payload
-  ) {
-    const data =
-      safeObject(payload);
-
-    return {
-      ...data,
-
-      metrics:
-        safeObject(
-          data.metrics
-        ),
-
-      system:
-        safeObject(
-          data.system
-        ),
-
-      revenue:
-        safeObject(
-          data.revenue
-        ),
-
-      leads:
-        safeArray(
-          data.leads
-        ),
-
-      permits:
-        safeArray(
-          data.permits
-        ),
-
-      osModules:
-        safeArray(
-          data.osModules ||
-          data.os_modules
-        ),
-
-      integrations:
-        safeArray(
-          data.integrations
-        )
-    };
-  }
-
-
-  /* ========================================================================
-   * LOAD DASHBOARD
-   * ====================================================================== */
-
-  async function loadDashboard() {
-    if (!state.authenticated) {
-      return null;
-    }
-
-    try {
-      const payload =
-        await apiRequest(
-          API.dashboard
-        );
-
-      state.dashboard =
-        normalizeDashboard(
-          payload
-        );
-
-      setGlobalStatus(
-        true,
-        "Connected"
-      );
-
-      renderDashboard(
-        state.dashboard
-      );
-
-      return state.dashboard;
-    } catch (error) {
-      setGlobalStatus(
-        false,
-        "API Error"
-      );
-
-      if (
-        error.status === 401 ||
-        error.status === 403
-      ) {
-        clearAdminKey();
-
-        state.authenticated =
-          false;
-
-        setAuthUI(false);
-
-        showToast(
-          "Admin session expired.",
-          "error"
-        );
-      } else {
-        showToast(
-          error.message ||
-          "Unable to load dashboard.",
-          "error"
-        );
-      }
-
-      throw error;
-    }
-  }
-
-
-  /* ========================================================================
-   * LOAD OS MODULES
-   * ====================================================================== */
-
-  async function loadOSModules() {
-    if (!state.authenticated) {
-      return [];
-    }
-
-    try {
-      const payload =
-        await apiRequest(
-          API.osModules
-        );
-
-      const modules =
-        Array.isArray(payload)
-          ? payload
-          : (
-              payload?.modules ||
-              payload?.osModules ||
-              payload?.os_modules ||
-              []
-            );
-
-      state.osModules =
-        safeArray(modules);
-
-      renderOSModules(
-        state.osModules
-      );
-
-      return state.osModules;
-    } catch (error) {
-      /*
-       * Do not destroy the UI when the endpoint is temporarily
-       * unavailable. Fall back to the built-in module definitions.
-       */
-      state.osModules =
-        OS_MODULES.map(
-          module => ({
-            ...module,
-            active: false
-          })
-        );
-
-      renderOSModules(
-        state.osModules
-      );
-
-      console.warn(
-        "OS module request failed:",
-        error
-      );
-
-      return state.osModules;
-    }
-  }
-
-
-  /* ========================================================================
-   * LOAD PERMITS
-   * ====================================================================== */
-
-  async function loadPermits() {
-    if (!state.authenticated) {
-      return [];
-    }
-
-    try {
-      const payload =
-        await apiRequest(
-          API.permits
-        );
-
-      state.permits =
-        safeArray(
-          Array.isArray(payload)
-            ? payload
-            : (
-                payload?.permits ||
-                payload?.data ||
-                []
-              )
-        );
-
-      renderPermits(
-        state.permits
-      );
-
-      return state.permits;
-    } catch (error) {
-      console.warn(
-        "Permit request failed:",
-        error
-      );
-
-      state.permits = [];
-
-      renderPermits([]);
-
-      return [];
-    }
-  }
-
-
-  /* ========================================================================
-   * DASHBOARD RENDERING
-   * ====================================================================== */
-
-  function renderDashboard(
-    dashboard
-  ) {
-    const data =
-      normalizeDashboard(
-        dashboard
-      );
-
-    const metrics =
-      safeObject(
-        data.metrics
-      );
-
-    const system =
-      safeObject(
-        data.system
-      );
-
-    const revenue =
-      safeObject(
-        data.revenue
-      );
-
-    const totalLeads =
-      metrics.total_leads ??
-      metrics.totalLeads ??
-      data.total_leads ??
-      data.totalLeads ??
-      safeArray(data.leads).length;
-
-    const totalPermits =
-      metrics.total_permits ??
-      metrics.totalPermits ??
-      data.total_permits ??
-      data.totalPermits ??
-      safeArray(data.permits).length;
-
-    const activeModules =
-      metrics.active_modules ??
-      metrics.activeModules ??
-      system.active_modules ??
-      system.activeModules ??
-      safeArray(
-        data.osModules
-      ).filter(
-        module =>
-          module.active === true ||
-          module.enabled === true
-      ).length;
-
-    const uptime =
-      system.uptime ??
-      data.uptime ??
-      metrics.uptime;
-
-    const revenueValue =
-      revenue.monthly ??
-      revenue.monthly_revenue ??
-      revenue.est_revenue_month ??
-      metrics.revenue ??
-      data.revenue;
-
-    text(
-      "total-leads",
-      number(totalLeads)
-    );
-
-    text(
-      "total_permits",
-      number(totalPermits)
-    );
-
-    text(
-      "active-modules",
-      number(activeModules)
-    );
-
-    text(
-      "uptime",
-      formatUptime(uptime)
-    );
-
-    text(
-      "revenue",
-      money(revenueValue)
-    );
-
-    /*
-     * Compatibility with older dashboard IDs.
-     */
-    text(
-      "total_leads",
-      number(totalLeads)
-    );
-
-    text(
-      "os_count",
-      `${number(activeModules)}/${number(
-        OS_MODULES.length
-      )}`
-    );
-
-    text(
-      "est_revenue_month",
-      money(revenueValue)
-    );
-
-    renderLeads(
-      safeArray(
-        data.leads
-      )
-    );
-
-    renderPermits(
-      safeArray(
-        data.permits
-      )
-    );
-
-    renderSystemHealth(
-      data
-    );
-  }
-
-
-  /* ========================================================================
-   * SYSTEM HEALTH
-   * ====================================================================== */
-
-  function renderSystemHealth(
-    dashboard
-  ) {
-    const system =
-      safeObject(
-        dashboard.system
-      );
-
-    const health =
-      safeObject(
-        dashboard.health
-      );
-
-    const status =
-      dashboard.status ||
-      system.status ||
-      health.status ||
-      (
-        dashboard.connected
-          ? "Operational"
-          : "Unknown"
-      );
-
-    text(
-      "system-status",
-      status
-    );
-
-    text(
-      "system-version",
-      dashboard.version ||
-      system.version ||
-      VERSION
-    );
-
-    text(
-      "last-update",
-      dateTime(
-        dashboard.updated_at ||
-        dashboard.updatedAt ||
-        system.updated_at ||
-        system.updatedAt
-      )
-    );
-  }
-
-
-  /* ========================================================================
-   * LEAD RENDERING
-   * ====================================================================== */
-
-  function renderLeads(
-    leads
-  ) {
-    const container =
-      byId("leads-list") ||
-      byId("lead-list") ||
-      byId("leads");
-
-    if (!container) {
-      return;
-    }
-
-    const items =
-      safeArray(leads);
-
-    if (!items.length) {
-      container.innerHTML =
-        `
-          <div class="empty-state">
-            No leads available.
-          </div>
-        `;
-
-      return;
-    }
-
-    container.innerHTML =
-      items
-        .slice(0, 50)
-        .map(
-          lead => {
-            const id =
-              lead.id ??
-              lead.lead_id ??
-              "";
-
-            const region =
-              lead.region ||
-              lead.province ||
-              lead.location ||
-              "Unknown";
-
-            const trade =
-              lead.trade_type ||
-              lead.trade ||
-              lead.category ||
-              "Opportunity";
-
-            const status =
-              lead.status ||
-              "new";
-
-            const value =
-              lead.value_estimate ??
-              lead.estimated_value ??
-              lead.value ??
-              0;
-
-            return `
-              <div
-                class="lead-row"
-                data-lead-id="${escapeHTML(id)}"
-              >
-                <div class="lead-main">
-                  <strong>
-                    ${escapeHTML(trade)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(region)}
-                  </span>
-                </div>
-
-                <div class="lead-meta">
-                  <span class="lead-status">
-                    ${escapeHTML(status)}
-                  </span>
-
-                  <span class="lead-value">
-                    ${escapeHTML(
-                      money(value)
-                    )}
-                  </span>
-                </div>
-              </div>
-            `;
-          }
-        )
-        .join("");
-  }
-
-
-  /* ========================================================================
-   * PERMIT RENDERING
-   * ====================================================================== */
-
-  function renderPermits(
-    permits
-  ) {
-    const container =
-      byId("permits-list") ||
-      byId("permit-list") ||
-      byId("permits");
-
-    if (!container) {
-      return;
-    }
-
-    const items =
-      safeArray(permits);
-
-    if (!items.length) {
-      container.innerHTML =
-        `
-          <div class="empty-state">
-            No permit intelligence available.
-          </div>
-        `;
-
-      return;
-    }
-
-    container.innerHTML =
-      items
-        .slice(0, 50)
-        .map(
-          permit => {
-            const authority =
-              permit.authority ||
-              permit.municipality ||
-              permit.source ||
-              "Unknown authority";
-
-            const type =
-              permit.permit_type ||
-              permit.type ||
-              "Permit";
-
-            const location =
-              permit.location ||
-              permit.region ||
-              permit.province ||
-              "Unknown location";
-
-            const status =
-              permit.status ||
-              "Unknown";
-
-            return `
-              <div class="permit-row">
-                <div>
-                  <strong>
-                    ${escapeHTML(type)}
-                  </strong>
-
-                  <span>
-                    ${escapeHTML(location)}
-                  </span>
-                </div>
-
-                <div>
-                  <span>
-                    ${escapeHTML(authority)}
-                  </span>
-
-                  <span class="permit-status">
-                    ${escapeHTML(status)}
-                  </span>
-                </div>
-              </div>
-            `;
-          }
-        )
-        .join("");
-        }
