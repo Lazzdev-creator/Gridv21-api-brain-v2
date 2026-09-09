@@ -3220,6 +3220,23 @@ const zwRunning = Boolean(zwStatus.running);
         else if (action === "refresh") {
           await Promise.all([loadSaStatus(), loadSaSources(), loadSaOpportunities()]);
           renderAcquisition();
+          <button
+  class="btn btn-primary"
+  type="button"
+  data-zw-action="scan"
+  ${zwRunning || state.actionInFlight ? "disabled" : ""}
+>
+  ${zwRunning ? "Zimbabwe Scanning…" : "🇿🇼 Zimbabwe Scan"}
+</button>
+
+<button
+  class="btn btn-secondary"
+  type="button"
+  data-zw-action="refresh"
+  ${state.actionInFlight ? "disabled" : ""}
+>
+  Refresh Zimbabwe
+</button>
         }
       });
     });
