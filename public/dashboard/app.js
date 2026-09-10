@@ -1,249 +1,622 @@
 (() => {
   "use strict";
 
-  const VERSION = "6.4.0";
+  /*
+   * ================================================================
+   * GRIDV21 BRAIN — EXECUTIVE DASHBOARD CONTROLLER
+   * ================================================================
+   *
+   * GRIDV21 BRAIN Enterprise Intelligence
+   *
+   * VERSION: 6.4.2
+   *
+   * Executive access:
+   *   authType === "admin_key"
+   *
+   * Tenant access:
+   *   authType === "tenant"
+   *
+   * Tenant sessions are NEVER treated as Executive sessions.
+   *
+   * Backend authorization remains the final security boundary.
+   *
+   * South Africa and Zimbabwe acquisition intelligence are
+   * integrated without replacing the existing Enterprise OS.
+   * ================================================================
+   */
 
-  /* ========================================================================
+  const VERSION = "6.4.2";
+
+
+  /* ================================================================
    * API ENDPOINTS
-   * ====================================================================== */
+   * ================================================================ */
 
-  const API = {
-    health: "/api/health",
+  const API = Object.freeze({
 
-    authVerify: "/api/auth/verify",
-    authMe: "/api/auth/me",
-    authLogout: "/api/auth/logout",
+    health:
+      "/api/health",
 
-    dashboard: "/api/dashboard",
-    osModules: "/api/os-modules",
-    permits: "/api/permits",
+    authVerify:
+      "/api/auth/verify",
 
-    scrapeNow: "/api/scrape-now",
-    scanStatus: "/api/scan-status",
-    scanStop: "/api/brain/scan-stop",
+    authMe:
+      "/api/auth/me",
 
-    brainPause: "/api/brain/pause",
-    brainResume: "/api/brain/resume",
-    emergencyStop: "/api/brain/emergency-stop",
-
-    osToggle: id =>
-      `/api/os-toggle/${encodeURIComponent(id)}`,
-
-    forecast: "/api/forecast",
-    integrations: "/api/integrations",
-
-    auditLogs: "/api/system-events",
-    systemEvents: "/api/system-events"
-  };
+    authLogout:
+      "/api/auth/logout",
 
 
-  /* ========================================================================
+    /* --------------------------------------------------------------
+     * EXECUTIVE DASHBOARD
+     * -------------------------------------------------------------- */
+
+    dashboard:
+      "/api/dashboard",
+
+    osModules:
+      "/api/os-modules",
+
+    permits:
+      "/api/permits",
+
+    scanStatus:
+      "/api/scan-status",
+
+
+    /* --------------------------------------------------------------
+     * BRAIN / ENGINE CONTROLS
+     * -------------------------------------------------------------- */
+
+    scrapeNow:
+      "/api/scrape-now",
+
+    brainPause:
+      "/api/brain/pause",
+
+    brainResume:
+      "/api/brain/resume",
+
+    emergencyStop:
+      "/api/brain/emergency-stop",
+
+    scanStop:
+      "/api/brain/scan-stop",
+
+
+    /* --------------------------------------------------------------
+     * SYSTEM / INTELLIGENCE
+     * -------------------------------------------------------------- */
+
+    systemEvents:
+      "/api/system-events",
+
+    forecast:
+      "/api/forecast",
+
+    integrations:
+      "/api/integrations",
+
+
+    /* --------------------------------------------------------------
+     * OS MODULE CONTROL
+     * -------------------------------------------------------------- */
+
+    osToggle:
+      id =>
+        `/api/os-toggle/${encodeURIComponent(id)}`,
+
+
+    /* --------------------------------------------------------------
+     * SOUTH AFRICA ACQUISITION INTELLIGENCE
+     * -------------------------------------------------------------- */
+
+    saSources:
+      "/api/sa-intelligence/sources",
+
+    saStatus:
+      "/api/sa-intelligence/status",
+
+    saScan:
+      "/api/sa-intelligence/scan",
+
+    saOpportunities:
+      "/api/sa-intelligence/opportunities",
+
+    saMatch:
+      "/api/sa-intelligence/match",
+
+    saScanAndMatch:
+      "/api/sa-intelligence/scan-and-match",
+
+
+    /* --------------------------------------------------------------
+     * ZIMBABWE ACQUISITION INTELLIGENCE
+     * -------------------------------------------------------------- */
+
+    zwSources:
+      "/api/zw-intelligence/sources",
+
+    zwStatus:
+      "/api/zw-intelligence/status",
+
+    zwScan:
+      "/api/zw-intelligence/scan",
+
+    zwOpportunities:
+      "/api/zw-intelligence/opportunities"
+
+  });
+
+
+  /* ================================================================
+   * STORAGE
+   * ================================================================ */
+
+  const ADMIN_STORAGE_KEY =
+    "GRIDV21_ADMIN_KEY";
+
+
+  /* ================================================================
    * APPLICATION STATE
-   * ====================================================================== */
+   * ================================================================ */
 
   const state = {
-    adminKey: "",
 
     /*
+     * Executive authentication.
+     *
      * IMPORTANT:
-     * authenticated refers to Executive/Admin access.
-     * Tenant login is handled separately by verifySession().
+     * Tenant authentication must never set these values.
      */
-    authenticated: false,
 
-    connected: false,
+    authenticated:
+      false,
 
-    dashboard: null,
+    authType:
+      null,
 
-    osModules: [],
-    permits: [],
-    leads: [],
+    role:
+      null,
 
-    integrations: [],
-    auditLogs: [],
-    systemEvents: [],
+    adminKey:
+      "",
 
-    refreshTimer: null,
-    requestInFlight: false,
 
-    mobileSidebarOpen: false
+    /* --------------------------------------------------------------
+     * CONNECTION
+     * -------------------------------------------------------------- */
+
+    connected:
+      false,
+
+
+    /* --------------------------------------------------------------
+     * DASHBOARD
+     * -------------------------------------------------------------- */
+
+    dashboard:
+      null,
+
+
+    /* --------------------------------------------------------------
+     * BRAIN ENGINE
+     * -------------------------------------------------------------- */
+
+    engine: {
+
+      running:
+        false,
+
+      scanning:
+        false,
+
+      emergencyStopped:
+        false,
+
+      lastScan:
+        null,
+
+      lastScanDuration:
+        null,
+
+      permitsFound:
+        0,
+
+      errors:
+        0,
+
+      uptime:
+        0,
+
+      lastError:
+        null
+
+    },
+
+
+    /* --------------------------------------------------------------
+     * ENTERPRISE OS
+     * -------------------------------------------------------------- */
+
+    modules:
+      [],
+
+
+    /* --------------------------------------------------------------
+     * PERMITS
+     * -------------------------------------------------------------- */
+
+    permits:
+      [],
+
+
+    /* --------------------------------------------------------------
+     * SYSTEM EVENTS
+     * -------------------------------------------------------------- */
+
+    events:
+      [],
+
+
+    /* --------------------------------------------------------------
+     * FORECAST
+     * -------------------------------------------------------------- */
+
+    forecast:
+      null,
+
+
+    /* --------------------------------------------------------------
+     * INTEGRATIONS
+     * -------------------------------------------------------------- */
+
+    integrations:
+      [],
+
+
+    /* --------------------------------------------------------------
+     * SOUTH AFRICA INTELLIGENCE
+     * -------------------------------------------------------------- */
+
+    sa: {
+
+      status:
+        null,
+
+      sources:
+        [],
+
+      opportunities:
+        [],
+
+      loading:
+        false,
+
+      lastError:
+        null
+
+    },
+
+
+    /* --------------------------------------------------------------
+     * ZIMBABWE INTELLIGENCE
+     * -------------------------------------------------------------- */
+
+    zw: {
+
+      status:
+        null,
+
+      sources:
+        [],
+
+      opportunities:
+        [],
+
+      loading:
+        false,
+
+      lastError:
+        null
+
+    },
+
+
+    /* --------------------------------------------------------------
+     * REFRESH / ACTION STATE
+     * -------------------------------------------------------------- */
+
+    refreshTimer:
+      null,
+
+    refreshInFlight:
+      false,
+
+    actionInFlight:
+      false,
+
+
+    /* --------------------------------------------------------------
+     * NAVIGATION
+     * -------------------------------------------------------------- */
+
+    activeSection:
+      "dashboard",
+
+    mobileSidebarOpen:
+      false
+
   };
 
 
-  /* ========================================================================
-   * ENTERPRISE OS MODULE DEFINITIONS
-   * ====================================================================== */
+  /* ================================================================
+   * FALLBACK ENTERPRISE OS MODULES
+   *
+   * These remain available even if /api/os-modules temporarily fails.
+   * ================================================================ */
 
-  const OS_MODULES = [
+  const FALLBACK_MODULES = [
+
     {
-      id: 1,
-      name: "Executive Intelligence",
+      id:
+        1,
+
+      name:
+        "Executive Intelligence",
+
       description:
         "Strategy and executive decision intelligence.",
-      layer: "Strategy",
-      kpis_count: 12,
-      agents_count: 4
+
+      layer:
+        "Strategy"
     },
 
-    {
-      id: 2,
-      name: "Revenue Intelligence",
-      description:
-        "Revenue performance, forecasting and monetisation.",
-      layer: "Finance",
-      kpis_count: 14,
-      agents_count: 5
-    },
 
     {
-      id: 3,
-      name: "Sales & CRM",
+      id:
+        2,
+
+      name:
+        "Revenue Intelligence",
+
       description:
-        "Sales pipeline, prospects and customer relationship intelligence.",
-      layer: "Sales",
-      kpis_count: 16,
-      agents_count: 6
+        "Revenue performance and forecasting.",
+
+      layer:
+        "Finance"
     },
 
-    {
-      id: 4,
-      name: "Marketing",
-      description:
-        "Growth, campaigns, audiences and acquisition intelligence.",
-      layer: "Growth",
-      kpis_count: 15,
-      agents_count: 5
-    },
 
     {
-      id: 5,
-      name: "Operations",
+      id:
+        3,
+
+      name:
+        "Sales & CRM",
+
       description:
-        "Operational performance and process intelligence.",
-      layer: "Operations",
-      kpis_count: 14,
-      agents_count: 5
+        "Sales pipeline and customer intelligence.",
+
+      layer:
+        "Sales"
     },
 
-    {
-      id: 6,
-      name: "Finance",
-      description:
-        "Accounting, cash flow and financial intelligence.",
-      layer: "Accounting",
-      kpis_count: 13,
-      agents_count: 4
-    },
 
     {
-      id: 7,
-      name: "Human Capital",
+      id:
+        4,
+
+      name:
+        "Marketing",
+
       description:
-        "People, workforce and organisational intelligence.",
-      layer: "People",
-      kpis_count: 11,
-      agents_count: 4
+        "Growth, campaigns and acquisition intelligence.",
+
+      layer:
+        "Growth"
     },
 
-    {
-      id: 8,
-      name: "Project Management",
-      description:
-        "Projects, delivery, milestones and resource intelligence.",
-      layer: "Projects",
-      kpis_count: 13,
-      agents_count: 4
-    },
 
     {
-      id: 9,
-      name: "Knowledge Intelligence",
+      id:
+        5,
+
+      name:
+        "Operations",
+
       description:
-        "Enterprise knowledge and institutional intelligence.",
-      layer: "Knowledge",
-      kpis_count: 10,
-      agents_count: 3
+        "Operational performance intelligence.",
+
+      layer:
+        "Operations"
     },
 
-    {
-      id: 10,
-      name: "Legal & Compliance",
-      description:
-        "Risk, regulatory and compliance intelligence.",
-      layer: "Compliance",
-      kpis_count: 12,
-      agents_count: 4
-    },
 
     {
-      id: 11,
-      name: "Supply Chain",
+      id:
+        6,
+
+      name:
+        "Finance",
+
       description:
-        "Suppliers, logistics and procurement intelligence.",
-      layer: "Supply",
-      kpis_count: 13,
-      agents_count: 4
+        "Accounting and financial intelligence.",
+
+      layer:
+        "Accounting"
     },
 
-    {
-      id: 12,
-      name: "Acquisition Intelligence",
-      description:
-        "Lead discovery, permit intelligence and acquisition.",
-      layer: "Lead Generation",
-      kpis_count: 18,
-      agents_count: 7
-    },
 
     {
-      id: 13,
-      name: "Customer Success",
+      id:
+        7,
+
+      name:
+        "Human Capital",
+
       description:
-        "Customer health, retention and expansion intelligence.",
-      layer: "Customer",
-      kpis_count: 12,
-      agents_count: 4
+        "People and workforce intelligence.",
+
+      layer:
+        "People"
     },
 
-    {
-      id: 14,
-      name: "IT & Security",
-      description:
-        "Technology, infrastructure and security intelligence.",
-      layer: "Technology",
-      kpis_count: 15,
-      agents_count: 5
-    },
 
     {
-      id: 15,
-      name: "Analytics & BI",
+      id:
+        8,
+
+      name:
+        "Project Management",
+
       description:
-        "Enterprise analytics, reporting and business intelligence.",
-      layer: "Analytics",
-      kpis_count: 20,
-      agents_count: 6
+        "Projects and delivery intelligence.",
+
+      layer:
+        "Projects"
+    },
+
+
+    {
+      id:
+        9,
+
+      name:
+        "Knowledge Intelligence",
+
+      description:
+        "Enterprise knowledge intelligence.",
+
+      layer:
+        "Knowledge"
+    },
+
+
+    {
+      id:
+        10,
+
+      name:
+        "Legal & Compliance",
+
+      description:
+        "Risk and compliance intelligence.",
+
+      layer:
+        "Compliance"
+    },
+
+
+    {
+      id:
+        11,
+
+      name:
+        "Supply Chain",
+
+      description:
+        "Suppliers, logistics and procurement.",
+
+      layer:
+        "Supply"
+    },
+
+
+    {
+      id:
+        12,
+
+      name:
+        "Acquisition Intelligence",
+
+      description:
+        "Lead discovery and acquisition.",
+
+      layer:
+        "Lead Generation"
+    },
+
+
+    {
+      id:
+        13,
+
+      name:
+        "Customer Success",
+
+      description:
+        "Retention and customer health.",
+
+      layer:
+        "Customer"
+    },
+
+
+    {
+      id:
+        14,
+
+      name:
+        "IT & Security",
+
+      description:
+        "Technology and security intelligence.",
+
+      layer:
+        "Technology"
+    },
+
+
+    {
+      id:
+        15,
+
+      name:
+        "Analytics & BI",
+
+      description:
+        "Business intelligence and analytics.",
+
+      layer:
+        "Analytics"
     }
+
   ];
 
 
-  /* ========================================================================
+  /* ================================================================
    * DOM HELPERS
-   * ====================================================================== */
+   * ================================================================ */
 
   function byId(id) {
-    return document.getElementById(id);
-  }
 
-
-  function $$(selector, root = document) {
-    return Array.from(
-      root.querySelectorAll(selector)
+    return document.getElementById(
+      id
     );
+
   }
 
 
-  function text(id, value) {
+  function all(
+    selector,
+    root = document
+  ) {
+
+    return Array.from(
+      root.querySelectorAll(
+        selector
+      )
+    );
+
+  }
+
+
+  function setText(
+    id,
+    value
+  ) {
+
     const element =
       byId(id);
 
@@ -257,10 +630,15 @@
       value === ""
         ? "—"
         : String(value);
+
   }
 
 
-  function html(id, value) {
+  function setHTML(
+    id,
+    value
+  ) {
+
     const element =
       byId(id);
 
@@ -270,55 +648,141 @@
 
     element.innerHTML =
       value ?? "";
+
   }
 
 
-  function escapeHTML(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+  function escapeHTML(
+    value
+  ) {
+
+    return String(
+      value ?? ""
+    )
+      .replace(
+        /&/g,
+        "&amp;"
+      )
+      .replace(
+        /</g,
+        "&lt;"
+      )
+      .replace(
+        />/g,
+        "&gt;"
+      )
+      .replace(
+        /"/g,
+        "&quot;"
+      )
+      .replace(
+        /'/g,
+        "&#039;"
+      );
+
   }
 
 
-  function safeArray(value) {
-    return Array.isArray(value)
+  function safeArray(
+    value
+  ) {
+
+    return Array.isArray(
+      value
+    )
       ? value
       : [];
+
   }
 
 
-  function safeObject(value) {
+  function safeObject(
+    value
+  ) {
+
     if (
       value &&
-      typeof value === "object" &&
+      typeof value ===
+        "object" &&
       !Array.isArray(value)
     ) {
+
       return value;
+
     }
 
     return {};
+
   }
 
 
-  function safeNumber(
+  function numeric(
     value,
     fallback = 0
   ) {
-    const numberValue =
+
+    const number =
       Number(value);
 
     return Number.isFinite(
-      numberValue
+      number
     )
-      ? numberValue
+      ? number
       : fallback;
+
   }
 
 
-  function dateTime(value) {
+  /* ================================================================
+   * FORMATTING
+   * ================================================================ */
+
+  function formatNumber(
+    value
+  ) {
+
+    return new Intl.NumberFormat(
+      "en-GB"
+    ).format(
+      numeric(
+        value,
+        0
+      )
+    );
+
+  }
+
+
+  function formatMoney(
+    value
+  ) {
+
+    return new Intl.NumberFormat(
+      "en-US",
+      {
+        style:
+          "currency",
+
+        currency:
+          "USD",
+
+        maximumFractionDigits:
+          2
+      }
+    ).format(
+      numeric(
+        value,
+        0
+      )
+    );
+
+  }
+
+
+  function formatDate(
+    value
+  ) {
+
     if (!value) {
       return "—";
     }
@@ -331,69 +795,67 @@
         date.getTime()
       )
     ) {
-      return String(value);
+
+      return String(
+        value
+      );
+
     }
 
     return date.toLocaleString(
       "en-GB",
       {
-        dateStyle: "medium",
-        timeStyle: "short"
+        dateStyle:
+          "medium",
+
+        timeStyle:
+          "short"
       }
     );
+
   }
 
 
-  function money(value) {
-    return new Intl.NumberFormat(
-      "en-GB",
-      {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 2
-      }
-    ).format(
-      safeNumber(value, 0)
-    );
-  }
+  function formatDuration(
+    value
+  ) {
 
-
-  function number(value) {
-    return new Intl.NumberFormat(
-      "en-GB"
-    ).format(
-      safeNumber(value, 0)
-    );
-  }
-
-
-  function bool(value) {
-    return value
-      ? "YES"
-      : "NO";
-  }
-
-
-  function formatDuration(value) {
     if (
       value === undefined ||
       value === null ||
       value === ""
     ) {
+
       return "—";
+
     }
 
     const seconds =
-      safeNumber(value, NaN);
+      numeric(
+        value,
+        NaN
+      );
 
     if (
-      !Number.isFinite(seconds)
+      !Number.isFinite(
+        seconds
+      )
     ) {
-      return String(value);
+
+      return String(
+        value
+      );
+
     }
 
-    if (seconds < 60) {
-      return `${Math.round(seconds)}s`;
+    if (
+      seconds < 60
+    ) {
+
+      return `${Math.round(
+        seconds
+      )}s`;
+
     }
 
     const minutes =
@@ -401,13 +863,17 @@
         seconds / 60
       );
 
-    const remainingSeconds =
+    const remaining =
       Math.round(
         seconds % 60
       );
 
-    if (minutes < 60) {
-      return `${minutes}m ${remainingSeconds}s`;
+    if (
+      minutes < 60
+    ) {
+
+      return `${minutes}m ${remaining}s`;
+
     }
 
     const hours =
@@ -415,29 +881,32 @@
         minutes / 60
       );
 
-    const remainingMinutes =
+    const mins =
       minutes % 60;
 
-    return `${hours}h ${remainingMinutes}m`;
+    return `${hours}h ${mins}m`;
+
   }
 
 
-  function formatUptime(value) {
-    if (
-      value === undefined ||
-      value === null ||
-      value === ""
-    ) {
-      return "—";
-    }
+  function formatUptime(
+    value
+  ) {
 
     const seconds =
-      safeNumber(value, NaN);
+      numeric(
+        value,
+        NaN
+      );
 
     if (
-      !Number.isFinite(seconds)
+      !Number.isFinite(
+        seconds
+      )
     ) {
-      return String(value);
+
+      return "—";
+
     }
 
     const days =
@@ -447,43 +916,75 @@
 
     const hours =
       Math.floor(
-        (seconds % 86400) / 3600
+        (seconds % 86400) /
+        3600
       );
 
     const minutes =
       Math.floor(
-        (seconds % 3600) / 60
+        (seconds % 3600) /
+        60
       );
 
-    if (days > 0) {
+    if (
+      days > 0
+    ) {
+
       return `${days}d ${hours}h`;
+
     }
 
-    if (hours > 0) {
+    if (
+      hours > 0
+    ) {
+
       return `${hours}h ${minutes}m`;
+
     }
 
     return `${minutes}m`;
+
   }
 
 
-  /* ========================================================================
-   * TOAST
-   * ====================================================================== */
+  function yesNo(
+    value
+  ) {
+
+    return value
+      ? "YES"
+      : "NO";
+
+  }
+
+
+  /* ================================================================
+   * TOAST / ACTION STATUS
+   * ================================================================ */
 
   function showToast(
     message,
     type = "info"
   ) {
+
     const toast =
       byId("toast");
 
     if (!toast) {
+
+      console.log(
+        "[GRIDV21]",
+        message
+      );
+
       return;
+
     }
 
     toast.textContent =
-      String(message ?? "");
+      String(
+        message ?? ""
+      );
 
     toast.className =
       `toast toast-${type}`;
@@ -499,395 +1000,162 @@
     showToast.timer =
       setTimeout(
         () => {
+
           toast.classList.remove(
             "show"
           );
+
         },
         3500
       );
+
   }
 
 
-  /* ========================================================================
+  function actionMessage(
+    message,
+    type = "info"
+  ) {
+
+    const element =
+      byId(
+        "action-message"
+      );
+
+    if (!element) {
+      return;
+    }
+
+    element.textContent =
+      String(
+        message ?? ""
+      );
+
+    element.dataset.type =
+      type;
+
+  }
+
+
+  /* ================================================================
    * GLOBAL CONNECTION STATUS
-   * ====================================================================== */
+   * ================================================================ */
 
   function setGlobalStatus(
     connected,
-    label
+    message
   ) {
+
     state.connected =
-      Boolean(connected);
-
-    const status =
-      byId("connection-status") ||
-      byId("system-connection") ||
-      byId("api-status");
-
-    if (status) {
-      status.textContent =
-        label ||
-        (
-          connected
-            ? "Connected"
-            : "Disconnected"
-        );
-
-      status.classList.toggle(
-        "online",
-        Boolean(connected)
+      Boolean(
+        connected
       );
 
-      status.classList.toggle(
-        "offline",
-        !connected
+    const text =
+      byId(
+        "global-status-text"
       );
-    }
+
+    const dot =
+      byId(
+        "global-status-dot"
+      );
+
+    const sidebarDot =
+      byId(
+        "sidebar-status-dot"
+      );
+
+    const sidebarText =
+      byId(
+        "sidebar-status-text"
+      );
 
     const badge =
-      byId("connection-badge");
+      byId(
+        "global-status"
+      );
+
+
+    const finalMessage =
+      message ||
+      (
+        connected
+          ? "Connected"
+          : "Disconnected"
+      );
+
+
+    if (text) {
+
+      text.textContent =
+        finalMessage;
+
+    }
+
+
+    if (sidebarText) {
+
+      sidebarText.textContent =
+        finalMessage;
+
+    }
+
 
     if (badge) {
-      badge.textContent =
-        connected
-          ? "ONLINE"
-          : "OFFLINE";
 
       badge.classList.toggle(
         "badge-success",
-        Boolean(connected)
+        Boolean(
+          connected
+        )
       );
 
       badge.classList.toggle(
-        "badge-danger",
-        !connected
+        "badge-muted",
+        !Boolean(
+          connected
+        )
       );
+
     }
 
-    const dot =
-      byId("connection-dot");
 
     if (dot) {
-      dot.classList.toggle(
-        "online",
-        Boolean(connected)
-      );
 
       dot.classList.toggle(
-        "offline",
-        !connected
-      );
-    }
-  }
-
-
-  /* ========================================================================
-   * API REQUEST HELPER
-   * ====================================================================== */
-
-  async function apiRequest(
-    url,
-    options = {}
-  ) {
-    const config = {
-      method: "GET",
-      credentials: "include",
-      headers: {
-        Accept: "application/json"
-      },
-      ...options
-    };
-
-    if (
-      config.body &&
-      typeof config.body === "object" &&
-      !(config.body instanceof FormData)
-    ) {
-      config.headers = {
-        ...config.headers,
-        "Content-Type": "application/json"
-      };
-
-      config.body =
-        JSON.stringify(
-          config.body
-        );
-    }
-
-    if (state.adminKey) {
-      config.headers = {
-        ...config.headers,
-        "X-Admin-Key":
-          state.adminKey
-      };
-    }
-
-    const response =
-      await fetch(
-        url,
-        config
-      );
-
-    const contentType =
-      response.headers.get(
-        "content-type"
-      ) || "";
-
-    let data;
-
-    if (
-      contentType.includes(
-        "application/json"
-      )
-    ) {
-      data =
-        await response.json();
-    } else {
-      data =
-        await response.text();
-    }
-
-    if (!response.ok) {
-      const error =
-        new Error(
-          (
-            data &&
-            typeof data === "object" &&
-            (
-              data.error ||
-              data.message
-            )
-          ) ||
-          `Request failed: ${response.status}`
-        );
-
-      error.status =
-        response.status;
-
-      error.data =
-        data;
-
-      throw error;
-    }
-
-    return data;
-  }
-
-
-  /* ========================================================================
-   * AUTHENTICATION
-   * ====================================================================== */
-
-  function getStoredAdminKey() {
-    try {
-      return (
-        localStorage.getItem(
-          "gridv21_admin_key"
-        ) || ""
-      );
-    } catch {
-      return "";
-    }
-  }
-
-
-  function storeAdminKey(key) {
-    state.adminKey =
-      String(key || "");
-
-    try {
-      if (state.adminKey) {
-        localStorage.setItem(
-          "gridv21_admin_key",
-          state.adminKey
-        );
-      } else {
-        localStorage.removeItem(
-          "gridv21_admin_key"
-        );
-      }
-    } catch {
-      /* Ignore storage errors. */
-    }
-  }
-
-
-  function clearAdminKey() {
-    state.adminKey = "";
-
-    try {
-      localStorage.removeItem(
-        "gridv21_admin_key"
-      );
-    } catch {
-      /* Ignore storage errors. */
-    }
-  }
-
-
-  function setAuthUI(
-    authenticated
-  ) {
-    state.authenticated =
-      Boolean(authenticated);
-
-    const loginPanel =
-      byId("admin-login");
-
-    const dashboardPanel =
-      byId("admin-dashboard");
-
-    if (loginPanel) {
-      loginPanel.hidden =
-        state.authenticated;
-    }
-
-    if (dashboardPanel) {
-      dashboardPanel.hidden =
-        !state.authenticated;
-    }
-
-    $$(
-      "[data-auth-required]"
-    ).forEach(
-      element => {
-        element.disabled =
-          !state.authenticated;
-      }
-    );
-
-    const authStatus =
-      byId("auth-status");
-
-    if (authStatus) {
-      authStatus.textContent =
-        state.authenticated
-          ? "Authenticated"
-          : "Authentication required";
-    }
-  }
-
-
-  async function verifyAdminKey(
-    key
-  ) {
-    const suppliedKey =
-      String(key || "").trim();
-
-    if (!suppliedKey) {
-      throw new Error(
-        "Admin key is required."
-      );
-    }
-
-    state.adminKey =
-      suppliedKey;
-
-    const result =
-      await apiRequest(
-        API.authVerify,
-        {
-          method: "POST",
-          body: {
-            admin_key:
-              suppliedKey
-          }
-        }
-      );
-
-    const authenticated =
-      Boolean(
-        result?.authenticated ??
-        result?.authorized ??
-        result?.success
-      );
-
-    if (!authenticated) {
-      clearAdminKey();
-
-      throw new Error(
-        result?.message ||
-        result?.error ||
-        "Invalid admin key."
-      );
-    }
-
-    storeAdminKey(
-      suppliedKey
-    );
-
-    setAuthUI(true);
-
-    return result;
-  }
-
-
-  async function verifyAdminSession() {
-    try {
-      const result =
-        await apiRequest(
-          API.authMe
-        );
-
-      const authenticated =
+        "status-online",
         Boolean(
-          result?.authenticated ??
-          result?.authorized ??
-          result?.admin ??
-          result?.user
-        );
-
-      if (authenticated) {
-        state.authenticated =
-          true;
-
-        setAuthUI(true);
-
-        return true;
-      }
-    } catch {
-      /* Session may not exist. */
-    }
-
-    if (state.adminKey) {
-      try {
-        await verifyAdminKey(
-          state.adminKey
-        );
-
-        return true;
-      } catch {
-        clearAdminKey();
-      }
-    }
-
-    setAuthUI(false);
-
-    return false;
-  }
-
-
-  async function logoutAdmin() {
-    try {
-      await apiRequest(
-        API.authLogout,
-        {
-          method: "POST"
-        }
+          connected
+        )
       );
-    } catch {
-      /* Logout locally even if server rejects. */
+
+      dot.classList.toggle(
+        "status-offline",
+        !Boolean(
+          connected
+        )
+      );
+
     }
 
-    clearAdminKey();
 
-    state.authenticated =
-      false;
+    if (sidebarDot) {
 
-    setAuthUI(false);
+      sidebarDot.classList.toggle(
+        "status-online",
+        Boolean(
+          connected
+        )
+      );
 
-    showToast(
-      "Logged out.",
-      "info"
-    );
-  }
+      sidebarDot.classList.toggle(
+        "status-offline",
+        !Boolean(
+          connected
+        )
+      );
+
+    }
+
+    }
