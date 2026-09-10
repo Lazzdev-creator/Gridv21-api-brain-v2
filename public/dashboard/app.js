@@ -3478,3 +3478,1210 @@ container.innerHTML =
   ).join("");
 
       }
+const zwStatus = safeObject(zw.status);
+    const zwStats = safeObject(zwStatus.stats);
+    const zwOpps = safeArray(zw.opportunities);
+    const zwSources = safeArray(zw.sources);
+    const zwRunning = Boolean(zwStatus.running);
+
+    const saHigh = saOpps.filter(o => o.tier === "HIGH").length;
+    const saMedium = saOpps.filter(o => o.tier === "MEDIUM").length;
+    const zwHigh = zwOpps.filter(o => o.tier === "HIGH").length;
+    const zwMedium = zwOpps.filter(o => o.tier === "MEDIUM").length;
+
+    const renderOpp = (o, country) => {
+      const tier = o.tier || "LOW";
+      const title =
+        o.project_type ||
+        o.project_title ||
+        o.application_type ||
+        o.permit_type ||
+        o.source_category ||
+        "Opportunity";
+
+      const place = [
+        o.address,
+        o.suburb,
+        o.town,
+        o.municipality,
+        o.procuring_entity
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      return `
+        <article class="card" style="padding:1rem 1.1rem;">
+          <div style="display:flex;justify-content:space-between;gap:.75rem;align-items:start;margin-bottom:.5rem;">
+            <div>
+              <strong>${escapeHTML(title)}</strong>
+
+              <div
+                class="muted"
+                style="font-size:.88rem;margin-top:.15rem;"
+              >
+                ${escapeHTML(
+                  place || country
+                )}
+              </div>
+            </div>
+
+            <span
+              class="badge ${
+                tier === "HIGH"
+                  ? "badge-success"
+                  : tier === "MEDIUM"
+                    ? "badge-warning"
+                    : "badge-muted"
+              }"
+            >
+              ${escapeHTML(tier)} ·
+              ${escapeHTML(
+                String(
+                  o.score ?? "—"
+                )
+              )}
+            </span>
+          </div>
+
+          <div
+            style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.6rem;font-size:.9rem;"
+          >
+            <div>
+              <span class="muted">
+                Entity
+              </span>
+              <br>
+              ${escapeHTML(
+                o.procuring_entity || "—"
+              )}
+            </div>
+
+            <div>
+              <span class="muted">
+                Municipality
+              </span>
+              <br>
+              ${escapeHTML(
+                o.municipality || "—"
+              )}
+            </div>
+
+            <div>
+              <span class="muted">
+                Category
+              </span>
+              <br>
+              ${escapeHTML(
+                o.source_category ||
+                o.category ||
+                "—"
+              )}
+            </div>
+
+            <div>
+              <span class="muted">
+                Status
+              </span>
+              <br>
+              ${escapeHTML(
+                o.status || "—"
+              )}
+            </div>
+
+            <div>
+              <span class="muted">
+                Closing
+              </span>
+              <br>
+              ${escapeHTML(
+                o.closing_date ||
+                o.deadline ||
+                "—"
+              )}
+            </div>
+          </div>
+
+          ${
+            o.ai_summary
+              ? `
+                <p
+                  class="muted"
+                  style="margin:.7rem 0 0;font-size:.85rem;"
+                >
+                  ${escapeHTML(
+                    o.ai_summary
+                  )}
+                </p>
+              `
+              : ""
+          }
+        </article>
+      `;
+    };
+
+    container.innerHTML = `
+      <div
+        class="section-actions"
+        style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;"
+      >
+        <button
+          class="btn btn-primary"
+          type="button"
+          data-sa-action="scan"
+          ${
+            saRunning ||
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          ${
+            saRunning
+              ? "Scanning…"
+              : "Run SA Scan"
+          }
+        </button>
+
+        <button
+          class="btn btn-secondary"
+          type="button"
+          data-sa-action="match"
+          ${
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          Match to Tenants
+        </button>
+
+        <button
+          class="btn btn-secondary"
+          type="button"
+          data-sa-action="scan-match"
+          ${
+            saRunning ||
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          Scan + Match
+        </button>
+
+        <button
+          class="btn btn-secondary"
+          type="button"
+          data-sa-action="refresh"
+          ${
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div
+        class="metric-grid"
+        style="margin-bottom:1.25rem;"
+      >
+        <article class="metric-card">
+          <span>
+            SA Scan Status
+          </span>
+
+          <strong>
+            ${
+              saRunning
+                ? "RUNNING"
+                : (
+                    saStatus.lastRun
+                      ? "IDLE"
+                      : "NEVER RUN"
+                  )
+            }
+          </strong>
+
+          <small>
+            ${
+              saStatus.lastRun
+                ? escapeHTML(
+                    new Date(
+                      saStatus.lastRun
+                    ).toLocaleString()
+                  )
+                : "No scan yet"
+            }
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            SA Sources
+          </span>
+
+          <strong>
+            ${
+              saSources.filter(
+                s => s.enabled
+              ).length
+            }/${saSources.length || "—"}
+          </strong>
+
+          <small>
+            Enabled / total
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            SA Fetched
+          </span>
+
+          <strong>
+            ${formatNumber(
+              saStats.fetched ?? 0
+            )}
+          </strong>
+
+          <small>
+            New
+            ${formatNumber(
+              saStats.new ?? 0
+            )}
+            · Updated
+            ${formatNumber(
+              saStats.updated ?? 0
+            )}
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            SA HIGH / MEDIUM
+          </span>
+
+          <strong>
+            ${formatNumber(
+              saStats.high ?? saHigh
+            )}
+            /
+            ${formatNumber(
+              saStats.medium ?? saMedium
+            )}
+          </strong>
+
+          <small>
+            Opportunity tiers
+          </small>
+        </article>
+      </div>
+
+      ${
+        saStatus.lastError ||
+        sa.lastError
+          ? `
+            <div
+              class="empty-panel"
+              style="border-color:#ef4444;margin-bottom:1rem;"
+            >
+              <strong>
+                South Africa last error
+              </strong>
+              <br>
+              ${escapeHTML(
+                saStatus.lastError ||
+                sa.lastError
+              )}
+            </div>
+          `
+          : ""
+      }
+
+      <div
+        class="section-head"
+        style="margin-bottom:.75rem;"
+      >
+        <div>
+          <span class="eyebrow">
+            LIVE FEED
+          </span>
+
+          <h3 style="margin:.15rem 0;">
+            South Africa Opportunities
+          </h3>
+
+          <p
+            class="muted"
+            style="margin:0;"
+          >
+            Top scored construction /
+            development leads from
+            enabled sources.
+          </p>
+        </div>
+      </div>
+
+      ${
+        saOpps.length
+          ? `
+            <div
+              class="list"
+              style="display:grid;gap:.75rem;"
+            >
+              ${saOpps
+                .map(
+                  o =>
+                    renderOpp(
+                      o,
+                      "South Africa"
+                    )
+                )
+                .join("")}
+            </div>
+          `
+          : `
+            <div class="empty-panel">
+              No South Africa opportunities
+              loaded yet.
+              <br>
+              Click
+              <strong>
+                Run SA Scan
+              </strong>
+              to pull enabled source data.
+            </div>
+          `
+      }
+
+      ${
+        saSources.length
+          ? `
+            <div
+              class="section-head"
+              style="margin:1.5rem 0 .75rem;"
+            >
+              <div>
+                <span class="eyebrow">
+                  SOURCES
+                </span>
+
+                <h3 style="margin:.15rem 0;">
+                  South Africa Sources
+                </h3>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Municipality</th>
+                    <th>Category</th>
+                    <th>Enabled</th>
+                    <th>Confidence</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  ${saSources
+                    .map(
+                      s => `
+                        <tr>
+                          <td>
+                            ${escapeHTML(
+                              s.id
+                            )}
+                          </td>
+
+                          <td>
+                            ${escapeHTML(
+                              s.municipality ||
+                              "—"
+                            )}
+                          </td>
+
+                          <td>
+                            ${escapeHTML(
+                              s.category ||
+                              "—"
+                            )}
+                          </td>
+
+                          <td>
+                            ${
+                              s.enabled
+                                ? "Yes"
+                                : "No"
+                            }
+                          </td>
+
+                          <td>
+                            ${escapeHTML(
+                              String(
+                                s.confidence ??
+                                "—"
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      `
+                    )
+                    .join("")}
+                </tbody>
+              </table>
+            </div>
+          `
+          : ""
+      }
+
+      <div
+        class="section-head"
+        style="margin:1.75rem 0 .75rem;"
+      >
+        <div>
+          <span class="eyebrow">
+            ZIMBABWE ACQUISITION INTELLIGENCE
+          </span>
+
+          <h3 style="margin:.15rem 0;">
+            🇿🇼 Zimbabwe Construction
+            Opportunities
+          </h3>
+
+          <p
+            class="muted"
+            style="margin:0;"
+          >
+            Zimbabwe procurement and
+            construction opportunities from
+            registered acquisition sources.
+          </p>
+        </div>
+      </div>
+
+      <div
+        class="section-actions"
+        style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;"
+      >
+        <button
+          class="btn btn-primary"
+          type="button"
+          data-zw-action="scan"
+          ${
+            zwRunning ||
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          ${
+            zwRunning
+              ? "Zimbabwe Scanning…"
+              : "🇿🇼 Zimbabwe Scan"
+          }
+        </button>
+
+        <button
+          class="btn btn-secondary"
+          type="button"
+          data-zw-action="refresh"
+          ${
+            state.actionInFlight
+              ? "disabled"
+              : ""
+          }
+        >
+          Refresh Zimbabwe
+        </button>
+      </div>
+
+      <div
+        class="metric-grid"
+        style="margin-bottom:1rem;"
+      >
+        <article class="metric-card">
+          <span>
+            ZW Scan Status
+          </span>
+
+          <strong>
+            ${
+              zwRunning
+                ? "RUNNING"
+                : (
+                    zwStatus.lastRun
+                      ? "IDLE"
+                      : "NEVER RUN"
+                  )
+            }
+          </strong>
+
+          <small>
+            ${
+              zwStatus.lastRun
+                ? escapeHTML(
+                    new Date(
+                      zwStatus.lastRun
+                    ).toLocaleString()
+                  )
+                : "No Zimbabwe scan yet"
+            }
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            ZW Sources
+          </span>
+
+          <strong>
+            ${
+              zwSources.filter(
+                s => s.enabled
+              ).length
+            }/${zwSources.length || "—"}
+          </strong>
+
+          <small>
+            Enabled / total
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            ZW Fetched
+          </span>
+
+          <strong>
+            ${formatNumber(
+              zwStats.fetched ?? 0
+            )}
+          </strong>
+
+          <small>
+            New
+            ${formatNumber(
+              zwStats.new ?? 0
+            )}
+          </small>
+        </article>
+
+        <article class="metric-card">
+          <span>
+            ZW HIGH / MEDIUM
+          </span>
+
+          <strong>
+            ${formatNumber(
+              zwStats.high ?? zwHigh
+            )}
+            /
+            ${formatNumber(
+              zwStats.medium ?? zwMedium
+            )}
+          </strong>
+
+          <small>
+            Opportunity tiers
+          </small>
+        </article>
+      </div>
+
+      ${
+        zwStatus.lastError ||
+        zw.lastError
+          ? `
+            <div
+              class="empty-panel"
+              style="border-color:#ef4444;margin-bottom:1rem;"
+            >
+              <strong>
+                Zimbabwe last error
+              </strong>
+              <br>
+              ${escapeHTML(
+                zwStatus.lastError ||
+                zw.lastError
+              )}
+            </div>
+          `
+          : ""
+      }
+
+      ${
+        zwOpps.length
+          ? `
+            <div
+              class="list"
+              style="display:grid;gap:.75rem;"
+            >
+              ${zwOpps
+                .map(
+                  o =>
+                    renderOpp(
+                      o,
+                      "Zimbabwe"
+                    )
+                )
+                .join("")}
+            </div>
+          `
+          : `
+            <div class="empty-panel">
+              No Zimbabwe opportunities
+              loaded yet.
+              <br>
+              Click
+              <strong>
+                🇿🇼 Zimbabwe Scan
+              </strong>
+              to run the acquisition engine.
+            </div>
+          `
+      }
+    `;
+
+    container
+      .querySelectorAll(
+        "[data-sa-action]"
+      )
+      .forEach(
+        btn => {
+          btn.addEventListener(
+            "click",
+            async () => {
+              const action =
+                btn.dataset.saAction;
+
+              if (
+                action === "scan"
+              ) {
+                await runSaScan();
+
+              } else if (
+                action === "match"
+              ) {
+                await runSaMatch();
+
+              } else if (
+                action === "scan-match"
+              ) {
+                await runSaScanAndMatch();
+
+              } else if (
+                action === "refresh"
+              ) {
+                await Promise.all([
+                  loadSaStatus(),
+                  loadSaSources(),
+                  loadSaOpportunities(),
+                  loadZwStatus(),
+                  loadZwSources(),
+                  loadZwOpportunities()
+                ]);
+
+                renderAcquisition();
+              }
+            }
+          );
+        }
+      );
+
+    container
+      .querySelectorAll(
+        "[data-zw-action]"
+      )
+      .forEach(
+        btn => {
+          btn.addEventListener(
+            "click",
+            async () => {
+              const action =
+                btn.dataset.zwAction;
+
+              if (
+                action === "scan"
+              ) {
+                await runZwScan();
+
+              } else if (
+                action === "refresh"
+              ) {
+                await Promise.all([
+                  loadZwStatus(),
+                  loadZwSources(),
+                  loadZwOpportunities()
+                ]);
+
+                renderAcquisition();
+              }
+            }
+          );
+        }
+      );
+  }
+
+  function renderSecurity() {
+    const container =
+      byId(
+        "security-content"
+      );
+
+    if (!container) return;
+
+    container.innerHTML = `
+      <div class="empty-panel">
+        <strong>
+          Executive security boundary active.
+        </strong>
+
+        <p>
+          Tenant authentication is not treated as
+          Executive authentication. Privileged controls
+          remain protected by backend authorization.
+        </p>
+      </div>
+    `;
+  }
+
+  /* ================================================================
+   * EVENT HANDLERS
+   * ================================================================ */
+
+  function bindEvents() {
+    const saveKey =
+      byId(
+        "saveKeyBtn"
+      );
+
+    const keyInput =
+      byId(
+        "adminKeyInput"
+      );
+
+    if (saveKey) {
+      saveKey.addEventListener(
+        "click",
+        async () => {
+          const key =
+            keyInput
+              ? keyInput.value
+              : "";
+
+          await verifyAdminKey(
+            key
+          );
+        }
+      );
+    }
+
+    if (keyInput) {
+      keyInput.addEventListener(
+        "keydown",
+        event => {
+          if (
+            event.key ===
+            "Enter"
+          ) {
+            event.preventDefault();
+
+            verifyAdminKey(
+              keyInput.value
+            );
+          }
+        }
+      );
+    }
+
+    const logout =
+      byId(
+        "logout-btn"
+      );
+
+    if (logout) {
+      logout.addEventListener(
+        "click",
+        logoutExecutive
+      );
+    }
+
+    const refresh =
+      byId(
+        "refresh-btn"
+      );
+
+    if (refresh) {
+      refresh.addEventListener(
+        "click",
+        async () => {
+          if (
+            !state.authenticated
+          ) {
+            showToast(
+              "Authenticate first.",
+              "warning"
+            );
+
+            return;
+          }
+
+          await refreshAll();
+
+          showToast(
+            "Dashboard refreshed.",
+            "success"
+          );
+        }
+      );
+    }
+
+    all(
+      ".nav-item[data-section]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          () => {
+            showSection(
+              button.dataset.section
+            );
+          }
+        );
+      }
+    );
+
+    all(
+      "[data-section-target]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          () => {
+            showSection(
+              button.dataset.sectionTarget
+            );
+          }
+        );
+      }
+    );
+
+    all(
+      "[data-action]"
+    ).forEach(
+      button => {
+        button.addEventListener(
+          "click",
+          async event => {
+            const action =
+              event.currentTarget
+                .dataset.action;
+
+            if (
+              action ===
+              "refresh"
+            ) {
+              await refreshAll();
+
+              return;
+            }
+
+            if (
+              action ===
+              "clear-logs"
+            ) {
+              state.events = [];
+
+              renderEvents();
+              renderAudit();
+
+              showToast(
+                "Audit view cleared.",
+                "info"
+              );
+
+              return;
+            }
+
+            await runExecutiveAction(
+              action
+            );
+          }
+        );
+      }
+    );
+
+    document.addEventListener(
+      "change",
+      event => {
+        const target =
+          event.target;
+
+        if (
+          target &&
+          target.matches(
+            "[data-os-toggle]"
+          )
+        ) {
+          toggleOS(
+            target
+          );
+        }
+      }
+    );
+
+    const exportButton =
+      byId(
+        "btnExportPermits"
+      );
+
+    if (exportButton) {
+      exportButton.addEventListener(
+        "click",
+        exportPermitsCSV
+      );
+    }
+
+    const openSidebar =
+      byId(
+        "open-sidebar"
+      );
+
+    if (openSidebar) {
+      openSidebar.addEventListener(
+        "click",
+        openMobileSidebar
+      );
+    }
+
+    const closeSidebar =
+      byId(
+        "close-sidebar"
+      );
+
+    if (closeSidebar) {
+      closeSidebar.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+    }
+
+    const overlay =
+      byId(
+        "sidebar-overlay"
+      );
+
+    if (overlay) {
+      overlay.addEventListener(
+        "click",
+        closeMobileSidebar
+      );
+    }
+  }
+
+  /* ================================================================
+   * INITIALISE UI
+   * ================================================================ */
+
+  function initialiseUI() {
+    setAuthUI(
+      state.authenticated
+    );
+
+    setGlobalStatus(
+      true,
+      "Checking system..."
+    );
+
+    renderModules();
+    renderPermits();
+    renderLeads();
+    renderEvents();
+    renderAudit();
+    renderIntegrations();
+    renderForecast();
+    renderSettings();
+    renderAnalytics();
+    renderAcquisition();
+    renderSecurity();
+
+    /*
+     * Generic OS shells.
+     */
+    [
+      "executive",
+      "revenue",
+      "sales",
+      "marketing",
+      "operations",
+      "finance",
+      "human-capital",
+      "projects",
+      "knowledge",
+      "legal",
+      "supply",
+      "customer-success"
+    ].forEach(
+      renderGenericOS
+    );
+  }
+
+  /* ================================================================
+   * STARTUP
+   * ================================================================ */
+
+  async function initialise() {
+    try {
+      loadAdminKey();
+
+      initialiseUI();
+
+      bindEvents();
+
+      showSection(
+        "dashboard"
+      );
+
+      /*
+       * First try the existing authenticated session.
+       */
+      const sessionValid =
+        await checkExistingSession();
+
+      /*
+       * If no active session exists, attempt the stored
+       * Executive admin key.
+       */
+      if (
+        !sessionValid &&
+        state.adminKey
+      ) {
+        await verifyAdminKey(
+          state.adminKey
+        );
+      }
+
+      if (
+        state.authenticated
+      ) {
+        await refreshAll();
+
+        /*
+         * Keep dashboard telemetry current.
+         */
+        clearInterval(
+          state.refreshTimer
+        );
+
+        state.refreshTimer =
+          setInterval(
+            () => {
+              if (
+                state.authenticated &&
+                !state.refreshInFlight
+              ) {
+                refreshAll();
+              }
+            },
+            30000
+          );
+      } else {
+        setGlobalStatus(
+          true,
+          "Admin key required"
+        );
+
+        actionMessage(
+          "Enter the Executive ADMIN_KEY to unlock controls.",
+          "warning"
+        );
+      }
+
+    } catch (error) {
+      console.error(
+        "[GRIDV21] Dashboard startup failed:",
+        error
+      );
+
+      setGlobalStatus(
+        false,
+        "Dashboard error"
+      );
+
+      actionMessage(
+        error.message ||
+          "Dashboard initialisation failed.",
+        "error"
+      );
+    }
+  }
+
+  /* ================================================================
+   * GLOBAL ERROR HANDLING
+   * ================================================================ */
+
+  window.addEventListener(
+    "error",
+    event => {
+      console.error(
+        "[GRIDV21] JavaScript error:",
+        event.error ||
+          event.message
+      );
+    }
+  );
+
+  window.addEventListener(
+    "unhandledrejection",
+    event => {
+      console.error(
+        "[GRIDV21] Unhandled promise rejection:",
+        event.reason
+      );
+    }
+  );
+
+  /* ================================================================
+   * PUBLIC DEBUG HANDLE
+   * ================================================================ */
+
+  window.GRIDV21Dashboard =
+    Object.freeze({
+      version:
+        VERSION,
+
+      refresh:
+        refreshAll,
+
+      authenticate:
+        verifyAdminKey,
+
+      logout:
+        logoutExecutive,
+
+      state
+    });
+
+  /* ================================================================
+   * RUN
+   * ================================================================ */
+
+  if (
+    document.readyState ===
+    "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      initialise,
+      {
+        once: true
+      }
+    );
+  } else {
+    initialise();
+  }
+
+})();
