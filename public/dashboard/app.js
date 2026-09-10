@@ -1799,3 +1799,507 @@
       return null;
     }
     }
+/* ================================================================
+   * API ERROR
+   * ================================================================ */
+
+  class APIError extends Error {
+    constructor(message, status = 0, payload = null) {
+      super(message || "Request failed");
+
+      this.name = "APIError";
+      this.status = status;
+      this.payload = payload;
+    }
+  }
+
+  /* ================================================================
+   * API REQUEST
+   * ================================================================ */
+
+  async function apiFetch(url, options = {}) {
+    const headers = {
+      Accept: "application/json"
+    };
+
+    if (options.body !== undefined) {
+      headers["Content-Type"] =
+        "application/json";
+    }
+
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
+
+    /*
+     * Executive requests may carry the admin key.
+     * Tenant sessions are handled by the backend session cookie.
+     */
+    if (state.adminKey) {
+      headers["x-admin-key"] =
+        state.adminKey;
+    }
+
+    let response;
+
+    try {
+      response = await fetch(url, {
+        ...options,
+        credentials: "include",
+        cache: "no-store",
+        headers
+      });
+    } catch (error) {
+      throw new APIError(
+        "Unable to connect to GRIDV21 server.",
+        0,
+        null
+      );
+    }
+
+    const contentType =
+      response.headers.get("content-type") || "";
+
+    let payload = {};
+
+    if (
+      contentType.includes(
+        "application/json"
+      )
+    ) {
+      payload =
+        await response.json().catch(
+          () => ({})
+        );
+    } else {
+      const text =
+        await response.text().catch(
+          () => ""
+        );
+
+      payload = {
+        message: text
+      };
+    }
+
+    if (!response.ok) {
+      throw new APIError(
+        payload.error ||
+          payload.message ||
+          `Request failed (${response.status})`,
+        response.status,
+        payload
+      );
+    }
+
+    return payload;
+  }
+
+  /* ================================================================
+   * ADMIN KEY STORAGE
+   * ================================================================ */
+
+  function loadAdminKey() {
+    try {
+      state.adminKey =
+        localStorage.getItem(
+          ADMIN_STORAGE_KEY
+        ) || "";
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Could not load admin key.",
+        error
+      );
+
+      state.adminKey = "";
+    }
+
+    const input =
+      byId("adminKeyInput");
+
+    if (
+      input &&
+      state.adminKey
+    ) {
+      input.value =
+        state.adminKey;
+    }
+  }
+
+  function clearAdminKeyStorage() {
+    try {
+      localStorage.removeItem(
+        ADMIN_STORAGE_KEY
+      );
+    } catch (_) {}
+
+    state.adminKey = "";
+  }
+
+  /* ================================================================
+   * EXECUTIVE AUTH UI
+   * ================================================================ */
+
+  function setAuthUI(authenticated) {
+    const input =
+      byId("adminKeyInput");
+
+    const save =
+      byId("saveKeyBtn");
+
+    const status =
+      byId("keyStatus");
+
+    if (input) {
+      input.disabled =
+        Boolean(authenticated);
+    }
+
+    if (save) {
+      save.disabled = false;
+    }
+
+    if (status) {
+      status.textContent =
+        authenticated
+          ? "Owner authenticated"
+          : "Admin key required";
+    }
+
+    setControlsEnabled(
+      authenticated
+    );
+  }
+
+  function setControlsEnabled(enabled) {
+    const privilegedActions = [
+      "scan-start",
+      "scan-stop",
+      "brain-pause",
+      "brain-resume",
+      "emergency-stop"
+    ];
+
+    all("[data-action]").forEach(
+      button => {
+        const action =
+          button.dataset.action;
+
+        if (
+          privilegedActions.includes(
+            action
+          )
+        ) {
+          button.disabled =
+            !enabled;
+        }
+      }
+    );
+
+    all("[data-os-toggle]").forEach(
+      input => {
+        input.disabled =
+          !enabled;
+      }
+    );
+
+    all("[data-admin-action]").forEach(
+      element => {
+        element.disabled =
+          !enabled;
+      }
+    );
+  }
+
+  /* ================================================================
+   * AUTH ERROR
+   * ================================================================ */
+
+  function showAuthError(message) {
+    const status =
+      byId("keyStatus");
+
+    if (status) {
+      status.textContent =
+        String(
+          message ||
+          "Admin authentication failed."
+        );
+    }
+
+    actionMessage(
+      message ||
+        "Admin authentication failed.",
+      "error"
+    );
+
+    showToast(
+      message ||
+        "Admin authentication failed.",
+      "error"
+    );
+  }
+
+  /* ================================================================
+   * EXECUTIVE AUTHENTICATION
+   * ================================================================ */
+
+  async function verifyAdminKey(key) {
+    const cleanKey =
+      String(key ?? "").trim();
+
+    if (!cleanKey) {
+      showAuthError(
+        "Enter the Executive admin key."
+      );
+
+      return false;
+    }
+
+    try {
+      const payload =
+        await apiFetch(
+          API.authVerify,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              admin_key: cleanKey
+            })
+          }
+        );
+
+      /*
+       * Executive access is deliberately strict.
+       * A successful tenant session must never unlock
+       * Executive dashboard controls.
+       */
+      const authenticated =
+        payload &&
+        payload.ok === true &&
+        payload.authenticated === true &&
+        payload.authType === "admin_key";
+
+      if (!authenticated) {
+        clearAdminKeyStorage();
+
+        setAuthUI(false);
+
+        showAuthError(
+          payload?.message ||
+            payload?.error ||
+            "Invalid Executive admin key."
+        );
+
+        return false;
+      }
+
+      state.adminKey =
+        cleanKey;
+
+      try {
+        localStorage.setItem(
+          ADMIN_STORAGE_KEY,
+          cleanKey
+        );
+      } catch (error) {
+        console.warn(
+          "[GRIDV21] Admin key could not be saved.",
+          error
+        );
+      }
+
+      state.authenticated = true;
+      state.authType =
+        "admin_key";
+
+      setAuthUI(true);
+
+      setGlobalStatus(
+        true,
+        "Executive authenticated"
+      );
+
+      actionMessage(
+        "Executive access verified.",
+        "success"
+      );
+
+      showToast(
+        "Executive access verified.",
+        "success"
+      );
+
+      return true;
+    } catch (error) {
+      clearAdminKeyStorage();
+
+      setAuthUI(false);
+
+      if (error instanceof APIError) {
+        if (
+          error.status === 401 ||
+          error.status === 403
+        ) {
+          showAuthError(
+            "Invalid or expired Executive admin key."
+          );
+        } else {
+          showAuthError(
+            error.message
+          );
+        }
+      } else {
+        showAuthError(
+          "Executive authentication failed."
+        );
+      }
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * SESSION CHECK
+   * ================================================================ */
+
+  async function checkExistingSession() {
+    try {
+      const payload =
+        await apiFetch(
+          API.authMe,
+          {
+            method: "GET"
+          }
+        );
+
+      if (
+        payload &&
+        payload.authenticated === true
+      ) {
+        const authType =
+          payload.authType ||
+          payload.auth_type ||
+          "";
+
+        /*
+         * Only admin_key authentication grants
+         * Executive dashboard privileges.
+         */
+        if (
+          authType === "admin_key"
+        ) {
+          state.authenticated =
+            true;
+
+          state.authType =
+            "admin_key";
+
+          setAuthUI(true);
+
+          setGlobalStatus(
+            true,
+            "Executive authenticated"
+          );
+
+          return true;
+        }
+
+        /*
+         * Tenant authentication may exist,
+         * but it must remain isolated from Executive controls.
+         */
+        if (
+          authType === "tenant"
+        ) {
+          state.authenticated =
+            false;
+
+          state.authType =
+            "tenant";
+
+          setAuthUI(false);
+
+          setGlobalStatus(
+            true,
+            "Tenant session detected"
+          );
+
+          return false;
+        }
+      }
+
+      state.authenticated =
+        false;
+
+      state.authType =
+        "";
+
+      setAuthUI(false);
+
+      return false;
+    } catch (error) {
+      /*
+       * A failed session check must not crash the
+       * dashboard. The Executive key can still be entered.
+       */
+      state.authenticated =
+        false;
+
+      state.authType =
+        "";
+
+      setAuthUI(false);
+
+      setGlobalStatus(
+        false,
+        "Server unavailable"
+      );
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * EXECUTIVE LOGOUT
+   * ================================================================ */
+
+  async function logoutExecutive() {
+    try {
+      await apiFetch(
+        API.authLogout,
+        {
+          method: "POST"
+        }
+      );
+    } catch (error) {
+      console.warn(
+        "[GRIDV21] Executive logout request failed.",
+        error
+      );
+    }
+
+    clearAdminKeyStorage();
+
+    state.authenticated =
+      false;
+
+    state.authType =
+      "";
+
+    setAuthUI(false);
+
+    setGlobalStatus(
+      true,
+      "Executive signed out"
+    );
+
+    actionMessage(
+      "Executive access signed out.",
+      "success"
+    );
+
+    showToast(
+      "Executive access signed out.",
+      "success"
+    );
+        }
