@@ -1159,3 +1159,643 @@
     }
 
     }
+  all("[data-os-toggle]").forEach(
+      input => {
+        input.disabled =
+          !enabled;
+      }
+    );
+
+    all("[data-admin-action]").forEach(
+      element => {
+        element.disabled =
+          !enabled;
+      }
+    );
+  }
+
+  function showAuthError(message) {
+    const status = byId("keyStatus");
+
+    if (status) {
+      status.textContent =
+        String(
+          message ||
+          "Admin authentication failed."
+        );
+    }
+
+    actionMessage(
+      message ||
+      "Admin authentication failed.",
+      "error"
+    );
+
+    showToast(
+      message ||
+      "Admin authentication failed.",
+      "error"
+    );
+  }
+
+  /* ================================================================
+   * EXECUTIVE AUTHENTICATION
+   * ================================================================ */
+
+  async function verifyAdminKey(key) {
+    const cleanKey =
+      String(key ?? "").trim();
+
+    if (!cleanKey) {
+      showAuthError(
+        "Enter the Executive admin key."
+      );
+
+      return false;
+    }
+
+    try {
+      const payload =
+        await apiFetch(
+          API.authVerify,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              admin_key: cleanKey
+            })
+          }
+        );
+
+      /*
+       * Executive access is deliberately strict.
+       * A successful tenant session must never unlock
+       * Executive dashboard controls.
+       */
+      const authenticated =
+        payload &&
+        payload.ok === true &&
+        payload.authenticated === true &&
+        payload.authType === "admin_key";
+
+      if (!authenticated) {
+        clearAdminKeyStorage();
+
+        setAuthUI(false);
+
+        showAuthError(
+          payload?.message ||
+          payload?.error ||
+          "Invalid Executive admin key."
+        );
+
+        return false;
+      }
+
+      state.adminKey = cleanKey;
+
+      try {
+        localStorage.setItem(
+          ADMIN_STORAGE_KEY,
+          cleanKey
+        );
+      } catch (error) {
+        console.warn(
+          "[GRIDV21] Admin key could not be saved.",
+          error
+        );
+      }
+
+      state.authenticated = true;
+      state.authType = "admin_key";
+
+      setAuthUI(true);
+
+      setGlobalStatus(
+        true,
+        "Executive authenticated"
+      );
+
+      actionMessage(
+        "Executive access verified.",
+        "success"
+      );
+
+      showToast(
+        "Executive access verified.",
+        "success"
+      );
+
+      return true;
+    } catch (error) {
+      clearAdminKeyStorage();
+
+      setAuthUI(false);
+
+      if (error instanceof APIError) {
+        if (
+          error.status === 401 ||
+          error.status === 403
+        ) {
+          showAuthError(
+            "Invalid or expired Executive admin key."
+          );
+        } else {
+          showAuthError(
+            error.message
+          );
+        }
+      } else {
+        showAuthError(
+          "Executive authentication failed."
+        );
+      }
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * SESSION CHECK
+   * ================================================================ */
+
+  async function checkExistingSession() {
+    try {
+      const payload =
+        await apiFetch(
+          API.authMe,
+          {
+            method: "GET"
+          }
+        );
+
+      if (
+        payload &&
+        payload.authenticated === true
+      ) {
+        const authType =
+          payload.authType ||
+          payload.auth_type ||
+          "";
+
+        /*
+         * Only admin_key authentication grants
+         * Executive dashboard privileges.
+         */
+        if (
+          authType === "admin_key"
+        ) {
+          state.authenticated = true;
+          state.authType = "admin_key";
+
+          setAuthUI(true);
+
+          setGlobalStatus(
+            true,
+            "Executive authenticated"
+          );
+
+          return true;
+        }
+
+        /*
+         * Tenant authentication may exist,
+         * but it must remain isolated from Executive controls.
+         */
+        if (
+          authType === "tenant"
+        ) {
+          state.authenticated = false;
+          state.authType = "tenant";
+
+          setAuthUI(false);
+
+          setGlobalStatus(
+            true,
+            "Tenant session detected"
+          );
+
+          return false;
+        }
+      }
+
+      state.authenticated = false;
+      state.authType = "";
+
+      setAuthUI(false);
+
+      return false;
+    } catch (error) {
+      /*
+       * A failed session check must not crash the
+       * dashboard. The Executive key can still be entered.
+       */
+      state.authenticated = false;
+      state.authType = "";
+
+      setAuthUI(false);
+
+      setGlobalStatus(
+        false,
+        "Server unavailable"
+      );
+
+      return false;
+    }
+  }
+
+  /* ================================================================
+   * EXECUTIVE LOGOUT
+   * ================================================================ */
+
+  async function logoutExecutive() {
+    try {
+      await apiFetch(
+        API.authLogout,
+        {
+          method: "POST"
+        }
+      );
+    } catch (error) {
+      /*
+       * Local Executive credentials are cleared even
+       * when the server logout endpoint is unavailable.
+       */
+      console.warn(
+        "[GRIDV21] Executive logout request failed.",
+        error
+      );
+    }
+
+    clearAdminKeyStorage();
+
+    state.authenticated = false;
+    state.authType = "";
+
+    setAuthUI(false);
+
+    setGlobalStatus(
+      true,
+      "Executive signed out"
+    );
+
+    actionMessage(
+      "Executive access signed out.",
+      "success"
+    );
+
+    showToast(
+      "Executive signed out.",
+      "success"
+    );
+  }
+
+  /* ================================================================
+   * GENERAL DATA HELPERS
+   * ================================================================ */
+
+  function firstDefined(...values) {
+    for (const value of values) {
+      if (
+        value !== undefined &&
+        value !== null &&
+        value !== ""
+      ) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  function arrayFromPayload(
+    payload,
+    ...keys
+  ) {
+    if (Array.isArray(payload)) {
+      return payload;
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return [];
+    }
+
+    for (const key of keys) {
+      if (Array.isArray(payload[key])) {
+        return payload[key];
+      }
+    }
+
+    return [];
+  }
+
+  function objectFromPayload(payload) {
+    if (
+      payload &&
+      typeof payload === "object" &&
+      !Array.isArray(payload)
+    ) {
+      return payload;
+    }
+
+    return {};
+  }
+
+  function setText(id, value) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.textContent =
+      value === undefined ||
+      value === null ||
+      value === ""
+        ? "—"
+        : String(value);
+  }
+
+  function setHTML(id, value) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.innerHTML =
+      value === undefined ||
+      value === null
+        ? ""
+        : String(value);
+  }
+
+  function setValue(id, value) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.value =
+      value === undefined ||
+      value === null
+        ? ""
+        : String(value);
+  }
+
+  function setVisible(id, visible) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.hidden = !Boolean(visible);
+  }
+
+  function setDisabled(id, disabled) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    element.disabled =
+      Boolean(disabled);
+  }
+
+  function setProgress(id, value) {
+    const element = byId(id);
+
+    if (!element) {
+      return;
+    }
+
+    const number =
+      Math.max(
+        0,
+        Math.min(
+          100,
+          numeric(value, 0)
+        )
+      );
+
+    element.style.width =
+      `${number}%`;
+
+    element.setAttribute(
+      "aria-valuenow",
+      String(number)
+    );
+  }
+
+  /* ================================================================
+   * EVENT FEED
+   * ================================================================ */
+
+  function addEvent(
+    message,
+    type = "info"
+  ) {
+    const container =
+      byId("events");
+
+    if (!container) {
+      return;
+    }
+
+    const item =
+      document.createElement("div");
+
+    item.className =
+      `event event-${type}`;
+
+    item.textContent =
+      String(message ?? "");
+
+    container.prepend(item);
+
+    /*
+     * Keep the live event feed bounded so repeated
+     * refreshes cannot grow the DOM indefinitely.
+     */
+    const children =
+      Array.from(
+        container.children
+      );
+
+    children
+      .slice(15)
+      .forEach(child => {
+        child.remove();
+      });
+  }
+
+  /* ================================================================
+   * AUTHENTICATION UI EVENTS
+   * ================================================================ */
+
+  async function handleSaveAdminKey() {
+    const input =
+      byId("adminKeyInput");
+
+    if (!input) {
+      showToast(
+        "Executive key input was not found.",
+        "error"
+      );
+
+      return;
+    }
+
+    const key =
+      String(
+        input.value ?? ""
+      ).trim();
+
+    if (!key) {
+      showAuthError(
+        "Enter the Executive admin key."
+      );
+
+      input.focus();
+
+      return;
+    }
+
+    const button =
+      byId("saveKeyBtn");
+
+    if (button) {
+      button.disabled = true;
+    }
+
+    actionMessage(
+      "Verifying Executive access...",
+      "info"
+    );
+
+    try {
+      await verifyAdminKey(key);
+    } finally {
+      if (button) {
+        button.disabled = false;
+      }
+    }
+  }
+
+  async function handleAdminKeyKeydown(event) {
+    if (
+      event.key === "Enter"
+    ) {
+      event.preventDefault();
+
+      await handleSaveAdminKey();
+    }
+  }
+
+  /* ================================================================
+   * EXECUTIVE ACTION GUARD
+   * ================================================================ */
+
+  function requireExecutiveAccess() {
+    if (
+      state.authenticated === true &&
+      state.authType === "admin_key"
+    ) {
+      return true;
+    }
+
+    showAuthError(
+      "Executive authentication is required."
+    );
+
+    return false;
+  }
+
+  async function runExecutiveAction(
+    action,
+    options = {}
+  ) {
+    if (!requireExecutiveAccess()) {
+      return null;
+    }
+
+    const {
+      method = "POST",
+      body,
+      successMessage,
+      loadingMessage,
+      errorMessage
+    } = options;
+
+    if (loadingMessage) {
+      actionMessage(
+        loadingMessage,
+        "info"
+      );
+    }
+
+    try {
+      const payload =
+        await apiFetch(
+          action,
+          {
+            method,
+            ...(body !== undefined
+              ? {
+                  body:
+                    JSON.stringify(body)
+                }
+              : {})
+          }
+        );
+
+      if (successMessage) {
+        actionMessage(
+          successMessage,
+          "success"
+        );
+
+        showToast(
+          successMessage,
+          "success"
+        );
+      }
+
+      return payload;
+    } catch (error) {
+      const message =
+        error instanceof APIError
+          ? error.message
+          : (
+              errorMessage ||
+              "Action failed."
+            );
+
+      actionMessage(
+        message,
+        "error"
+      );
+
+      showToast(
+        message,
+        "error"
+      );
+
+      if (
+        error instanceof APIError &&
+        (
+          error.status === 401 ||
+          error.status === 403
+        )
+      ) {
+        state.authenticated = false;
+        state.authType = "";
+
+        setAuthUI(false);
+      }
+
+      return null;
+    }
+    }
